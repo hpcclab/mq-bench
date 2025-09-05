@@ -1,0 +1,1 @@
+// Queryable role stub

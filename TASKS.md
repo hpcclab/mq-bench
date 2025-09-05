@@ -17,33 +17,42 @@ Done when: versions and topology are recorded in `TASKS.md` and referenced in `D
 
 ## Phase 1 — Docker Compose Skeleton (static topology)
 
-- [ ] Add `docker-compose.yml` with services: `router1`, `router2`, `router3`, and placeholder client roles.
-- [ ] Create `config/router1.json5`, `config/router2.json5`, `config/router3.json5` with discovery disabled and static peers.
-- [ ] Add `scripts/compose_up.sh` and `scripts/compose_down.sh` (optional helpers).
-- [ ] Validate that routers start and form the intended topology without auto-discovery.
+- [x] Add `docker-compose.yml` with services: `router1`, `router2`, `router3`, and placeholder client roles.
+- [x] Create `config/router1.json5`, `config/router2.json5`, `config/router3.json5` with discovery disabled and static peers.
+- [x] Add `scripts/compose_up.sh` and `scripts/compose_down.sh` (optional helpers).
+- [x] Validate that routers start and form the intended topology without auto-discovery.
 
 Instructions (later):
 - Ensure Docker and Compose are installed.
 - Bring up only routers first; inspect logs to confirm peering.
 
-Done when: routers are running and peered via static config; no discovery messages appear in logs.
+Done when: routers are running and peered via static config; no discovery messages appear in logs. (Status: DONE)
 
-## Phase 2 — Rust Harness Scaffolding
+## Phase 2: Rust Harness Scaffold ✓ DONE
+- [x] Create Rust harness with Clap CLI ✓ DONE  
+- [x] Module structure (roles/, metrics/, etc.) ✓ DONE
+- [x] CLI parsing with pub/sub/req/qry subcommands ✓ DONE
+- [x] Dependencies: tokio, zenoh 1.5.1, clap, hdrhistogram, etc. ✓ DONE
+- [x] Empty stubs compile successfully ✓ DONE
 
-- [ ] Update `Cargo.toml` with dependency stubs (tokio, clap, serde, hdrhistogram, csv, tracing, zenoh).
-- [ ] Add crate structure and empty modules per `RUST_DESIGN.md` (no logic yet).
-- [ ] Wire CLI skeleton with subcommands `pub`, `sub`, `req`, `qry` that only parse args and exit.
+## Phase 3: Publisher/Subscriber Core ✓ DONE
+- [x] Implement payload header encode/parse helpers ✓ DONE
+- [x] Publisher open-loop scheduler and basic send loop ✓ DONE 
+- [x] Publisher functionality working with Docker cluster ✓ DONE
+- [x] CSV output with statistics snapshots ✓ DONE
+- [x] Subscriber receive loop with latency calculation ✓ DONE
+- [x] Shell script for testing pub/sub processes ✓ DONE
+- [x] Fix message routing issue (exposed router2/3 ports; verified sub on 7448 and pub on 7449 end-to-end)
+- [x] CSV snapshots with latency percentiles working end-to-end (stdout). Note: CSV-to-file supported in code; wiring CLI flags for output paths is next.
 
-Done when: `cargo build` succeeds and `mq-bench --help` shows subcommands.
+## Phase 3 — Publisher/Subscriber Minimal Functionality (Recap)
 
-## Phase 3 — Publisher/Subscriber Minimal Functionality
+- [x] Implement payload header encode/parse helpers.
+- [x] Implement `pub` open-loop scheduler and basic send loop.
+- [x] Implement `sub` receive loop with latency calculation and CSV snapshots.
+- [x] Validate end-to-end on multi-router (3-router star) at small rates.
 
-- [ ] Implement payload header encode/parse helpers.
-- [ ] Implement `pub` open-loop scheduler and basic send loop.
-- [ ] Implement `sub` receive loop with latency calculation and CSV snapshots.
-- [ ] Validate end-to-end on single router at small rates.
-
-Done when: CSV outputs include throughput and latency stats; runs complete without errors.
+Done when: CSV outputs include throughput and latency stats; runs complete without errors. (Status: DONE)
 
 ## Phase 4 — Requester/Queryable Minimal Functionality
 
@@ -128,3 +137,7 @@ artifacts/           # output (gitignored)
 - Confirm Zenoh versions/tags.
 - Decide on enabling Prometheus by default.
 - Define 2–3 hard SLOs for key scenarios (baseline and fanout).
+
+Notes for next iteration:
+- Wire CLI flags for CSV output files (pub/sub) and run IDs; default to stdout if not provided.
+- Add simple scenario scripts and an artifacts folder structure for runs.

@@ -1,0 +1,47 @@
+networks:
+  zenoh-net:
+    driver: bridge
+
+services:
+  router1:
+    image: eclipse/zenoh:1.5.1
+    container_name: router1
+    command: ["-c", "/etc/zenoh/router1.json5"]
+    ports:
+      - "7447:7447" # TCP listener exposed to host
+    volumes:
+      - ./config/router1.json5:/etc/zenoh/router1.json5:ro
+    environment:
+      RUST_LOG: info
+    networks:
+      - zenoh-net
+
+  router2:
+    image: eclipse/zenoh:1.5.1
+    container_name: router2
+    command: ["-c", "/etc/zenoh/router2.json5"]
+    ports:
+      - "7448:7447" # expose TCP listener to host for router2
+    volumes:
+      - ./config/router2.json5:/etc/zenoh/router2.json5:ro
+    environment:
+      RUST_LOG: info
+    networks:
+      - zenoh-net
+    depends_on:
+      - router1
+
+  router3:
+    image: eclipse/zenoh:1.5.1
+    container_name: router3
+    command: ["-c", "/etc/zenoh/router3.json5"]
+    ports:
+      - "7449:7447" # expose TCP listener to host for router3
+    volumes:
+      - ./config/router3.json5:/etc/zenoh/router3.json5:ro
+    environment:
+      RUST_LOG: info
+    networks:
+      - zenoh-net
+    depends_on:
+      - router1
