@@ -1,6 +1,6 @@
 use crate::metrics::stats::StatsSnapshot;
 use anyhow::Result;
-use tokio::fs::File;
+use tokio::fs::{self, File};
 use tokio::io::{AsyncWriteExt, BufWriter};
 
 pub enum OutputWriter {
@@ -10,6 +10,12 @@ pub enum OutputWriter {
 
 impl OutputWriter {
     pub async fn new_csv(path: String) -> Result<Self> {
+        // Ensure parent directory exists
+        if let Some(parent) = std::path::Path::new(&path).parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).await.ok();
+            }
+        }
         let file = File::create(&path).await?;
         let mut writer = BufWriter::new(file);
         

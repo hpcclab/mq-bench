@@ -24,10 +24,6 @@ Docker/routers
 Developer workflows
 - Build binary: `cargo build --release` (or debug for quick runs).
 - Bring up routers only: `scripts/compose_up.sh`; tear down: `scripts/compose_down.sh`.
-- Local tests (examples in repo root):
-  - `test_pubsub.sh`: single-router pub/sub smoke (uses 7447)
-  - `debug_test.sh`: short debug run with logs to `logs/`
-  - `cross_router_test.sh`: intended for router2↔router3 via host ports; verify the ports match README (7448/7449).
 
 CLI patterns (current)
 - Publisher: `mq-bench pub --endpoint tcp/127.0.0.1:7449 --topic-prefix bench/topic --payload 1024 --rate 1000 --duration 60`

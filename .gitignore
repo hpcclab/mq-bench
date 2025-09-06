@@ -3,3 +3,10 @@
 # Ignore logs directory contents
 logs/*
 !logs/.gitignore
+
+# Local run artifacts
+artifacts/
+
+# OS/editor junk
+**/.DS_Store
+**/*.swp

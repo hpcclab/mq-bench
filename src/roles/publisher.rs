@@ -12,10 +12,13 @@ pub struct PublisherConfig {
     pub endpoint: String,
     pub key_expr: String,
     pub payload_size: usize,
-    pub rate: f64,
+    pub rate: Option<f64>,
     pub duration_secs: Option<u64>,
     pub output_file: Option<String>,
     pub snapshot_interval_secs: u64,
+    // Aggregation support
+    pub shared_stats: Option<Arc<Stats>>, // when set, use this shared collector
+    pub disable_internal_snapshot: bool,  // when true, do not launch internal snapshot logger
 }
 
 pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
@@ -23,7 +26,7 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     println!("  Endpoint: {}", config.endpoint);
     println!("  Key: {}", config.key_expr);
     println!("  Payload size: {} bytes", config.payload_size);
-    println!("  Rate: {:.2} msg/s", config.rate);
+    if let Some(r) = config.rate { println!("  Rate: {:.2} msg/s", r); } else { println!("  Rate: unlimited (no delay)"); }
     if let Some(duration) = config.duration_secs {
         println!("  Duration: {} seconds", duration);
     } else {
@@ -43,34 +46,43 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     println!("Connected to Zenoh");
     
     // Initialize statistics and rate controller
-    let stats = Arc::new(Stats::new());
-    let mut rate_controller = RateController::new(config.rate);
+    let stats = if let Some(s) = &config.shared_stats { s.clone() } else { Arc::new(Stats::new()) };
+    let mut rate_controller = config.rate.map(|r| RateController::new(r));
     
-    // Setup output writer
+    // Setup output writer (only when not aggregated)
     let mut output = if let Some(ref path) = config.output_file {
-        OutputWriter::new_csv(path.clone()).await?
+        Some(OutputWriter::new_csv(path.clone()).await?)
+    } else if config.shared_stats.is_none() {
+        Some(OutputWriter::new_stdout())
     } else {
-        OutputWriter::new_stdout()
+        None
     };
     
     // Start snapshot task
-    let stats_clone = Arc::clone(&stats);
-    let snapshot_handle = tokio::spawn(async move {
-        let mut interval_timer = interval(Duration::from_secs(config.snapshot_interval_secs));
-        loop {
-            interval_timer.tick().await;
-            let snapshot = stats_clone.snapshot().await;
-            // Use sent-based rate for publisher (receiver-based throughput is always 0 here)
-            let elapsed = snapshot.total_duration.as_secs_f64();
-            let send_rate = if elapsed > 0.0 { snapshot.sent_count as f64 / elapsed } else { 0.0 };
-            println!(
-                "Publisher stats - Sent: {}, Errors: {}, Rate: {:.2} msg/s",
-                snapshot.sent_count,
-                snapshot.error_count,
-                send_rate
-            );
-        }
-    });
+    let snapshot_handle = if !config.disable_internal_snapshot {
+        let stats_clone = Arc::clone(&stats);
+        let interval_secs = config.snapshot_interval_secs;
+        Some(tokio::spawn(async move {
+            let mut interval_timer = interval(Duration::from_secs(interval_secs));
+            loop {
+                interval_timer.tick().await;
+                let snapshot = stats_clone.snapshot().await;
+                // Compute avg and interval send rates
+                let elapsed = snapshot.total_duration.as_secs_f64();
+                let avg_send_rate = if elapsed > 0.0 { snapshot.sent_count as f64 / elapsed } else { 0.0 };
+                let inst_send_rate = if snapshot.interval_duration.as_secs_f64() > 0.0 {
+                    snapshot.interval_sent_count as f64 / snapshot.interval_duration.as_secs_f64()
+                } else { 0.0 };
+                println!(
+                    "Publisher stats - Sent: {}, Errors: {}, Rate(avg): {:.2} msg/s, Rate(inst): {:.2} msg/s",
+                    snapshot.sent_count,
+                    snapshot.error_count,
+                    avg_send_rate,
+                    inst_send_rate
+                );
+            }
+        }))
+    } else { None };
     
     // Publishing loop
     let mut sequence = 0u64;
@@ -86,8 +98,10 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
                 }
             }
             
-            // Wait for next scheduled send
-            rate_controller.wait_for_next().await;
+            // Wait for next scheduled send (if paced)
+            if let Some(rc) = &mut rate_controller {
+                rc.wait_for_next().await;
+            }
             
             // Generate and send payload
             let payload = generate_payload(sequence, config.payload_size);
@@ -126,11 +140,13 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     println!("  Average rate: {:.2} msg/s", avg_send_rate);
     println!("  Total duration: {:.2}s", final_stats.total_duration.as_secs_f64());
     
-    // Write final snapshot to output
-    output.write_snapshot(&final_stats).await?;
+    // Write final snapshot to output (if not aggregated)
+    if let Some(ref mut out) = output {
+        out.write_snapshot(&final_stats).await?;
+    }
     
     // Clean up
-    snapshot_handle.abort();
+    if let Some(h) = snapshot_handle { h.abort(); }
     session.close().await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
     
     Ok(())

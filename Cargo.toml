@@ -16,3 +16,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
 zenoh = "1.5.1"
+futures = "0.3"
+flume = "0.11"
