@@ -54,6 +54,29 @@ Done when: routers are running and peered via static config; no discovery messag
 
 Done when: CSV outputs include throughput and latency stats; runs complete without errors. (Status: DONE)
 
+## Phase R — Transport Abstraction Refactor (for Baselines & Extensibility)
+
+- [ ] Introduce a transport abstraction trait to decouple roles from Zenoh specifics.
+  - Interface sketch: `connect(options)`, `publish(topic, bytes)`, `subscribe(expr) -> stream<bytes>`, `request(subject, bytes) -> response_stream`.
+  - Error model: unify into a small enum; map Zenoh/client-specific errors internally.
+- [ ] Extract shared wire/payload logic
+  - Keep `payload::MessageHeader` as the canonical header; make use optional per-transport.
+  - Add a small `wire` module with helpers for framing (for TCP baseline).
+- [ ] Adapter: implement `Transport` for Zenoh (feature `transport-zenoh`, default-on).
+- [ ] Refactor roles (`publisher`, `subscriber`, `requester`, `queryable`) to use the `Transport` trait.
+  - Preserve existing CLIs/metrics; only the transport binding changes under the hood.
+- [ ] CLI: add `--engine` enum with values: `zenoh` (default), `tcp`, `nats`, `redis`, `mqtt`, `grpc`.
+  - Add generic `--connect` (repeatable `KEY=VALUE`) to pass engine-specific options.
+  - Back-compat: `--endpoint` still works for `zenoh`; translate into `--connect`.
+- [ ] Features and deps
+  - Add Cargo features per engine to keep deps optional (e.g., `transport-nats`, `transport-redis`, ...).
+  - CI/build profiles compile only `zenoh` by default; others via `--features`.
+- [ ] Testing
+  - Add a mock transport to unit-test roles without a broker.
+  - Smoke test: run pub/sub and req/qry with `--engine zenoh` to ensure no regressions.
+
+Done when: the binary runs unchanged for Zenoh (`--engine zenoh` default), unit tests pass, and adding a new engine is limited to an adapter + minimal wiring.
+
 ## Phase 4 — Requester/Queryable Minimal Functionality ✓ PARTIAL DONE
 
 - [x] Implement `qry` to serve prefixes and reply with fixed-size payloads.
@@ -135,6 +158,42 @@ Success criteria:
 
 Done when: scripts can run with routers up and produce artifact folders for each run.
 
+## Phase 10 — Non‑Zenoh Baselines (Comparison Engines)
+
+Baseline engines to implement after the refactor above:
+
+- [ ] Raw TCP (reference ceiling)
+  - Client/server over `tokio::net::TcpStream` with simple length-prefixed frames.
+  - Pub/Sub emulation: prefix each frame with topic length + topic bytes + payload.
+  - Req/Rep: correlation id in header; echo server for baseline.
+- [ ] NATS
+  - Use `async-nats` crate; pub/sub and request/reply.
+  - CLI: `--connect url=nats://127.0.0.1:4222`.
+- [ ] Redis
+  - Use `redis` crate; Pub/Sub for topics; Req/Rep via LIST (RPUSH/BLPOP) or Redis Streams.
+  - CLI: `--connect url=redis://127.0.0.1:6379`.
+- [ ] MQTT (Mosquitto)
+  - Use `rumqttc`; QoS 0 for apples-to-apples throughput.
+  - CLI: `--connect host=127.0.0.1,port=1883`.
+- [ ] gRPC streaming
+  - Use `tonic` for bidi-stream (pub/sub-like) and unary (req/rep) baselines.
+
+Docker & orchestration:
+- [ ] Extend `docker-compose.yml` with services: `nats` (4222), `redis` (6379), `mosquitto` (1883).
+- [ ] Keep Zenoh routers unchanged; baselines run side-by-side on distinct ports.
+
+Harness & scripts:
+- [ ] Add `scripts/run_baselines.sh` to run the same workloads across engines using `--engine` and `--connect`.
+- [ ] Extend existing scenario scripts to accept `ENGINE` env var and pass through connect options.
+- [ ] Artifacts
+  - Common CSV schema across engines (throughput, latency percentiles, errors).
+  - Artifact layout mirrors existing runs under `artifacts/run_*/{engine}/...`.
+
+Validation & acceptance:
+- [ ] Each engine: local 1→1 pub/sub and req/qry runs complete without errors at small rates.
+- [ ] CSVs are comparable (same headers/units); sanity-check latencies vs TCP baseline.
+- [ ] Optional: add a short README section explaining how to bring up each baseline service and run.
+
 ## Phase 7 — Fault Injection
 
 - [ ] Add `scripts/faults.sh` to restart routers, churn clients.
@@ -188,6 +247,7 @@ artifacts/           # output (gitignored)
 - [x] Harness can run pub/sub and req/qry with CSV outputs.
 - [ ] Minimal scenario scripts produce artifacts consistently.
 - [ ] Fault injection does not crash the system; metrics capture degradation and recovery.
+- [ ] Transport abstraction in place; Zenoh + at least one non‑Zenoh engine runs the same scenarios.
 
 ## Open items
 
@@ -200,3 +260,4 @@ Notes for next iteration:
 - Add simple scenario scripts and an artifacts folder structure for runs. (baseline + 3-router scripts added; fanout/queries stubs)
 - Extend CSV schema for requester/queryable to include TTF, TTL, timeouts, and replies_per_query as separate columns.
 - Flesh out `run_fanout.sh` and `run_queries.sh` to orchestrate multi-client scenarios and archive artifacts per run.
+- Begin transport refactor (Phase R), then implement the first baseline (TCP) and add NATS/Redis/MQTT incrementally.
