@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use tokio::sync::Mutex;
 
 use super::{
     ConnectOptions, IncomingQuery, Payload, QueryResponder, QueryResponderInner,
@@ -17,7 +18,9 @@ pub struct ZenohTransport {
 
 pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
     let mut cfg = zenoh::config::Config::default();
-    cfg.insert_json5("mode", "\"client\"")
+    // Mode configurable via connect param: mode=client|peer (default: client)
+    let mode = opts.params.get("mode").cloned().unwrap_or_else(|| "client".to_string());
+    cfg.insert_json5("mode", &format!("\"{}\"", mode))
         .map_err(|e| TransportError::Connect(e.to_string()))?;
     if let Some(eps) = opts
         .params
@@ -33,10 +36,10 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         cfg.insert_json5("connect/endpoints", &list)
             .map_err(|e| TransportError::Connect(e.to_string()))?;
     }
-    cfg.insert_json5("scouting/multicast/enabled", "false")
-        .map_err(|e| TransportError::Connect(e.to_string()))?;
-    cfg.insert_json5("scouting/gossip/enabled", "false")
-        .map_err(|e| TransportError::Connect(e.to_string()))?;
+    // cfg.insert_json5("scouting/multicast/enabled", "false")
+    //     .map_err(|e| TransportError::Connect(e.to_string()))?;
+    // cfg.insert_json5("scouting/gossip/enabled", "false")
+    //     .map_err(|e| TransportError::Connect(e.to_string()))?;
 
     let session = zenoh::open(cfg)
         .await
@@ -53,22 +56,21 @@ impl Transport for ZenohTransport {
     ) -> Result<Box<dyn super::Subscription>, TransportError> {
         // Use Zenoh's callback directly and forward to handler without extra channel when possible.
         let handler = Arc::new(handler);
-        let h2 = handler.clone();
         let sub = self
             .session
             .declare_subscriber(expr)
             .callback(move |sample| {
                 // Minimal work in callback
-                (h2)(TransportMessage {
+                (handler)(TransportMessage {
                     payload: Payload::from_zenoh(sample.payload().clone()),
                 });
             })
             .await
             .map_err(|e| TransportError::Subscribe(e.to_string()))?;
         // Box the concrete subscriber as Any to avoid depending on its concrete type
-        let boxed: Box<dyn std::any::Any + Send> = Box::new(sub);
+        let boxed = Box::new(sub);
         Ok(Box::new(ZenohSubscription {
-            inner: std::sync::Mutex::new(Some(boxed)),
+            inner: Mutex::new(Some(boxed)),
         }))
     }
 
@@ -120,7 +122,7 @@ impl Transport for ZenohTransport {
             .await
             .map_err(|e| TransportError::Subscribe(e.to_string()))?;
         let boxed: Box<dyn std::any::Any + Send> = Box::new(q);
-        Ok(Box::new(ZenohQueryRegistration { inner: std::sync::Mutex::new(Some(boxed)) }))
+    Ok(Box::new(ZenohQueryRegistration { inner: Mutex::new(Some(boxed)) }))
     }
 
     async fn shutdown(&self) -> Result<(), TransportError> {
@@ -159,26 +161,26 @@ impl QueryResponderInner for ZenohResponder {
 }
 
 struct ZenohSubscription {
-    inner: std::sync::Mutex<Option<Box<dyn std::any::Any + Send>>>,
+    inner: Mutex<Option<Box<dyn std::any::Any + Send>>>,
 }
 
 #[async_trait::async_trait]
 impl super::Subscription for ZenohSubscription {
     async fn shutdown(&self) -> Result<(), TransportError> {
         // Drop the inner subscriber to stop callbacks
-        let _ = self.inner.lock().unwrap().take();
+        let _ = self.inner.lock().await.take();
         Ok(())
     }
 }
 
 struct ZenohQueryRegistration {
-    inner: std::sync::Mutex<Option<Box<dyn std::any::Any + Send>>>,
+    inner: Mutex<Option<Box<dyn std::any::Any + Send>>>,
 }
 
 #[async_trait::async_trait]
 impl super::QueryRegistration for ZenohQueryRegistration {
     async fn shutdown(&self) -> Result<(), TransportError> {
-        let _ = self.inner.lock().unwrap().take();
+    let _ = self.inner.lock().await.take();
         Ok(())
     }
 }

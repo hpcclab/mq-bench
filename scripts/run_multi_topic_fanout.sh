@@ -22,19 +22,21 @@ def PAYLOAD   "${PAYLOAD:-1024}"
 def RATE      "${RATE:-10}"        # per logical publisher (msg/s). <=0 for max speed
 def DURATION  "${DURATION:-30}"
 def SNAPSHOT  "${SNAPSHOT:-5}"
+def SHARE_TRANSPORT "${SHARE_TRANSPORT:-false}"
 
 # Topology and keys
 def TOPIC_PREFIX "${TOPIC_PREFIX:-bench/mtopic}"
-def ENDPOINT_SUB "${ENDPOINT_SUB:-tcp/127.0.0.1:7448}"
-def ENDPOINT_PUB "${ENDPOINT_PUB:-tcp/127.0.0.1:7449}"
+def ENDPOINT_SUB "${ENDPOINT_SUB:-tcp/127.0.0.1:7447}"
+def ENDPOINT_PUB "${ENDPOINT_PUB:-tcp/127.0.0.1:7447}"
+def ZENOH_MODE "${ZENOH_MODE:-}"
 
 ART_DIR="artifacts/${RUN_ID}/fanout_multi_topic"
 BIN="./target/release/mq-bench"
 
 hdr "[run_multi_topic_fanout] ${RUN_ID}"
 echo "Dims: T=${TENANTS} R=${REGIONS} S=${SERVICES} K=${SHARDS} | pubs=${PUBLISHERS} mapping=${MAPPING}"
-echo "Load: payload=${PAYLOAD} rate_per_pub=${RATE} dur=${DURATION}s snapshot=${SNAPSHOT}s"
-echo "Paths: sub=${ENDPOINT_SUB} pub=${ENDPOINT_PUB} prefix=${TOPIC_PREFIX}"
+echo "Load: payload=${PAYLOAD} rate_per_pub=${RATE} dur=${DURATION}s snapshot=${SNAPSHOT}s share_transport=${SHARE_TRANSPORT}"
+echo "Paths: sub=${ENDPOINT_SUB} pub=${ENDPOINT_PUB} prefix=${TOPIC_PREFIX} mode=${ZENOH_MODE:-client}"
 mkdir -p "${ART_DIR}"
 
 if [[ ! -x "${BIN}" ]]; then
@@ -46,8 +48,12 @@ SUB_CSV="${ART_DIR}/sub_agg.csv"
 PUB_CSV="${ART_DIR}/mt_pub.csv"
 
 echo "Starting wildcard subscriber on ${ENDPOINT_SUB} → ${TOPIC_PREFIX}/** (aggregated CSV)"
+CONNECT_SUB_ARGS=(--endpoint "${ENDPOINT_SUB}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+  CONNECT_SUB_ARGS=(--connect "endpoint=${ENDPOINT_SUB}" --connect "mode=${ZENOH_MODE}")
+fi
 "${BIN}" --snapshot-interval "${SNAPSHOT}" sub \
-  --endpoint "${ENDPOINT_SUB}" \
+  "${CONNECT_SUB_ARGS[@]}" \
   --expr "${TOPIC_PREFIX}/**" \
   --subscribers 1 \
   --csv "${SUB_CSV}" \
@@ -60,8 +66,14 @@ sleep 1
 echo "Running multi-topic publisher on ${ENDPOINT_PUB} → ${TOPIC_PREFIX}/t*/r*/svc*/k*"
 RATE_FLAG=()
 if [[ -n "${RATE}" ]]; then RATE_FLAG=(--rate "${RATE}"); fi
+SHARE_FLAG=()
+if [[ "${SHARE_TRANSPORT}" == "true" ]]; then SHARE_FLAG=(--share-transport); fi
+CONNECT_PUB_ARGS=(--endpoint "${ENDPOINT_PUB}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+  CONNECT_PUB_ARGS=(--connect "endpoint=${ENDPOINT_PUB}" --connect "mode=${ZENOH_MODE}")
+fi
 "${BIN}" --snapshot-interval "${SNAPSHOT}" mt-pub \
-  --endpoint "${ENDPOINT_PUB}" \
+  "${CONNECT_PUB_ARGS[@]}" \
   --topic-prefix "${TOPIC_PREFIX}" \
   --tenants "${TENANTS}" \
   --regions "${REGIONS}" \
@@ -72,6 +84,7 @@ if [[ -n "${RATE}" ]]; then RATE_FLAG=(--rate "${RATE}"); fi
   --payload "${PAYLOAD}" \
   "${RATE_FLAG[@]}" \
   --duration "${DURATION}" \
+  "${SHARE_FLAG[@]}" \
   --csv "${PUB_CSV}" \
   >"${ART_DIR}/mt_pub.log" 2>&1 &
 PUB_PID=$!

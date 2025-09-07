@@ -18,6 +18,7 @@ def KEY_PREFIX "${KEY_PREFIX:-bench/qry}"
 def PROC_DELAY "${PROC_DELAY:-0}"
 def QRY_EP "${QRY_EP:-tcp/127.0.0.1:7447}"
 def REQ_EP "${REQ_EP:-tcp/127.0.0.1:7447}"
+ZENOH_MODE="${ZENOH_MODE:-}"
 
 ART_DIR="artifacts/${RUN_ID}/queries"
 BIN="./target/release/mq-bench"
@@ -36,8 +37,12 @@ QRY_CSV="${ART_DIR}/queryable.csv"
 REQ_CSV="${ART_DIR}/requester.csv"
 
 echo "Starting queryable on ${QRY_EP} serving prefix ${PREFIX}/**"
+CONNECT_QRY_ARGS=(--endpoint "${QRY_EP}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+	CONNECT_QRY_ARGS=(--connect "endpoint=${QRY_EP}" --connect "mode=${ZENOH_MODE}")
+fi
 "${BIN}" --snapshot-interval "${SNAPSHOT}" qry \
-	--endpoint "${QRY_EP}" \
+		"${CONNECT_QRY_ARGS[@]}" \
 	--serve-prefix "${PREFIX}/**" \
 	--reply-size "${REPLY_SIZE}" \
 	--proc-delay "${PROC_DELAY}" \
@@ -51,8 +56,12 @@ sleep 1
 echo "Running requester on ${REQ_EP} querying ${KEY_EXPR}"
 QPS_FLAG=()
 if [[ -n "${QPS}" ]] && (( QPS > 0 )); then QPS_FLAG=(--qps "${QPS}"); fi
+CONNECT_REQ_ARGS=(--endpoint "${REQ_EP}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+	CONNECT_REQ_ARGS=(--connect "endpoint=${REQ_EP}" --connect "mode=${ZENOH_MODE}")
+fi
 "${BIN}" --snapshot-interval "${SNAPSHOT}" req \
-	--endpoint "${REQ_EP}" \
+		"${CONNECT_REQ_ARGS[@]}" \
 	--key-expr "${KEY_EXPR}" \
 	"${QPS_FLAG[@]}" \
 	--concurrency "${CONC}" \

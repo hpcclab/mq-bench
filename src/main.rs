@@ -1,16 +1,18 @@
-use mq_bench::metrics::stats::Stats;
-use mq_bench::output::OutputWriter;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use futures::future::join_all;
+use mq_bench::metrics::stats::Stats;
+use mq_bench::output::OutputWriter;
+use mq_bench::roles::multi_topic::{
+    KeyMappingMode, MultiTopicConfig, MultiTopicSubConfig, run_multi_topic, run_multi_topic_sub,
+};
 use mq_bench::roles::publisher::{PublisherConfig, run_publisher};
-use mq_bench::roles::multi_topic::{run_multi_topic, MultiTopicConfig, KeyMappingMode, run_multi_topic_sub, MultiTopicSubConfig};
 use mq_bench::roles::queryable::{QueryableConfig, run_queryable};
 use mq_bench::roles::requester::{RequesterConfig, run_requester};
 use mq_bench::roles::subscriber::{SubscriberConfig, run_subscriber};
-use std::sync::Arc;
-use mq_bench::transport::config::{parse_engine, parse_connect_kv};
 use mq_bench::transport::Engine;
+use mq_bench::transport::config::{parse_connect_kv, parse_engine};
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(name = "mq-bench")]
@@ -40,17 +42,17 @@ struct Cli {
 enum Commands {
     /// Publisher role
     Pub {
-    /// Messaging engine (zenoh|tcp|redis)
-    #[arg(long, default_value = "zenoh")]
-    engine: String,
+        /// Messaging engine (zenoh|tcp|redis)
+        #[arg(long, default_value = "zenoh")]
+        engine: String,
 
-    /// Engine connect options as KEY=VALUE (repeatable)
-    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
-    connect: Vec<String>,
+        /// Engine connect options as KEY=VALUE (repeatable)
+        #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+        connect: Vec<String>,
 
-    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
-    #[arg(long)]
-    endpoint: Vec<String>,
+        /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+        #[arg(long)]
+        endpoint: Vec<String>,
 
         /// Topic prefix
         #[arg(long, default_value = "bench/topic")]
@@ -68,13 +70,17 @@ enum Commands {
         #[arg(long, default_value = "1024")]
         payload: u32,
 
-    /// Rate per publisher (msg/s). If omitted or <= 0, runs at max speed (no delay)
-    #[arg(long, alias = "qps", allow_hyphen_values = true)]
-    rate: Option<i32>,
+        /// Rate per publisher (msg/s). If omitted or <= 0, runs at max speed (no delay)
+        #[arg(long, alias = "qps", allow_hyphen_values = true)]
+        rate: Option<i32>,
 
         /// Duration in seconds
         #[arg(long, default_value = "60")]
         duration: u32,
+
+        /// Share a single transport across all publishers (default: false)
+        #[arg(long, default_value = "false")]
+        share_transport: bool,
 
         /// Reliability (best/reliable)
         #[arg(long, default_value = "best")]
@@ -113,9 +119,9 @@ enum Commands {
         #[arg(long, default_value = "10")]
         shards: u32,
 
-        /// Number of logical publishers (<= T*R*S*K)
-        #[arg(long, default_value = "100")]
-        publishers: u32,
+        /// Number of logical publishers (<= T*R*S*K). Negative => use total_keys
+        #[arg(long, default_value = "-1", allow_hyphen_values = true)]
+        publishers: i64,
 
         /// Mapping mode (mdim|hash)
         #[arg(long, default_value = "mdim")]
@@ -132,6 +138,10 @@ enum Commands {
         /// Duration in seconds
         #[arg(long, default_value = "60")]
         duration: u32,
+
+        /// Share a single transport across all subscribers (default: false)
+        #[arg(long, default_value = "false")]
+        share_transport: bool,
 
         /// Optional CSV output file path (stdout if omitted)
         #[arg(long)]
@@ -166,9 +176,9 @@ enum Commands {
         #[arg(long, default_value = "10")]
         shards: u32,
 
-        /// Number of per-key subscribers (<= T*R*S*K)
-        #[arg(long, default_value = "100")]
-        subscribers: u32,
+        /// Number of per-key subscribers (<= T*R*S*K). Negative => use total_keys
+        #[arg(long, default_value = "-1", allow_hyphen_values = true)]
+        subscribers: i64,
 
         /// Mapping mode (mdim|hash)
         #[arg(long, default_value = "hash")]
@@ -178,23 +188,27 @@ enum Commands {
         #[arg(long, default_value = "60")]
         duration: u32,
 
+        /// Share a single transport across all subscribers (default: false)
+        #[arg(long, default_value = "false")]
+        share_transport: bool,
+
         /// Optional CSV output file path (stdout if omitted)
         #[arg(long)]
         csv: Option<String>,
     },
     /// Subscriber role
     Sub {
-    /// Messaging engine (zenoh|tcp|redis)
-    #[arg(long, default_value = "zenoh")]
-    engine: String,
+        /// Messaging engine (zenoh|tcp|redis)
+        #[arg(long, default_value = "zenoh")]
+        engine: String,
 
-    /// Engine connect options as KEY=VALUE (repeatable)
-    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
-    connect: Vec<String>,
+        /// Engine connect options as KEY=VALUE (repeatable)
+        #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+        connect: Vec<String>,
 
-    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
-    #[arg(long)]
-    endpoint: Vec<String>,
+        /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+        #[arg(long)]
+        endpoint: Vec<String>,
 
         /// Key expression to subscribe to
         #[arg(long, default_value = "bench/**")]
@@ -214,25 +228,25 @@ enum Commands {
     },
     /// Requester role
     Req {
-    /// Messaging engine (zenoh|tcp|redis)
-    #[arg(long, default_value = "zenoh")]
-    engine: String,
+        /// Messaging engine (zenoh|tcp|redis)
+        #[arg(long, default_value = "zenoh")]
+        engine: String,
 
-    /// Engine connect options as KEY=VALUE (repeatable)
-    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
-    connect: Vec<String>,
+        /// Engine connect options as KEY=VALUE (repeatable)
+        #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+        connect: Vec<String>,
 
-    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
-    #[arg(long)]
-    endpoint: Vec<String>,
+        /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+        #[arg(long)]
+        endpoint: Vec<String>,
 
         /// Key expression for queries
         #[arg(long, required = true)]
         key_expr: String,
 
-    /// Queries per second. If omitted or <= 0, runs at max speed (no delay)
-    #[arg(long, alias = "rate", allow_hyphen_values = true)]
-    qps: Option<i32>,
+        /// Queries per second. If omitted or <= 0, runs at max speed (no delay)
+        #[arg(long, alias = "rate", allow_hyphen_values = true)]
+        qps: Option<i32>,
 
         /// In-flight concurrency
         #[arg(long, default_value = "10")]
@@ -252,17 +266,17 @@ enum Commands {
     },
     /// Queryable role
     Qry {
-    /// Messaging engine (zenoh|tcp|redis)
-    #[arg(long, default_value = "zenoh")]
-    engine: String,
+        /// Messaging engine (zenoh|tcp|redis)
+        #[arg(long, default_value = "zenoh")]
+        engine: String,
 
-    /// Engine connect options as KEY=VALUE (repeatable)
-    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
-    connect: Vec<String>,
+        /// Engine connect options as KEY=VALUE (repeatable)
+        #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+        connect: Vec<String>,
 
-    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
-    #[arg(long)]
-    endpoint: Vec<String>,
+        /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+        #[arg(long)]
+        endpoint: Vec<String>,
 
         /// Key prefixes to serve
         #[arg(long, required = true)]
@@ -318,12 +332,15 @@ async fn main() -> Result<()> {
             duration,
             reliability: _reliability,
             csv,
+            share_transport: _,
         } => {
             // Parse engine and connect opts (support legacy --endpoint)
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
             if conn.params.is_empty() {
-                if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }
+                if let Some(ep) = endpoint.first() {
+                    conn.params.insert("endpoint".into(), ep.clone());
+                }
             }
             let mut handles = Vec::new();
             // Externalize snapshotting always (single or multiple)
@@ -365,7 +382,10 @@ async fn main() -> Result<()> {
                     connect: conn.clone(),
                     key_expr,
                     payload_size: payload as usize,
-                    rate: match rate { Some(v) if v > 0 => Some(v as f64), _ => None },
+                    rate: match rate {
+                        Some(v) if v > 0 => Some(v as f64),
+                        _ => None,
+                    },
                     duration_secs: Some(duration as u64),
                     output_file: None,
                     snapshot_interval_secs: snapshot_interval_secs,
@@ -404,12 +424,20 @@ async fn main() -> Result<()> {
             payload,
             rate,
             duration,
+            share_transport,
             csv,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
-            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
-            let mapping = match mapping.as_str() { "mdim" => KeyMappingMode::MDim, _ => KeyMappingMode::Hash };
+            if conn.params.is_empty() {
+                if let Some(ep) = endpoint.first() {
+                    conn.params.insert("endpoint".into(), ep.clone());
+                }
+            }
+            let mapping = match mapping.as_str() {
+                "mdim" => KeyMappingMode::MDim,
+                _ => KeyMappingMode::Hash,
+            };
 
             // Aggregate CSV via shared stats (like pub/sub)
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
@@ -433,7 +461,9 @@ async fn main() -> Result<()> {
                         }
                     }
                 }))
-            } else { None };
+            } else {
+                None
+            };
 
             let cfg = MultiTopicConfig {
                 engine: engine.clone(),
@@ -446,17 +476,26 @@ async fn main() -> Result<()> {
                 publishers,
                 mapping,
                 payload_size: payload as usize,
-                rate_per_pub: match rate { Some(v) if v > 0 => Some(v as f64), _ => None },
+                rate_per_pub: match rate {
+                    Some(v) if v > 0 => Some(v as f64),
+                    _ => None,
+                },
                 duration_secs: duration as u64,
                 snapshot_interval_secs,
+                share_transport,
                 shared_stats: shared_stats.clone(),
                 disable_internal_snapshot: true,
             };
             run_multi_topic(cfg).await?;
             if let Some(stats) = shared_stats {
-                if let Some(mut out) = agg_output { let snap = stats.snapshot().await; let _ = out.write_snapshot(&snap).await; }
+                if let Some(mut out) = agg_output {
+                    let snap = stats.snapshot().await;
+                    let _ = out.write_snapshot(&snap).await;
+                }
             }
-            if let Some(h) = agg_handle { h.abort(); }
+            if let Some(h) = agg_handle {
+                h.abort();
+            }
             Ok(())
         }
         Commands::MtSub {
@@ -471,18 +510,28 @@ async fn main() -> Result<()> {
             subscribers,
             mapping,
             duration,
+            share_transport,
             csv,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
-            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
-            let mapping = match mapping.as_str() { "mdim" => KeyMappingMode::MDim, _ => KeyMappingMode::Hash };
+            if conn.params.is_empty() {
+                if let Some(ep) = endpoint.first() {
+                    conn.params.insert("endpoint".into(), ep.clone());
+                }
+            }
+            let mapping = match mapping.as_str() {
+                "mdim" => KeyMappingMode::MDim,
+                _ => KeyMappingMode::Hash,
+            };
 
             // Aggregate CSV via shared stats
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
             let mut agg_output = if let Some(ref path) = csv {
                 Some(OutputWriter::new_csv(path.clone()).await?)
-            } else { Some(OutputWriter::new_stdout()) };
+            } else {
+                Some(OutputWriter::new_stdout())
+            };
             let agg_stats_clone = shared_stats.clone();
             let agg_handle = if let Some(stats) = agg_stats_clone.clone() {
                 let mut out = agg_output.take();
@@ -493,10 +542,14 @@ async fn main() -> Result<()> {
                     loop {
                         t.tick().await;
                         let snap = stats.snapshot().await;
-                        if let Some(ref mut o) = out { let _ = o.write_snapshot(&snap).await; }
+                        if let Some(ref mut o) = out {
+                            let _ = o.write_snapshot(&snap).await;
+                        }
                     }
                 }))
-            } else { None };
+            } else {
+                None
+            };
 
             let cfg = MultiTopicSubConfig {
                 engine: engine.clone(),
@@ -510,14 +563,20 @@ async fn main() -> Result<()> {
                 mapping,
                 duration_secs: duration as u64,
                 snapshot_interval_secs,
+                share_transport,
                 shared_stats: shared_stats.clone(),
                 disable_internal_snapshot: true,
             };
             run_multi_topic_sub(cfg).await?;
             if let Some(stats) = shared_stats {
-                if let Some(mut out) = agg_output { let snap = stats.snapshot().await; let _ = out.write_snapshot(&snap).await; }
+                if let Some(mut out) = agg_output {
+                    let snap = stats.snapshot().await;
+                    let _ = out.write_snapshot(&snap).await;
+                }
             }
-            if let Some(h) = agg_handle { h.abort(); }
+            if let Some(h) = agg_handle {
+                h.abort();
+            }
             Ok(())
         }
         Commands::Sub {
@@ -531,7 +590,11 @@ async fn main() -> Result<()> {
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
-            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
+            if conn.params.is_empty() {
+                if let Some(ep) = endpoint.first() {
+                    conn.params.insert("endpoint".into(), ep.clone());
+                }
+            }
             let mut handles = Vec::new();
             // Externalize snapshotting always
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
@@ -600,7 +663,11 @@ async fn main() -> Result<()> {
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
-            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
+            if conn.params.is_empty() {
+                if let Some(ep) = endpoint.first() {
+                    conn.params.insert("endpoint".into(), ep.clone());
+                }
+            }
             // Externalize snapshotting even for single requester
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
             let mut agg_output = if let Some(ref path) = csv {
@@ -632,7 +699,10 @@ async fn main() -> Result<()> {
                 engine: engine.clone(),
                 connect: conn,
                 key_expr,
-                qps: match qps { Some(v) if v > 0 => Some(v as u32), _ => None },
+                qps: match qps {
+                    Some(v) if v > 0 => Some(v as u32),
+                    _ => None,
+                },
                 concurrency,
                 timeout_ms: timeout,
                 duration_secs: duration as u64,
@@ -666,7 +736,11 @@ async fn main() -> Result<()> {
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
-            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
+            if conn.params.is_empty() {
+                if let Some(ep) = endpoint.first() {
+                    conn.params.insert("endpoint".into(), ep.clone());
+                }
+            }
             // Externalize snapshotting
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
             let mut agg_output = if let Some(ref path) = csv {

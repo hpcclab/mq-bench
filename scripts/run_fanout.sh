@@ -18,6 +18,7 @@ BIN="./target/release/mq-bench"
 ENDPOINT_PUB="${ENDPOINT_PUB:-tcp/127.0.0.1:7447}"
 ENDPOINT_SUB="${ENDPOINT_SUB:-tcp/127.0.0.1:7448}"
 KEY="${KEY:-bench/topic}"
+ZENOH_MODE="${ZENOH_MODE:-}"
 
 echo "[run_fanout] Run ID: ${RUN_ID} | SUBS=${SUBS} RATE=${RATE} DURATION=${DURATION}s"
 mkdir -p "${ART_DIR}"
@@ -31,8 +32,12 @@ SUB_CSV="${ART_DIR}/sub_agg.csv"
 PUB_CSV="${ART_DIR}/pub.csv"
 
 echo "Starting ${SUBS} subscribers on ${ENDPOINT_SUB} → ${KEY} (aggregated CSV)"
+CONNECT_SUB_ARGS=(--endpoint "${ENDPOINT_SUB}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+	CONNECT_SUB_ARGS=(--connect "endpoint=${ENDPOINT_SUB}" --connect "mode=${ZENOH_MODE}")
+fi
 "${BIN}" --snapshot-interval "${SNAPSHOT}" sub \
-	--endpoint "${ENDPOINT_SUB}" \
+		"${CONNECT_SUB_ARGS[@]}" \
 	--expr "${KEY}" \
 	--subscribers "${SUBS}" \
 	--csv "${SUB_CSV}" \
@@ -45,8 +50,12 @@ sleep 1
 echo "Running publisher on ${ENDPOINT_PUB} → ${KEY}"
 RATE_FLAG=()
 if [[ -n "${RATE}" ]] && (( RATE > 0 )); then RATE_FLAG=(--rate "${RATE}"); fi
+CONNECT_PUB_ARGS=(--endpoint "${ENDPOINT_PUB}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+	CONNECT_PUB_ARGS=(--connect "endpoint=${ENDPOINT_PUB}" --connect "mode=${ZENOH_MODE}")
+fi
 "${BIN}" --snapshot-interval "${SNAPSHOT}" pub \
-	--endpoint "${ENDPOINT_PUB}" \
+		"${CONNECT_PUB_ARGS[@]}" \
 	--topic-prefix "${KEY}" \
 	--payload "${PAYLOAD}" \
 	"${RATE_FLAG[@]}" \

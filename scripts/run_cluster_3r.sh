@@ -16,6 +16,7 @@ def PAYLOAD "${PAYLOAD:-1024}"
 def RATE     "${RATE:-10000}"
 def DURATION "${DURATION:-20}"
 def SNAPSHOT "${SNAPSHOT:-5}"
+ZENOH_MODE="${ZENOH_MODE:-}"
 
 echo "[run_cluster_3r] Run ID: ${RUN_ID}"
 mkdir -p "${ART_DIR}"
@@ -29,14 +30,22 @@ SUB_CSV="${ART_DIR}/sub.csv"
 PUB_CSV="${ART_DIR}/pub.csv"
 
 echo "Starting subscriber on ${SUB_ENDPOINT} → ${KEY}"
-"${BIN}" --snapshot-interval "${SNAPSHOT}" sub --endpoint "${SUB_ENDPOINT}" --expr "${KEY}" --csv "${SUB_CSV}" >"${ART_DIR}/sub.log" 2>&1 &
+CONNECT_SUB_ARGS=(--endpoint "${SUB_ENDPOINT}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+  CONNECT_SUB_ARGS=(--connect "endpoint=${SUB_ENDPOINT}" --connect "mode=${ZENOH_MODE}")
+fi
+"${BIN}" --snapshot-interval "${SNAPSHOT}" sub "${CONNECT_SUB_ARGS[@]}" --expr "${KEY}" --csv "${SUB_CSV}" >"${ART_DIR}/sub.log" 2>&1 &
 SUB_PID=$!
 trap 'echo "Stopping subscriber (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
 
 sleep 1
 
 echo "Running publisher on ${PUB_ENDPOINT} → ${KEY} (payload=${PAYLOAD}, rate=${RATE}, duration=${DURATION}s, snap=${SNAPSHOT}s)"
-"${BIN}" --snapshot-interval "${SNAPSHOT}" pub --endpoint "${PUB_ENDPOINT}" --topic-prefix "${KEY}" --payload "${PAYLOAD}" ${RATE:+--rate "${RATE}"} --duration "${DURATION}" --csv "${PUB_CSV}" >"${ART_DIR}/pub.log" 2>&1 &
+CONNECT_PUB_ARGS=(--endpoint "${PUB_ENDPOINT}")
+if [[ -n "${ZENOH_MODE}" ]]; then
+  CONNECT_PUB_ARGS=(--connect "endpoint=${PUB_ENDPOINT}" --connect "mode=${ZENOH_MODE}")
+fi
+"${BIN}" --snapshot-interval "${SNAPSHOT}" pub "${CONNECT_PUB_ARGS[@]}" --topic-prefix "${KEY}" --payload "${PAYLOAD}" ${RATE:+--rate "${RATE}"} --duration "${DURATION}" --csv "${PUB_CSV}" >"${ART_DIR}/pub.log" 2>&1 &
 PUB_PID=$!
 
 # Status watcher

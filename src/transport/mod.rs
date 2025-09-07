@@ -157,12 +157,12 @@ pub trait QueryRegistration: Send + Sync {
 pub struct TransportBuilder;
 
 impl TransportBuilder {
-    pub async fn connect(engine: Engine, _opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
+    pub async fn connect(engine: Engine, opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
         match engine {
             Engine::Zenoh => {
                 #[cfg(feature = "transport-zenoh")]
                 {
-                    return crate::transport::zenoh::connect(_opts).await;
+                    return crate::transport::zenoh::connect(opts).await;
                 }
                 #[cfg(not(feature = "transport-zenoh"))]
                 {
@@ -172,7 +172,7 @@ impl TransportBuilder {
             Engine::Redis => {
                 #[cfg(feature = "transport-redis")]
                 {
-                    return crate::transport::redis::connect(_opts).await;
+                    return crate::transport::redis::connect(opts).await;
                 }
                 #[cfg(not(feature = "transport-redis"))]
                 {
@@ -182,7 +182,7 @@ impl TransportBuilder {
             Engine::Mqtt => {
                 #[cfg(feature = "transport-mqtt")]
                 {
-                    return crate::transport::mqtt::connect(_opts).await;
+                    return crate::transport::mqtt::connect(opts).await;
                 }
                 #[cfg(not(feature = "transport-mqtt"))]
                 {
@@ -191,7 +191,7 @@ impl TransportBuilder {
             }
             #[cfg(any(test, feature = "transport-mock"))]
             Engine::Mock => {
-                return crate::transport::mock::connect(_opts).await;
+                return crate::transport::mock::connect(opts).await;
             }
             _ => Err(TransportError::Connect("engine not yet implemented".into())),
         }

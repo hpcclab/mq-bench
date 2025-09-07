@@ -23,12 +23,13 @@ pub struct MultiTopicConfig {
     pub regions: u32,
     pub services: u32,
     pub shards: u32,
-    pub publishers: u32,           // number of logical publishers (<= T*R*S*K)
+    pub publishers: i64,           // number of logical publishers (<= T*R*S*K); negative => use total_keys
     pub mapping: KeyMappingMode,   // mapping mode from i -> (t,r,s,k)
     pub payload_size: usize,
     pub rate_per_pub: Option<f64>,
     pub duration_secs: u64,
     pub snapshot_interval_secs: u64,
+    pub share_transport: bool,     // when true, reuse one transport for all publishers
     // Aggregation support
     pub shared_stats: Option<Arc<Stats>>, // when set, aggregate externally
     pub disable_internal_snapshot: bool,
@@ -69,6 +70,17 @@ fn map_index(i: u64, t: u32, r: u32, s: u32, k: u32, mode: KeyMappingMode) -> (u
 }
 
 pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
+    // Determine total keys and effective publisher count
+    let total_keys = (config.tenants as u64)
+        .saturating_mul(config.regions as u64)
+        .saturating_mul(config.services as u64)
+        .saturating_mul(config.shards as u64);
+    let pubs: u64 = if config.publishers < 0 {
+        total_keys
+    } else {
+        (config.publishers as u64).min(total_keys)
+    };
+
     println!(
         "[multi_topic] engine={:?} prefix={} dims=T{}xR{}xS{}xK{} pubs={} payload={} rate={:?} dur={}s",
         config.engine,
@@ -77,13 +89,13 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
         config.regions,
         config.services,
         config.shards,
-        config.publishers,
+        pubs,
         config.payload_size,
         config.rate_per_pub,
         config.duration_secs
     );
 
-    // One client per publisher: connect inside the loop below
+    // Shared vs per-key transport depending on config
 
     // Stats
     let stats: Arc<Stats> = config.shared_stats.clone().unwrap_or_else(|| Arc::new(Stats::new()));
@@ -107,57 +119,96 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
         }))
     } else { None };
 
-    // Prepare publishers
-    let total_keys = (config.tenants as u64)
-        .saturating_mul(config.regions as u64)
-        .saturating_mul(config.services as u64)
-        .saturating_mul(config.shards as u64);
-    let pubs = config.publishers.min(total_keys as u32) as u64;
+    // Prepare publishers (pubs calculated above)
 
     let stop = Arc::new(AtomicBool::new(false));
     let mut handles = Vec::with_capacity(pubs as usize);
 
-    for i in 0..pubs {
-        let (t, r, s, k) = map_index(
-            i,
-            config.tenants,
-            config.regions,
-            config.services,
-            config.shards,
-            config.mapping,
-        );
-        let key = format!(
-            "{}/t{}/r{}/svc{}/k{}",
-            config.topic_prefix, t, r, s, k
-        );
-        // Dedicated transport and publisher per key (one client per publisher)
+    if config.share_transport {
+        println!("[multi_topic] using shared transport");
         let transport: Box<dyn Transport> = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
             .await
-            .map_err(|e| anyhow::Error::msg(format!("transport connect error ({}): {}", key, e)))?;
-        let pub_handle = transport
-            .create_publisher(&key)
-            .await
-            .map_err(|e| anyhow::Error::msg(format!("create_publisher error ({}): {}", key, e)))?;
-        let stats_p = stats.clone();
-        let rate = config.rate_per_pub;
-        let payload_size = config.payload_size;
-        let stop_flag = stop.clone();
-        handles.push(tokio::spawn(async move {
-            let mut rc = rate.map(RateController::new);
-            let mut seq = 0u64;
-            loop {
-                if stop_flag.load(Ordering::Relaxed) { break; }
-                if let Some(r) = &mut rc { r.wait_for_next().await; }
-                let payload = generate_payload(seq, payload_size);
-                let bytes = Bytes::from(payload);
-                match pub_handle.publish(bytes).await {
-                    Ok(_) => { stats_p.record_sent().await; seq = seq.wrapping_add(1); },
-                    Err(e) => { eprintln!("[multi_topic] send error on {}: {}", key, e); stats_p.record_error().await; }
+            .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
+        for i in 0..pubs {
+            let (t, r, s, k) = map_index(i, config.tenants, config.regions, config.services, config.shards, config.mapping);
+            let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
+            let pub_handle = transport
+                .create_publisher(&key)
+                .await
+                .map_err(|e| anyhow::Error::msg(format!("create_publisher error ({}): {}", key, e)))?;
+            let stats_p = stats.clone();
+            let rate = config.rate_per_pub;
+            let payload_size = config.payload_size;
+            let stop_flag = stop.clone();
+            handles.push(tokio::spawn(async move {
+                let mut rc = rate.map(RateController::new);
+                let mut seq = 0u64;
+                loop {
+                    if stop_flag.load(Ordering::Relaxed) { break; }
+                    if let Some(r) = &mut rc { r.wait_for_next().await; }
+                    let payload = generate_payload(seq, payload_size);
+                    let bytes = Bytes::from(payload);
+                    match pub_handle.publish(bytes).await {
+                        Ok(_) => { stats_p.record_sent().await; seq = seq.wrapping_add(1); },
+                        Err(e) => { eprintln!("[multi_topic] send error on {}: {}", key, e); stats_p.record_error().await; }
+                    }
                 }
-            }
-            let _ = pub_handle.shutdown().await;
-            let _ = transport.shutdown().await;
-        }));
+                let _ = pub_handle.shutdown().await;
+            }));
+        }
+        // Wait and stop
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(config.duration_secs)) => {},
+            _ = tokio::signal::ctrl_c() => {},
+        }
+        stop.store(true, Ordering::Relaxed);
+        let _ = join_all(handles).await;
+        transport
+            .shutdown()
+            .await
+            .map_err(|e| anyhow::Error::msg(format!("transport shutdown error: {}", e)))?;
+        if let Some(h) = snapshot_handle { h.abort(); }
+        let final_stats = stats.snapshot().await;
+        println!(
+            "[multi_topic] done: sent={} errors={} total_tps={:.2}",
+            final_stats.sent_count,
+            final_stats.error_count,
+            final_stats.total_throughput()
+        );
+        return Ok(());
+    } else {
+        println!("[multi_topic] using per-key transports");
+        for i in 0..pubs {
+            let (t, r, s, k) = map_index(i, config.tenants, config.regions, config.services, config.shards, config.mapping);
+            let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
+            let transport: Box<dyn Transport> = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
+                .await
+                .map_err(|e| anyhow::Error::msg(format!("transport connect error ({}): {}", key, e)))?;
+            let pub_handle = transport
+                .create_publisher(&key)
+                .await
+                .map_err(|e| anyhow::Error::msg(format!("create_publisher error ({}): {}", key, e)))?;
+            let stats_p = stats.clone();
+            let rate = config.rate_per_pub;
+            let payload_size = config.payload_size;
+            let stop_flag = stop.clone();
+            handles.push(tokio::spawn(async move {
+                let mut rc = rate.map(RateController::new);
+                let mut seq = 0u64;
+                loop {
+                    if stop_flag.load(Ordering::Relaxed) { break; }
+                    if let Some(r) = &mut rc { r.wait_for_next().await; }
+                    let payload = generate_payload(seq, payload_size);
+                    let bytes = Bytes::from(payload);
+                    match pub_handle.publish(bytes).await {
+                        Ok(_) => { stats_p.record_sent().await; seq = seq.wrapping_add(1); },
+                        Err(e) => { eprintln!("[multi_topic] send error on {}: {}", key, e); stats_p.record_error().await; }
+                    }
+                }
+                let _ = pub_handle.shutdown().await;
+                let _ = transport.shutdown().await;
+            }));
+        }
     }
 
     // Wait for either duration or Ctrl+C
@@ -194,10 +245,11 @@ pub struct MultiTopicSubConfig {
     pub regions: u32,
     pub services: u32,
     pub shards: u32,
-    pub subscribers: u32,            // number of per-key subscriptions (<= T*R*S*K)
+    pub subscribers: i64,            // number of per-key subscriptions (<= T*R*S*K); negative => use total_keys
     pub mapping: KeyMappingMode,
     pub duration_secs: u64,
     pub snapshot_interval_secs: u64,
+    pub share_transport: bool,        // when true, reuse one transport for all subscriptions
     // Aggregation support
     pub shared_stats: Option<Arc<Stats>>, // when set, aggregate externally
     pub disable_internal_snapshot: bool,
@@ -207,6 +259,16 @@ use crate::payload::parse_header;
 use crate::time_sync::now_unix_ns_estimate;
 
 pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
+    // Compute total keys and effective subscriber count
+    let total_keys = (config.tenants as u64)
+        .saturating_mul(config.regions as u64)
+        .saturating_mul(config.services as u64)
+        .saturating_mul(config.shards as u64);
+    let subs: u64 = if config.subscribers < 0 {
+        total_keys
+    } else {
+        (config.subscribers as u64).min(total_keys)
+    };
     println!(
         "[multi_topic_sub] engine={:?} prefix={} dims=T{}xR{}xS{}xK{} subs={} dur={}s",
         config.engine,
@@ -215,11 +277,11 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
         config.regions,
         config.services,
         config.shards,
-        config.subscribers,
+        subs,
         config.duration_secs
     );
 
-    // Note: one client per subscription, connect inside the loop below
+    // Note: shared vs per-subscription transport
 
     // Stats (use shared aggregator if provided)
     let stats: Arc<Stats> = config.shared_stats.clone().unwrap_or_else(|| Arc::new(Stats::new()));
@@ -265,32 +327,62 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
         }
     });
 
-    // Create per-key subscriptions
-    let total_keys = (config.tenants as u64)
-        .saturating_mul(config.regions as u64)
-        .saturating_mul(config.services as u64)
-        .saturating_mul(config.shards as u64);
-    let subs = config.subscribers.min(total_keys as u32) as u64;
+    // Create per-key subscriptions (subs computed above)
 
+    if config.share_transport {
+        println!("[multi_topic_sub] using shared transport");
+        let transport: Box<dyn Transport> = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
+            .await
+            .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
+        let mut subs_vec: Vec<Box<dyn crate::transport::Subscription>> = Vec::with_capacity(subs as usize);
+        for i in 0..subs {
+            let (t, r, s, k) = map_index(i, config.tenants, config.regions, config.services, config.shards, config.mapping);
+            let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
+            let handler_tx = tx.clone();
+            let sub = transport
+                .subscribe(&key, Box::new(move |msg: crate::transport::TransportMessage| {
+                    let mut hdr = [0u8; 24];
+                    let bytes = msg.payload.as_cow();
+                    if bytes.len() >= 24 {
+                        hdr.copy_from_slice(&bytes[..24]);
+                        let recv = now_unix_ns_estimate();
+                        let _ = handler_tx.try_send((recv, hdr));
+                    }
+                }))
+                .await
+                .map_err(|e| anyhow::Error::msg(format!("subscribe error on {}: {}", key, e)))?;
+            subs_vec.push(sub);
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(config.duration_secs)) => {},
+            _ = tokio::signal::ctrl_c() => {},
+        }
+        for s in &subs_vec { let _ = s.shutdown().await; }
+        transport
+            .shutdown()
+            .await
+            .map_err(|e| anyhow::Error::msg(format!("transport shutdown error: {}", e)))?;
+        if let Some(h) = snapshot_handle { h.abort(); }
+        let s = stats.snapshot().await;
+        println!(
+            "[multi_topic_sub] done: recv={} errors={} total_tps={:.2} p99={:.2}ms",
+            s.received_count,
+            s.error_count,
+            s.total_throughput(),
+            s.latency_ns_p99 as f64 / 1_000_000.0
+        );
+        return Ok(());
+    }
+
+    // Per-subscription transports
+    println!("[multi_topic_sub] using per-key transports");
     // Hold both the subscription and its own transport to keep the client alive
     let mut clients: Vec<(Box<dyn crate::transport::Subscription>, Box<dyn Transport>)> =
         Vec::with_capacity(subs as usize);
-
     for i in 0..subs {
-        let (t, r, s, k) = map_index(
-            i,
-            config.tenants,
-            config.regions,
-            config.services,
-            config.shards,
-            config.mapping,
-        );
-        let key = format!(
-            "{}/t{}/r{}/svc{}/k{}",
-            config.topic_prefix, t, r, s, k
-        );
+        let (t, r, s, k) = map_index(i, config.tenants, config.regions, config.services, config.shards, config.mapping);
+        let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
         let handler_tx = tx.clone();
-        // Create a dedicated client for this subscription
         let transport: Box<dyn Transport> = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
             .await
             .map_err(|e| anyhow::Error::msg(format!("transport connect error ({}): {}", key, e)))?;
