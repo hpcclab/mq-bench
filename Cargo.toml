@@ -23,7 +23,7 @@ async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
 
 [features]
-default = ["transport-zenoh", "transport-redis", "transport-mqtt"]
+default = ["transport-mock", "transport-zenoh", "transport-redis", "transport-mqtt"]
 transport-zenoh = ["dep:zenoh"]
 transport-redis = ["dep:redis"]
 transport-mock = []

@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use futures::future::join_all;
 use mq_bench::roles::publisher::{PublisherConfig, run_publisher};
+use mq_bench::roles::multi_topic::{run_multi_topic, MultiTopicConfig, KeyMappingMode, run_multi_topic_sub, MultiTopicSubConfig};
 use mq_bench::roles::queryable::{QueryableConfig, run_queryable};
 use mq_bench::roles::requester::{RequesterConfig, run_requester};
 use mq_bench::roles::subscriber::{SubscriberConfig, run_subscriber};
@@ -78,6 +79,104 @@ enum Commands {
         /// Reliability (best/reliable)
         #[arg(long, default_value = "best")]
         reliability: String,
+
+        /// Optional CSV output file path (stdout if omitted)
+        #[arg(long)]
+        csv: Option<String>,
+    },
+    /// Multi-topic publisher (single process, many keys)
+    #[command(name = "mt-pub")]
+    MtPub {
+        /// Messaging engine (zenoh|mqtt|redis)
+        #[arg(long, default_value = "zenoh")]
+        engine: String,
+
+        /// Engine connect options as KEY=VALUE (repeatable)
+        #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+        connect: Vec<String>,
+
+        /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+        #[arg(long)]
+        endpoint: Vec<String>,
+
+        /// Topic prefix, e.g., bench/topic
+        #[arg(long, default_value = "bench/topic")]
+        topic_prefix: String,
+
+        /// Dimensions: tenants, regions, services, shards
+        #[arg(long, default_value = "10")]
+        tenants: u32,
+        #[arg(long, default_value = "2")]
+        regions: u32,
+        #[arg(long, default_value = "5")]
+        services: u32,
+        #[arg(long, default_value = "10")]
+        shards: u32,
+
+        /// Number of logical publishers (<= T*R*S*K)
+        #[arg(long, default_value = "100")]
+        publishers: u32,
+
+        /// Mapping mode (mdim|hash)
+        #[arg(long, default_value = "mdim")]
+        mapping: String,
+
+        /// Payload size in bytes
+        #[arg(long, default_value = "1024")]
+        payload: u32,
+
+        /// Rate per publisher (msg/s). If omitted or <= 0, runs at max speed (no delay)
+        #[arg(long, alias = "qps", allow_hyphen_values = true)]
+        rate: Option<i32>,
+
+        /// Duration in seconds
+        #[arg(long, default_value = "60")]
+        duration: u32,
+
+        /// Optional CSV output file path (stdout if omitted)
+        #[arg(long)]
+        csv: Option<String>,
+    },
+    /// Multi-topic subscriber: spawn many per-key subscriptions
+    #[command(name = "mt-sub")]
+    MtSub {
+        /// Messaging engine (zenoh|mqtt|redis)
+        #[arg(long, default_value = "zenoh")]
+        engine: String,
+
+        /// Engine connect options as KEY=VALUE (repeatable)
+        #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+        connect: Vec<String>,
+
+        /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+        #[arg(long)]
+        endpoint: Vec<String>,
+
+        /// Topic prefix, e.g., bench/mtopic
+        #[arg(long, default_value = "bench/mtopic")]
+        topic_prefix: String,
+
+        /// Dimensions: tenants, regions, services, shards
+        #[arg(long, default_value = "10")]
+        tenants: u32,
+        #[arg(long, default_value = "2")]
+        regions: u32,
+        #[arg(long, default_value = "5")]
+        services: u32,
+        #[arg(long, default_value = "10")]
+        shards: u32,
+
+        /// Number of per-key subscribers (<= T*R*S*K)
+        #[arg(long, default_value = "100")]
+        subscribers: u32,
+
+        /// Mapping mode (mdim|hash)
+        #[arg(long, default_value = "hash")]
+        mapping: String,
+
+        /// Duration in seconds
+        #[arg(long, default_value = "60")]
+        duration: u32,
 
         /// Optional CSV output file path (stdout if omitted)
         #[arg(long)]
@@ -289,6 +388,136 @@ async fn main() -> Result<()> {
             if let Some(h) = agg_handle {
                 h.abort();
             }
+            Ok(())
+        }
+        Commands::MtPub {
+            engine,
+            connect,
+            endpoint,
+            topic_prefix,
+            tenants,
+            regions,
+            services,
+            shards,
+            publishers,
+            mapping,
+            payload,
+            rate,
+            duration,
+            csv,
+        } => {
+            let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
+            let mut conn = parse_connect_kv(&connect);
+            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
+            let mapping = match mapping.as_str() { "mdim" => KeyMappingMode::MDim, _ => KeyMappingMode::Hash };
+
+            // Aggregate CSV via shared stats (like pub/sub)
+            let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
+            let mut agg_output = if let Some(ref path) = csv {
+                Some(OutputWriter::new_csv(path.clone()).await?)
+            } else {
+                Some(OutputWriter::new_stdout())
+            };
+            let agg_stats_clone = shared_stats.clone();
+            let agg_handle = if let Some(stats) = agg_stats_clone.clone() {
+                let mut out = agg_output.take();
+                Some(tokio::spawn(async move {
+                    let mut t = tokio::time::interval(std::time::Duration::from_secs(
+                        snapshot_interval_secs,
+                    ));
+                    loop {
+                        t.tick().await;
+                        let snap = stats.snapshot().await;
+                        if let Some(ref mut o) = out {
+                            let _ = o.write_snapshot(&snap).await;
+                        }
+                    }
+                }))
+            } else { None };
+
+            let cfg = MultiTopicConfig {
+                engine: engine.clone(),
+                connect: conn.clone(),
+                topic_prefix,
+                tenants,
+                regions,
+                services,
+                shards,
+                publishers,
+                mapping,
+                payload_size: payload as usize,
+                rate_per_pub: match rate { Some(v) if v > 0 => Some(v as f64), _ => None },
+                duration_secs: duration as u64,
+                snapshot_interval_secs,
+                shared_stats: shared_stats.clone(),
+                disable_internal_snapshot: true,
+            };
+            run_multi_topic(cfg).await?;
+            if let Some(stats) = shared_stats {
+                if let Some(mut out) = agg_output { let snap = stats.snapshot().await; let _ = out.write_snapshot(&snap).await; }
+            }
+            if let Some(h) = agg_handle { h.abort(); }
+            Ok(())
+        }
+        Commands::MtSub {
+            engine,
+            connect,
+            endpoint,
+            topic_prefix,
+            tenants,
+            regions,
+            services,
+            shards,
+            subscribers,
+            mapping,
+            duration,
+            csv,
+        } => {
+            let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
+            let mut conn = parse_connect_kv(&connect);
+            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
+            let mapping = match mapping.as_str() { "mdim" => KeyMappingMode::MDim, _ => KeyMappingMode::Hash };
+
+            // Aggregate CSV via shared stats
+            let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
+            let mut agg_output = if let Some(ref path) = csv {
+                Some(OutputWriter::new_csv(path.clone()).await?)
+            } else { Some(OutputWriter::new_stdout()) };
+            let agg_stats_clone = shared_stats.clone();
+            let agg_handle = if let Some(stats) = agg_stats_clone.clone() {
+                let mut out = agg_output.take();
+                Some(tokio::spawn(async move {
+                    let mut t = tokio::time::interval(std::time::Duration::from_secs(
+                        snapshot_interval_secs,
+                    ));
+                    loop {
+                        t.tick().await;
+                        let snap = stats.snapshot().await;
+                        if let Some(ref mut o) = out { let _ = o.write_snapshot(&snap).await; }
+                    }
+                }))
+            } else { None };
+
+            let cfg = MultiTopicSubConfig {
+                engine: engine.clone(),
+                connect: conn.clone(),
+                topic_prefix,
+                tenants,
+                regions,
+                services,
+                shards,
+                subscribers,
+                mapping,
+                duration_secs: duration as u64,
+                snapshot_interval_secs,
+                shared_stats: shared_stats.clone(),
+                disable_internal_snapshot: true,
+            };
+            run_multi_topic_sub(cfg).await?;
+            if let Some(stats) = shared_stats {
+                if let Some(mut out) = agg_output { let snap = stats.snapshot().await; let _ = out.write_snapshot(&snap).await; }
+            }
+            if let Some(h) = agg_handle { h.abort(); }
             Ok(())
         }
         Commands::Sub {
