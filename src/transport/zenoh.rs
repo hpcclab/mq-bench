@@ -1,0 +1,219 @@
+//! Zenoh adapter implementing the Transport trait.
+
+use std::{pin::Pin, sync::Arc};
+
+use bytes::Bytes;
+use flume::Receiver;
+use futures::{Stream, stream};
+
+use super::{
+    ConnectOptions, IncomingQuery, Payload, QueryResponder, QueryResponderInner,
+    Transport, TransportError, TransportMessage,
+};
+#[allow(unused_imports)]
+use zenoh::bytes::ZBytes;
+
+pub struct ZenohTransport {
+    session: zenoh::Session,
+}
+
+pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
+    let mut cfg = zenoh::config::Config::default();
+    cfg.insert_json5("mode", "\"client\"")
+        .map_err(|e| TransportError::Connect(e.to_string()))?;
+    if let Some(eps) = opts
+        .params
+        .get("endpoint")
+        .cloned()
+        .or_else(|| opts.params.get("endpoints").cloned())
+    {
+        let list = if eps.starts_with('[') {
+            eps
+        } else {
+            format!("[\"{}\"]", eps)
+        };
+        cfg.insert_json5("connect/endpoints", &list)
+            .map_err(|e| TransportError::Connect(e.to_string()))?;
+    }
+    cfg.insert_json5("scouting/multicast/enabled", "false")
+        .map_err(|e| TransportError::Connect(e.to_string()))?;
+    cfg.insert_json5("scouting/gossip/enabled", "false")
+        .map_err(|e| TransportError::Connect(e.to_string()))?;
+
+    let session = zenoh::open(cfg)
+        .await
+        .map_err(|e| TransportError::Connect(e.to_string()))?;
+    Ok(Box::new(ZenohTransport { session }))
+}
+
+#[async_trait::async_trait]
+impl Transport for ZenohTransport {
+    async fn publish(&self, topic: &str, payload: Bytes) -> Result<(), TransportError> {
+        self.session
+            .put(topic, payload)
+            .await
+            .map_err(|e| TransportError::Publish(e.to_string()))
+    }
+
+    async fn subscribe(
+        &self,
+        expr: &str,
+        handler: Box<dyn Fn(TransportMessage) + Send + Sync + 'static>,
+    ) -> Result<Box<dyn super::Subscription>, TransportError> {
+        // Use Zenoh's callback directly and forward to handler without extra channel when possible.
+        let handler = Arc::new(handler);
+        let h2 = handler.clone();
+        let sub = self
+            .session
+            .declare_subscriber(expr)
+            .callback(move |sample| {
+                // Minimal work in callback
+                (h2)(TransportMessage {
+                    payload: Payload::from_zenoh(sample.payload().clone()),
+                });
+            })
+            .await
+            .map_err(|e| TransportError::Subscribe(e.to_string()))?;
+        // Box the concrete subscriber as Any to avoid depending on its concrete type
+        let boxed: Box<dyn std::any::Any + Send> = Box::new(sub);
+        Ok(Box::new(ZenohSubscription {
+            inner: std::sync::Mutex::new(Some(boxed)),
+        }))
+    }
+
+    async fn create_publisher(&self, topic: &str) -> Result<Box<dyn super::Publisher>, TransportError> {
+        let pub_decl = self
+            .session
+            .declare_publisher(topic.to_string())
+            .await
+            .map_err(|e| TransportError::Publish(e.to_string()))?;
+        Ok(Box::new(ZenohPublisher { inner: pub_decl }))
+    }
+
+    async fn request(&self, subject: &str, _payload: Bytes) -> Result<Payload, TransportError> {
+        // Minimal implementation: wait for first reply, ignore payload content for now.
+        let replies = self
+            .session
+            .get(subject)
+            .with(flume::bounded(1))
+            .await
+            .map_err(|e| TransportError::Request(e.to_string()))?;
+        let reply = replies
+            .recv_async()
+            .await
+            .map_err(|e| TransportError::Request(e.to_string()))?;
+        match reply.result() {
+            Ok(sample) => Ok(Payload::from_zenoh(sample.payload().clone())),
+            Err(e) => Err(TransportError::Request(e.to_string())),
+        }
+    }
+
+    async fn register_queryable(&self, subject: &str, handler: Box<dyn Fn(IncomingQuery) + Send + Sync + 'static>) -> Result<Box<dyn super::QueryRegistration>, TransportError> {
+        let handler = Arc::new(handler);
+        let h2 = handler.clone();
+        let q = self
+            .session
+            .declare_queryable(subject)
+            .callback(move |query| {
+                let subject = query.key_expr().to_string();
+                let payload = query.payload().cloned().unwrap_or_else(|| ZBytes::new());
+                let responder = ZenohResponder::new(query);
+                let incoming = IncomingQuery {
+                    subject,
+                    payload: Payload::from_zenoh(payload),
+                    correlation: None,
+                    responder: QueryResponder { inner: Arc::new(responder) },
+                };
+                (h2)(incoming);
+            })
+            .await
+            .map_err(|e| TransportError::Subscribe(e.to_string()))?;
+        let boxed: Box<dyn std::any::Any + Send> = Box::new(q);
+        Ok(Box::new(ZenohQueryRegistration { inner: std::sync::Mutex::new(Some(boxed)) }))
+    }
+
+    async fn shutdown(&self) -> Result<(), TransportError> {
+        self.session
+            .close()
+            .await
+            .map_err(|e| TransportError::Other(e.to_string()))
+    }
+
+    async fn health_check(&self) -> Result<(), TransportError> {
+        Ok(())
+    }
+}
+
+struct ZenohResponder {
+    query: zenoh::query::Query,
+}
+
+impl ZenohResponder {
+    fn new(query: zenoh::query::Query) -> Self {
+        Self { query }
+    }
+}
+
+#[async_trait::async_trait]
+impl QueryResponderInner for ZenohResponder {
+    async fn send(&self, payload: Bytes) -> Result<(), TransportError> {
+        self.query
+            .reply(self.query.key_expr(), payload)
+            .await
+            .map_err(|e| TransportError::Other(e.to_string()))
+    }
+    async fn end(&self) -> Result<(), TransportError> {
+        Ok(())
+    }
+}
+
+fn flume_to_stream<T: Send + 'static>(
+    rx: Receiver<T>,
+    guard: Option<Box<dyn Send>>,
+) -> Pin<Box<dyn Stream<Item = T> + Send>> {
+    // Capture both the receiver and guard in the stream state so the guard stays alive
+    let state = (rx, guard);
+    Box::pin(stream::unfold(state, |(rx, guard)| async move {
+        match rx.recv_async().await {
+            Ok(item) => Some((item, (rx, guard))),
+            Err(_) => None,
+        }
+    }))
+}
+
+struct ZenohSubscription {
+    inner: std::sync::Mutex<Option<Box<dyn std::any::Any + Send>>>,
+}
+
+#[async_trait::async_trait]
+impl super::Subscription for ZenohSubscription {
+    async fn shutdown(&self) -> Result<(), TransportError> {
+        // Drop the inner subscriber to stop callbacks
+        let _ = self.inner.lock().unwrap().take();
+        Ok(())
+    }
+}
+
+struct ZenohQueryRegistration {
+    inner: std::sync::Mutex<Option<Box<dyn std::any::Any + Send>>>,
+}
+
+#[async_trait::async_trait]
+impl super::QueryRegistration for ZenohQueryRegistration {
+    async fn shutdown(&self) -> Result<(), TransportError> {
+        let _ = self.inner.lock().unwrap().take();
+        Ok(())
+    }
+}
+
+struct ZenohPublisher {
+    inner: zenoh::pubsub::Publisher<'static>,
+}
+
+#[async_trait::async_trait]
+impl super::Publisher for ZenohPublisher {
+    async fn publish(&self, payload: Bytes) -> Result<(), TransportError> {
+        self.inner.put(payload).await.map_err(|e| TransportError::Publish(e.to_string()))
+    }
+    async fn shutdown(&self) -> Result<(), TransportError> { Ok(()) }
+}

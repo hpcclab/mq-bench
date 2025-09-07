@@ -2,7 +2,8 @@ use crate::metrics::stats::Stats;
 use crate::output::OutputWriter;
 use crate::rate::RateController;
 use anyhow::Result;
-use zenoh::query::ConsolidationMode;
+use bytes::Bytes;
+use crate::transport::{TransportBuilder, Engine, ConnectOptions};
 use std::sync::Arc;
 use std::pin::Pin;
 use futures::Future;
@@ -35,13 +36,14 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
 	println!("  Timeout: {} ms", config.timeout_ms);
 	println!("  Duration: {} s", config.duration_secs);
 
-	// Zenoh session
-	let mut zenoh_config = zenoh::config::Config::default();
-	zenoh_config.insert_json5("mode", "\"client\"").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	zenoh_config.insert_json5("connect/endpoints", &format!("[\"{}\"]", config.endpoint)).map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	zenoh_config.insert_json5("scouting/multicast/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	zenoh_config.insert_json5("scouting/gossip/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	let session = zenoh::open(zenoh_config).await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
+	// Transport session
+	let mut opts = ConnectOptions::default();
+	opts.params.insert("endpoint".into(), config.endpoint.clone());
+	let transport: Arc<Box<dyn crate::transport::Transport>> = Arc::from(
+		TransportBuilder::connect(Engine::Zenoh, opts)
+			.await
+			.map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?
+	);
 
 	// Stats and output
 	let stats = if let Some(s) = &config.shared_stats { s.clone() } else { Arc::new(Stats::new()) };
@@ -90,7 +92,7 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
 	// Query loop
 	let start = Instant::now();
 	let mut rate = config.qps.map(|q| RateController::new(q as f64));
-	let mut inflight: FuturesUnordered<Pin<Box<dyn Future<Output = Result<(Option<Duration>, Duration, u32), ()>> + Send>>> = FuturesUnordered::new();
+	let mut inflight: FuturesUnordered<Pin<Box<dyn Future<Output = Result<Option<Duration>, ()>> + Send>>> = FuturesUnordered::new();
 	let mut total_sent = 0u64;
 	let mut total_recv = 0u64;
 
@@ -104,36 +106,23 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
 		// Maintain concurrency
 		while inflight.len() < config.concurrency as usize {
 			if let Some(rc) = &mut rate { rc.wait_for_next().await; }
-			let session = session.clone();
 			let key_expr = config.key_expr.clone();
 			let tx_ev = tx.clone();
 			let timeout_ms = config.timeout_ms;
-			let fut: Pin<Box<dyn Future<Output = Result<(Option<Duration>, Duration, u32), ()>> + Send>> = Box::pin(async move {
+			let transport = Arc::clone(&transport);
+			let fut: Pin<Box<dyn Future<Output = Result<Option<Duration>, ()>> + Send>> = Box::pin(async move {
 				let t0 = Instant::now();
-				// Use handler-based API with a flume channel to receive replies efficiently
-				let res = session
-					.get(&key_expr)
-					.congestion_control(zenoh::qos::CongestionControl::Block)
-					.consolidation(ConsolidationMode::None)
-					.timeout(Duration::from_millis(timeout_ms))
-					.with(flume::bounded(64))
-					.await;
-				match res {
-					Ok(replies) => {
-						let mut t_first: Option<Duration> = None;
-						let mut t_last: Duration = Duration::from_nanos(0);
-						let mut n = 0u32;
-						while let Ok(_reply) = replies.recv_async().await {
-							let now = t0.elapsed();
-							if t_first.is_none() { t_first = Some(now); }
-							t_last = now;
-							n += 1;
-						}
-						let _ = tx_ev.try_send(Ev::Sent); // query sent
-						if let Some(ttf) = t_first { let _ = tx_ev.try_send(Ev::Recv(ttf.as_nanos() as u64)); }
-						Ok((t_first, t_last, n))
+				// First-reply request with timeout around the transport call
+				let fut = transport.request(&key_expr, Bytes::new());
+				match tokio::time::timeout(Duration::from_millis(timeout_ms), fut).await {
+					Ok(Ok(_payload)) => {
+						let now = t0.elapsed();
+						let _ = tx_ev.try_send(Ev::Sent);
+						let _ = tx_ev.try_send(Ev::Recv(now.as_nanos() as u64));
+						Ok(Some(now))
 					}
-					Err(e) => { eprintln!("Requester query error: {}", e); let _ = tx_ev.try_send(Ev::Err); Err(()) }
+					Ok(Err(e)) => { eprintln!("Requester query error: {}", e); let _ = tx_ev.try_send(Ev::Err); Err(()) }
+					Err(_to) => { eprintln!("Requester timeout"); let _ = tx_ev.try_send(Ev::Err); Err(()) }
 				}
 			});
 			inflight.push(fut);
@@ -162,6 +151,7 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
 	}
 
 	if let Some(h) = snapshot_handle { h.abort(); }
-	session.close().await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
+	// Close transport
+	transport.shutdown().await.map_err(|e| anyhow::Error::msg(format!("transport shutdown error: {}", e)))?;
 	Ok(())
 }

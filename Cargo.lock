@@ -1380,6 +1380,8 @@ name = "mq-bench"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "bytes",
  "chrono",
  "clap",
  "csv",
@@ -1389,6 +1391,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "thiserror 2.0.16",
  "tokio",
  "tracing",
  "tracing-subscriber",

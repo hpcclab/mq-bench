@@ -20,9 +20,8 @@ impl OutputWriter {
         let mut writer = BufWriter::new(file);
         
         // Write CSV header
-        writer.write_all(StatsSnapshot::csv_header().as_bytes()).await?;
-        writer.write_all(b"\n").await?;
-        writer.flush().await?;
+    writer.write_all(StatsSnapshot::csv_header().as_bytes()).await?;
+    writer.write_all(b"\n").await?;
         
         println!("Writing CSV output to: {}", path);
         Ok(Self::Csv(writer))
@@ -38,6 +37,7 @@ impl OutputWriter {
             Self::Csv(writer) => {
                 writer.write_all(snapshot.to_csv_row().as_bytes()).await?;
                 writer.write_all(b"\n").await?;
+                // Flush so external tail/readers see progress promptly
                 writer.flush().await?;
             }
             Self::Stdout => {

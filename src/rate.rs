@@ -17,8 +17,8 @@ impl RateController {
     /// Create new rate controller for target messages per second
     /// Implementation: token bucket with adaptive tick (<=1000 ticks/s) to amortize timer cost.
     pub fn new(msgs_per_second: f64) -> Self {
-        // Adaptive tick: aim for <= 1000 ticks per second; not less than 1ms
-        let ticks_per_sec = msgs_per_second.max(1.0).min(1000.0);
+        // Adaptive tick: aim for <= 100 ticks per second; not less than 10ms
+        let ticks_per_sec = msgs_per_second.max(1.0).min(100.0);
         let tick = Duration::from_secs_f64(1.0 / ticks_per_sec);
         let mut ticker = interval(tick);
         ticker.set_missed_tick_behavior(MissedTickBehavior::Burst);

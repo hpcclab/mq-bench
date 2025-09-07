@@ -65,11 +65,11 @@ Done when: CSV outputs include throughput and latency stats; runs complete witho
 - [ ] Adapter: implement `Transport` for Zenoh (feature `transport-zenoh`, default-on).
 - [ ] Refactor roles (`publisher`, `subscriber`, `requester`, `queryable`) to use the `Transport` trait.
   - Preserve existing CLIs/metrics; only the transport binding changes under the hood.
-- [ ] CLI: add `--engine` enum with values: `zenoh` (default), `tcp`, `nats`, `redis`, `mqtt`, `grpc`.
+- [ ] CLI: add `--engine` enum with values: `zenoh` (default), `tcp`, `redis` (others later).
   - Add generic `--connect` (repeatable `KEY=VALUE`) to pass engine-specific options.
   - Back-compat: `--endpoint` still works for `zenoh`; translate into `--connect`.
 - [ ] Features and deps
-  - Add Cargo features per engine to keep deps optional (e.g., `transport-nats`, `transport-redis`, ...).
+  - Add Cargo features per engine to keep deps optional. Prioritize: `transport-tcp`, `transport-redis`.
   - CI/build profiles compile only `zenoh` by default; others via `--features`.
 - [ ] Testing
   - Add a mock transport to unit-test roles without a broker.
@@ -160,30 +160,30 @@ Done when: scripts can run with routers up and produce artifact folders for each
 
 ## Phase 10 — Non‑Zenoh Baselines (Comparison Engines)
 
-Baseline engines to implement after the refactor above:
+Baseline engines to implement after the refactor above (prioritized first-tier, then later-stage):
 
-- [ ] Raw TCP (reference ceiling)
+- [ ] Raw TCP (reference ceiling) — FIRST TIER
   - Client/server over `tokio::net::TcpStream` with simple length-prefixed frames.
   - Pub/Sub emulation: prefix each frame with topic length + topic bytes + payload.
   - Req/Rep: correlation id in header; echo server for baseline.
-- [ ] NATS
-  - Use `async-nats` crate; pub/sub and request/reply.
-  - CLI: `--connect url=nats://127.0.0.1:4222`.
-- [ ] Redis
+- [ ] Redis — FIRST TIER
   - Use `redis` crate; Pub/Sub for topics; Req/Rep via LIST (RPUSH/BLPOP) or Redis Streams.
   - CLI: `--connect url=redis://127.0.0.1:6379`.
+- [ ] NATS — LATER STAGE
+  - Use `async-nats` crate; pub/sub and request/reply.
+  - CLI: `--connect url=nats://127.0.0.1:4222`.
 - [ ] MQTT (Mosquitto)
   - Use `rumqttc`; QoS 0 for apples-to-apples throughput.
   - CLI: `--connect host=127.0.0.1,port=1883`.
 - [ ] gRPC streaming
   - Use `tonic` for bidi-stream (pub/sub-like) and unary (req/rep) baselines.
 
-Docker & orchestration:
-- [ ] Extend `docker-compose.yml` with services: `nats` (4222), `redis` (6379), `mosquitto` (1883).
+Docker & orchestration (first-tier focus initially):
+- [ ] Extend `docker-compose.yml` with services: `redis` (6379). Add `nats`/`mosquitto` later.
 - [ ] Keep Zenoh routers unchanged; baselines run side-by-side on distinct ports.
 
 Harness & scripts:
-- [ ] Add `scripts/run_baselines.sh` to run the same workloads across engines using `--engine` and `--connect`.
+- [ ] Add `scripts/run_baselines.sh` to run the same workloads across engines using `--engine` and `--connect` (start with `tcp`, `redis`).
 - [ ] Extend existing scenario scripts to accept `ENGINE` env var and pass through connect options.
 - [ ] Artifacts
   - Common CSV schema across engines (throughput, latency percentiles, errors).

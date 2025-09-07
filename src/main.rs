@@ -17,6 +17,7 @@ mod payload;
 mod rate;
 mod roles;
 mod time_sync;
+mod transport;
 
 #[derive(Parser)]
 #[command(name = "mq-bench")]

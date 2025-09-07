@@ -2,11 +2,12 @@ use crate::payload::generate_payload;
 use crate::metrics::stats::Stats;
 use crate::output::OutputWriter;
 use anyhow::Result;
+use bytes::Bytes;
+use crate::transport::{TransportBuilder, Engine, ConnectOptions, IncomingQuery};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
 use tokio::time::{interval, sleep};
-use flume;
 
 pub struct QueryableConfig {
 	pub endpoint: String,
@@ -27,13 +28,12 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
 	println!("  Reply size: {} bytes", config.reply_size);
 	println!("  Processing delay: {} ms", config.proc_delay_ms);
 
-	// Zenoh session
-	let mut zenoh_config = zenoh::config::Config::default();
-	zenoh_config.insert_json5("mode", "\"client\"").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	zenoh_config.insert_json5("connect/endpoints", &format!("[\"{}\"]", config.endpoint)).map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	zenoh_config.insert_json5("scouting/multicast/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	zenoh_config.insert_json5("scouting/gossip/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-	let session = zenoh::open(zenoh_config).await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
+	// Transport session
+	let mut opts = ConnectOptions::default();
+	opts.params.insert("endpoint".into(), config.endpoint.clone());
+	let transport = TransportBuilder::connect(Engine::Zenoh, opts)
+		.await
+		.map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
 
 	// Stats and output
 	let stats = if let Some(s) = &config.shared_stats { s.clone() } else { Arc::new(Stats::new()) };
@@ -61,41 +61,33 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
 
 	// Prepare a reusable payload buffer to avoid per-reply allocations
 	let reply_size = config.reply_size;
-	let cached_payload = generate_payload(0, reply_size);
-	// Worker channel to process queries without per-query task spawns
-	let (tx, rx) = flume::bounded::<zenoh::query::Query>(10_000);
-	{
-		let stats_worker = stats.clone();
-		// Use the cached payload inside the worker; clone per reply to hand to zenoh
-		let proc_delay = config.proc_delay_ms;
-		let payload_template = cached_payload.clone();
-		tokio::spawn(async move {
-			while let Ok(query) = rx.recv_async().await {
-				if proc_delay > 0 { sleep(Duration::from_millis(proc_delay)).await; }
-				let payload = payload_template.clone();
-				if let Err(e) = query.reply(query.key_expr(), payload).await {
-					eprintln!("Queryable reply error: {}", e);
-					stats_worker.record_error().await;
-				} else {
-					stats_worker.record_sent().await;
-				}
-			}
-		});
-	}
+	let payload_template = generate_payload(0, reply_size);
 
-	// Register queryables and keep them alive
-	let mut _queryables: Vec<_> = Vec::new();
+	// Register queryables with handler-based API, keep guards alive
+	let mut _guards = Vec::new();
 	for prefix in &config.serve_prefix {
-		let tx_cb = tx.clone();
-		let q = session
-			.declare_queryable(prefix)
-			.callback(move |query| {
-				// Try to enqueue; on backpressure, drop to keep callback cheap
-				let _ = tx_cb.try_send(query);
-			})
+		let stats_worker = stats.clone();
+		let proc_delay = config.proc_delay_ms;
+		let payload_template = payload_template.clone();
+		let guard = transport
+			.register_queryable(prefix, Box::new(move |IncomingQuery { responder, .. }| {
+				// Minimal handler: spawn to avoid blocking zenoh callback
+				let stats_worker = stats_worker.clone();
+				let payload_template = payload_template.clone();
+				tokio::spawn(async move {
+					if proc_delay > 0 { sleep(Duration::from_millis(proc_delay)).await; }
+					let payload = Bytes::from(payload_template.clone());
+					if let Err(e) = responder.send(payload).await {
+						eprintln!("Queryable reply error: {}", e);
+						stats_worker.record_error().await;
+					} else {
+						stats_worker.record_sent().await;
+					}
+				});
+			}))
 			.await
-			.map_err(|e| anyhow::Error::msg(e.to_string()))?;
-		_queryables.push(q);
+			.map_err(|e| anyhow::Error::msg(format!("register_queryable error: {}", e)))?;
+		_guards.push(guard);
 	}
 
 	println!("Queryable(s) registered. Waiting for queries...");
@@ -117,6 +109,8 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
 	}
 
 	if let Some(h) = snapshot_handle { h.abort(); }
-	session.close().await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
+	// Shutdown queryable registrations then transport
+	for g in _guards { let _ = g.shutdown().await; }
+	transport.shutdown().await.map_err(|e| anyhow::Error::msg(format!("transport shutdown error: {}", e)))?;
 	Ok(())
 }

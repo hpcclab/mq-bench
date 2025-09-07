@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/lib.sh"
 RUN_ID=${1:-${RUN_ID:-run_$(date +%Y%m%d_%H%M%S)}}
 def PAYLOAD "${PAYLOAD:-1024}"
 def RATE     "${RATE:-10000}"
-def DURATION "${DURATION:-10}"
+def DURATION "${DURATION:-20}"
 def SNAPSHOT "${SNAPSHOT:-5}"
 SUB_ENDPOINT="${SUB_ENDPOINT:-tcp/127.0.0.1:7447}"
 PUB_ENDPOINT="${PUB_ENDPOINT:-tcp/127.0.0.1:7447}"

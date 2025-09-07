@@ -1,12 +1,14 @@
-use crate::payload::parse_header;
 use crate::metrics::stats::Stats;
 use crate::output::OutputWriter;
+use crate::payload::parse_header;
+use crate::time_sync::now_unix_ns_estimate;
+use crate::transport::{ConnectOptions, Engine, TransportBuilder, TransportMessage};
 use anyhow::Result;
+use flume;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tokio::signal;
 use tokio::time::interval;
-use flume;
 
 pub struct SubscriberConfig {
     pub endpoint: String,
@@ -22,21 +24,22 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     println!("Starting subscriber:");
     println!("  Endpoint: {}", config.endpoint);
     println!("  Key: {}", config.key_expr);
-    
-    // Initialize Zenoh session with connection endpoint
-    let mut zenoh_config = zenoh::config::Config::default();
-    zenoh_config.insert_json5("mode", "\"client\"").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    zenoh_config.insert_json5("connect/endpoints", &format!("[\"{}\"]", config.endpoint)).map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    zenoh_config.insert_json5("scouting/multicast/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    zenoh_config.insert_json5("scouting/gossip/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    
-    let session = zenoh::open(zenoh_config).await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    
-    println!("Connected to Zenoh");
-    
+    // Initialize Transport (Zenoh engine by default)
+    let mut opts = ConnectOptions::default();
+    opts.params
+        .insert("endpoint".into(), config.endpoint.clone());
+    let transport = TransportBuilder::connect(Engine::Zenoh, opts)
+        .await
+        .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
+    println!("Connected via transport: Zenoh");
+
     // Initialize statistics (use shared if provided)
-    let stats = if let Some(s) = &config.shared_stats { s.clone() } else { Arc::new(Stats::new()) };
-    
+    let stats = if let Some(s) = &config.shared_stats {
+        s.clone()
+    } else {
+        Arc::new(Stats::new())
+    };
+
     // Setup output writer (only when not aggregated/external)
     let mut output = if let Some(ref path) = config.output_file {
         Some(OutputWriter::new_csv(path.clone()).await?)
@@ -45,7 +48,7 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     } else {
         None
     };
-    
+
     // Start snapshot task (only if not disabled)
     let snapshot_handle = if !config.disable_internal_snapshot {
         let stats_clone = Arc::clone(&stats);
@@ -69,71 +72,103 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
                 }
             }
         }))
-    } else { None };
-    
-    // Channel + worker to avoid per-message task spawn overhead
-    let (tx, rx) = flume::bounded::<u64>(10_000);
+    } else {
+        None
+    };
+
+    // Channel + worker to avoid per-message work in callback; send (recv_time, header_bytes)
+    let (tx, rx) = flume::unbounded::<(u64, [u8; 24])>();
     let stats_worker = stats.clone();
     tokio::spawn(async move {
-        while let Ok(lat) = rx.recv_async().await {
-            // Update stats in a single task to reduce contention
-            stats_worker.record_received(lat).await;
+        let mut buf = Vec::with_capacity(1024);
+        loop {
+            // Block until at least 1 item
+            let first = match rx.recv_async().await {
+                Ok(v) => v,
+                Err(_) => break,
+            };
+            buf.clear();
+            buf.push(first);
+            // Drain a small batch without awaiting to amortize locking
+            while let Ok(v) = rx.try_recv() {
+                buf.push(v);
+                if buf.len() >= 1024 {
+                    break;
+                }
+            }
+            // Parse headers and compute latencies
+            let mut lats = Vec::with_capacity(buf.len());
+            for (recv_ns, hdr) in buf.drain(..) {
+                if let Ok(h) = parse_header(&hdr) {
+                    lats.push(recv_ns.saturating_sub(h.timestamp_ns));
+                }
+            }
+            stats_worker.record_received_batch(&lats).await;
         }
     });
 
-    // Create subscriber with callback, push latencies into channel
-    let tx_cb = tx.clone();
-    let _subscriber = session
-        .declare_subscriber(&config.key_expr)
-        .callback(move |sample| {
-            let tx = tx_cb.clone();
-            // Compute latency synchronously and try to enqueue
-            let receive_time = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
-        match parse_header(&sample.payload().to_bytes()) {
-                Ok(header) => {
-                    let latency_ns = receive_time.saturating_sub(header.timestamp_ns);
-            let _ = tx.try_send(latency_ns); // drop on backpressure to avoid blocking
-                }
-                Err(e) => {
-                    eprintln!("Failed to parse message header: {}", e);
-                    // We avoid recording error here to keep callback lightweight
-                }
+    // Subscribe via Transport with a handler
+    let handler_tx = tx.clone();
+    let subscription = transport
+        .subscribe(&config.key_expr, Box::new(move |msg: TransportMessage| {
+            // Minimal callback: copy 24-byte header and enqueue with receive timestamp
+            let mut hdr = [0u8; 24];
+            let bytes = msg.payload.as_cow();
+            if bytes.len() >= 24 {
+                hdr.copy_from_slice(&bytes[..24]);
+                let recv = now_unix_ns_estimate();
+                let _ = handler_tx.try_send((recv, hdr));
             }
-        })
+        }))
         .await
-        .map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    
+        .map_err(|e| anyhow::Error::msg(format!("subscribe error: {}", e)))?;
     println!("Subscribed to key expression: {}", config.key_expr);
-    
-    // Wait for Ctrl+C
-    tokio::select! {
-        _ = signal::ctrl_c() => {
-            println!("Ctrl+C received, stopping subscriber");
-        }
-    }
-    
+
+    // Wait for Ctrl+C or until process exits; callbacks will keep updating stats
+    signal::ctrl_c().await?;
+    println!("Ctrl+C received, stopping subscriber");
+
     // Final statistics
     let final_stats = stats.snapshot().await;
     println!("\nFinal Subscriber Statistics:");
     println!("  Messages received: {}", final_stats.received_count);
     println!("  Errors: {}", final_stats.error_count);
-    println!("  Average rate: {:.2} msg/s", final_stats.total_throughput());
-    println!("  Latency P50: {:.2}ms", final_stats.latency_ns_p50 as f64 / 1_000_000.0);
-    println!("  Latency P95: {:.2}ms", final_stats.latency_ns_p95 as f64 / 1_000_000.0);
-    println!("  Latency P99: {:.2}ms", final_stats.latency_ns_p99 as f64 / 1_000_000.0);
-    println!("  Total duration: {:.2}s", final_stats.total_duration.as_secs_f64());
-    
+    println!(
+        "  Average rate: {:.2} msg/s",
+        final_stats.total_throughput()
+    );
+    println!(
+        "  Latency P50: {:.2}ms",
+        final_stats.latency_ns_p50 as f64 / 1_000_000.0
+    );
+    println!(
+        "  Latency P95: {:.2}ms",
+        final_stats.latency_ns_p95 as f64 / 1_000_000.0
+    );
+    println!(
+        "  Latency P99: {:.2}ms",
+        final_stats.latency_ns_p99 as f64 / 1_000_000.0
+    );
+    println!(
+        "  Total duration: {:.2}s",
+        final_stats.total_duration.as_secs_f64()
+    );
+
     // Write final snapshot to output
     if let Some(ref mut out) = output {
         out.write_snapshot(&final_stats).await?;
     }
-    
+
     // Clean up
-    if let Some(h) = snapshot_handle { h.abort(); }
-    session.close().await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    
+    if let Some(h) = snapshot_handle {
+        h.abort();
+    }
+    // Graceful shutdown of subscription and transport
+    let _ = subscription.shutdown().await;
+    transport
+        .shutdown()
+        .await
+        .map_err(|e| anyhow::Error::msg(format!("transport shutdown error: {}", e)))?;
+
     Ok(())
 }

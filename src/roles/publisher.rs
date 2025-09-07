@@ -3,6 +3,8 @@ use crate::rate::RateController;
 use crate::metrics::stats::Stats;
 use crate::output::OutputWriter;
 use anyhow::Result;
+use bytes::Bytes;
+use crate::transport::{TransportBuilder, Engine, ConnectOptions, Transport};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
@@ -32,18 +34,17 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     } else {
         println!("  Duration: unlimited (until Ctrl+C)");
     }
-    
-    // Initialize Zenoh session with connection endpoint
-    let mut zenoh_config = zenoh::config::Config::default();
-    zenoh_config.insert_json5("mode", "\"client\"").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    zenoh_config.insert_json5("connect/endpoints", &format!("[\"{}\"]", config.endpoint)).map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    zenoh_config.insert_json5("scouting/multicast/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    zenoh_config.insert_json5("scouting/gossip/enabled", "false").map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    
-    let session = zenoh::open(zenoh_config).await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    let publisher = session.declare_publisher(&config.key_expr).await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
-    
-    println!("Connected to Zenoh");
+    // Initialize Transport (default to Zenoh engine; map endpoint to connect options)
+    let mut opts = ConnectOptions::default();
+    opts.params.insert("endpoint".into(), config.endpoint.clone());
+    let transport: Box<dyn Transport> = TransportBuilder::connect(Engine::Zenoh, opts)
+        .await
+        .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
+    println!("Connected via transport: Zenoh");
+    // Pre-declare publisher for performance
+    let publisher = transport.create_publisher(&config.key_expr)
+        .await
+        .map_err(|e| anyhow::Error::msg(format!("create_publisher error: {}", e)))?;
     
     // Initialize statistics and rate controller
     let stats = if let Some(s) = &config.shared_stats { s.clone() } else { Arc::new(Stats::new()) };
@@ -104,15 +105,16 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
             }
             
             // Generate and send payload
-            let payload = generate_payload(sequence, config.payload_size);
-            
-            match publisher.put(payload).await {
+        let payload = generate_payload(sequence, config.payload_size);
+        let bytes = Bytes::from(payload);
+
+    match publisher.publish(bytes).await {
                 Ok(_) => {
                     stats.record_sent().await;
                     sequence += 1;
                 }
                 Err(e) => {
-                    eprintln!("Send error: {}", e);
+            eprintln!("Send error: {}", e);
                     stats.record_error().await;
                 }
             }
@@ -147,7 +149,7 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     
     // Clean up
     if let Some(h) = snapshot_handle { h.abort(); }
-    session.close().await.map_err(|e| anyhow::Error::msg(e.to_string()))?;
+    transport.shutdown().await.map_err(|e| anyhow::Error::msg(format!("transport shutdown error: {}", e)))?;
     
     Ok(())
 }

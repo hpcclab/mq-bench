@@ -1,4 +1,5 @@
 use hdrhistogram::Histogram;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 
@@ -8,9 +9,9 @@ pub struct Stats {
     latency_hist: RwLock<Histogram<u64>>,
     
     // Counters
-    pub sent_count: RwLock<u64>,
-    pub received_count: RwLock<u64>,
-    pub error_count: RwLock<u64>,
+    pub sent_count: AtomicU64,
+    pub received_count: AtomicU64,
+    pub error_count: AtomicU64,
     
     // Timing
     start_time: Instant,
@@ -31,9 +32,9 @@ impl Stats {
         Self {
             // 1ns to 60s range, 3 significant digits
             latency_hist: RwLock::new(Histogram::new_with_bounds(1, 60_000_000_000, 3).unwrap()),
-            sent_count: RwLock::new(0),
-            received_count: RwLock::new(0),
-            error_count: RwLock::new(0),
+            sent_count: AtomicU64::new(0),
+            received_count: AtomicU64::new(0),
+            error_count: AtomicU64::new(0),
             start_time: now,
             last_snapshot: RwLock::new(now),
             last_sent_count: RwLock::new(0),
@@ -45,16 +46,14 @@ impl Stats {
     
     /// Record a sent message
     pub async fn record_sent(&self) {
-        let mut count = self.sent_count.write().await;
-        *count += 1;
+    self.sent_count.fetch_add(1, Ordering::Relaxed);
     let mut first = self.first_sent_time.write().await;
     if first.is_none() { *first = Some(Instant::now()); }
     }
     
     /// Record a received message with latency
     pub async fn record_received(&self, latency_ns: u64) {
-        let mut count = self.received_count.write().await;
-        *count += 1;
+    self.received_count.fetch_add(1, Ordering::Relaxed);
     let mut first = self.first_received_time.write().await;
     if first.is_none() { *first = Some(Instant::now()); }
         
@@ -65,16 +64,32 @@ impl Stats {
     
     /// Record an error
     pub async fn record_error(&self) {
-        let mut count = self.error_count.write().await;
-        *count += 1;
+    self.error_count.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record a batch of received latencies with minimal locking
+    pub async fn record_received_batch(&self, latencies_ns: &[u64]) {
+    if latencies_ns.is_empty() { return; }
+    // Bump received count once
+    self.received_count.fetch_add(latencies_ns.len() as u64, Ordering::Relaxed);
+        // Set first_received_time if unset
+        {
+            let mut first = self.first_received_time.write().await;
+            if first.is_none() { *first = Some(Instant::now()); }
+        }
+        // Record all latencies under a single histogram write lock
+        let mut hist = self.latency_hist.write().await;
+        for &lat in latencies_ns {
+            let _ = hist.record(lat);
+        }
     }
     
     /// Get current snapshot of statistics
     pub async fn snapshot(&self) -> StatsSnapshot {
         let now = Instant::now();
-        let sent = *self.sent_count.read().await;
-        let received = *self.received_count.read().await;
-        let errors = *self.error_count.read().await;
+    let sent = self.sent_count.load(Ordering::Relaxed);
+    let received = self.received_count.load(Ordering::Relaxed);
+    let errors = self.error_count.load(Ordering::Relaxed);
         
         let hist = self.latency_hist.read().await;
         let p50 = hist.value_at_quantile(0.5);
@@ -133,9 +148,9 @@ impl Stats {
     /// Reset all statistics
     #[allow(dead_code)]
     pub async fn reset(&self) {
-        *self.sent_count.write().await = 0;
-        *self.received_count.write().await = 0;
-        *self.error_count.write().await = 0;
+    self.sent_count.store(0, Ordering::Relaxed);
+    self.received_count.store(0, Ordering::Relaxed);
+    self.error_count.store(0, Ordering::Relaxed);
         self.latency_hist.write().await.reset();
         *self.last_snapshot.write().await = Instant::now();
     }
