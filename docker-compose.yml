@@ -3,6 +3,38 @@ networks:
     driver: bridge
 
 services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - zenoh-net
+
+  emqx:
+    image: emqx:5.8
+    container_name: emqx
+    ports:
+      - "1884:1883"   # MQTT TCP
+      - "18084:18083" # Dashboard (optional)
+    environment:
+      - EMQX_ALLOW_ANONYMOUS=true
+      - EMQX_AUTHORIZATION__NO_MATCH=allow
+      - EMQX_LOG__LEVEL=info
+    networks:
+      - zenoh-net
+
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: hivemq
+    ports:
+      - "1885:1883"   # MQTT TCP
+      - "8081:8080"   # Dashboard (optional)
+    networks:
+      - zenoh-net
+
   redis:
     image: redis:7-alpine
     container_name: redis

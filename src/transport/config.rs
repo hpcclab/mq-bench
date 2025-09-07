@@ -5,6 +5,7 @@ pub fn parse_engine(s: &str) -> Option<Engine> {
         "zenoh" => Some(Engine::Zenoh),
         "tcp" => Some(Engine::Tcp),
         "redis" => Some(Engine::Redis),
+    "mqtt" => Some(Engine::Mqtt),
         _ => None,
     }
 }

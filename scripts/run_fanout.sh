@@ -15,7 +15,8 @@ def SNAPSHOT "${SNAPSHOT:-5}"
 
 ART_DIR="artifacts/${RUN_ID}/fanout_singlesite"
 BIN="./target/release/mq-bench"
-ENDPOINT="${ENDPOINT:-tcp/127.0.0.1:7447}"
+ENDPOINT_PUB="${ENDPOINT_PUB:-tcp/127.0.0.1:7447}"
+ENDPOINT_SUB="${ENDPOINT_SUB:-tcp/127.0.0.1:7448}"
 KEY="${KEY:-bench/topic}"
 
 echo "[run_fanout] Run ID: ${RUN_ID} | SUBS=${SUBS} RATE=${RATE} DURATION=${DURATION}s"
@@ -29,9 +30,9 @@ fi
 SUB_CSV="${ART_DIR}/sub_agg.csv"
 PUB_CSV="${ART_DIR}/pub.csv"
 
-echo "Starting ${SUBS} subscribers on ${ENDPOINT} → ${KEY} (aggregated CSV)"
+echo "Starting ${SUBS} subscribers on ${ENDPOINT_SUB} → ${KEY} (aggregated CSV)"
 "${BIN}" --snapshot-interval "${SNAPSHOT}" sub \
-	--endpoint "${ENDPOINT}" \
+	--endpoint "${ENDPOINT_SUB}" \
 	--expr "${KEY}" \
 	--subscribers "${SUBS}" \
 	--csv "${SUB_CSV}" \
@@ -41,11 +42,11 @@ trap 'echo "Stopping subscribers (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 
 
 sleep 1
 
-echo "Running publisher on ${ENDPOINT} → ${KEY}"
+echo "Running publisher on ${ENDPOINT_PUB} → ${KEY}"
 RATE_FLAG=()
 if [[ -n "${RATE}" ]] && (( RATE > 0 )); then RATE_FLAG=(--rate "${RATE}"); fi
 "${BIN}" --snapshot-interval "${SNAPSHOT}" pub \
-	--endpoint "${ENDPOINT}" \
+	--endpoint "${ENDPOINT_PUB}" \
 	--topic-prefix "${KEY}" \
 	--payload "${PAYLOAD}" \
 	"${RATE_FLAG[@]}" \

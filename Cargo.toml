@@ -20,13 +20,14 @@ flume = "0.11"
 bytes = "1"
 thiserror = "2"
 async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
 
 [features]
-default = ["transport-zenoh", "transport-redis"]
+default = ["transport-zenoh", "transport-redis", "transport-mqtt"]
 transport-zenoh = ["dep:zenoh"]
-transport-tcp = []
 transport-redis = ["dep:redis"]
 transport-mock = []
+transport-mqtt = ["dep:rumqttc"]
 
 [dependencies.zenoh]
 version = "1.5.1"
@@ -35,6 +36,10 @@ optional = true
 version = "0.32"
 optional = true
 features = ["tokio-comp", "connection-manager"]
+
+[dependencies.rumqttc]
+version = "0.24"
+optional = true
 
 [profile.release]
 lto = true

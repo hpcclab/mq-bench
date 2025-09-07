@@ -103,9 +103,9 @@ Done when: artifacts directory contains CSVs and summary JSON; optional metrics 
 ## Phase 6 — Scenario Scripts (Compose)
 
 - [x] Add `scripts/run_local_baseline.sh` — 1→1 pub/sub sweeps.
-- [ ] Add `scripts/run_fanout.sh` — 1→N sweeps. (stub present)
+- [x] Add `scripts/run_fanout.sh` — 1→N sweeps. (initial implementation added; aggregates N subs and one pub, writes CSVs)
 - [x] Add `scripts/run_cluster_3r.sh` — 3-router star/ring scenarios.
-- [ ] Add `scripts/run_queries.sh` — requester/queryable sweeps. (stub present; needs wiring to current CLI and artifacts layout)
+- [x] Add `scripts/run_queries.sh` — requester/queryable sweeps. (initial implementation added; supports QPS, concurrency, timeouts, CSVs)
 
 ### Multi-topic fanout plan
 
@@ -163,42 +163,51 @@ Done when: scripts can run with routers up and produce artifact folders for each
 
 ## Phase 10 — Non‑Zenoh Baselines (Comparison Engines)
 
-Baseline engines to implement after the refactor above (prioritized first-tier, then later-stage):
+Plan revision: prioritize MQTT and ZMQ; Redis is de‑prioritized (kept as optional/experimental).
 
-- [ ] Redis — FIRST TIER (start with this)
-  - Use `redis` crate; Pub/Sub for topics; Req/Rep via LIST (RPUSH/BLPOP) or Redis Streams.
-  - CLI: `--connect url=redis://127.0.0.1:6379`.
+- [ ] MQTT — FIRST TIER (recommended)
+  - Client: `rumqttc` (async). Use QoS 0 to match at‑most‑once perf testing.
+  - Pub/Sub: topics map 1:1. Retain the 24‑byte header for latency.
+  - Req/Rep: emulate via reply topics (e.g., request → `bench/q`, reply → `bench/q/replies/{client_id}/{corr_id}`) or a reply‑to header.
+  - CLI: `--connect host=127.0.0.1,port=1883[,client_id=...,username=...,password=...]`.
 - [ ] ZeroMQ (ZMQ) — FIRST TIER
-  - Use `zmq` crate; Pub/Sub via XPUB/XSUB proxy (topics as prefix); Req/Rep via REQ/REP (pool for concurrency).
-  - CLI: `--connect xsub=tcp://HOST:5556,xpub=tcp://HOST:5557` for pub/sub; `req_url=tcp://HOST:5560` (requester), `req_bind=tcp://0.0.0.0:5560` (queryable).
-- [ ] Raw TCP (reference ceiling) — LATER STAGE
-  - Client/server over `tokio::net::TcpStream` with simple length-prefixed frames.
-  - Pub/Sub emulation: prefix each frame with topic length + topic bytes + payload.
-  - Req/Rep: correlation id in header; echo server for baseline.
+  - `zmq` crate; XPUB/XSUB proxy for pub/sub; REQ/REP for queries (pool for concurrency).
+  - CLI: `--connect xsub=tcp://HOST:5556,xpub=tcp://HOST:5557` (pub/sub); `req_url=tcp://HOST:5560` requester, `req_bind=tcp://0.0.0.0:5560` queryable.
+- [ ] Redis — OPTIONAL / EXPERIMENTAL
+  - Already prototyped (pub/sub and LIST‑based req/rep). Keep for occasional comparisons but not a primary baseline.
+- [ ] Raw TCP — LATER STAGE (reference ceiling)
+  - Length‑prefixed frames over `tokio::net::TcpStream`; simple echo for req/rep.
 - [ ] NATS — LATER STAGE
-  - Use `async-nats` crate; pub/sub and request/reply.
-  - CLI: `--connect url=nats://127.0.0.1:4222`.
-- [ ] MQTT (Mosquitto)
-  - Use `rumqttc`; QoS 0 for apples-to-apples throughput.
-  - CLI: `--connect host=127.0.0.1,port=1883`.
-- [ ] gRPC streaming
-  - Use `tonic` for bidi-stream (pub/sub-like) and unary (req/rep) baselines.
+  - `async-nats`; pub/sub and request/reply. CLI: `--connect url=nats://127.0.0.1:4222`.
+- [ ] gRPC streaming — LATER STAGE
+  - `tonic` bidi‑stream (pub/sub‑like) and unary (req/rep).
 
-Docker & orchestration (first-tier focus initially):
-- [ ] Extend `docker-compose.yml` with services: `redis` (6379) and `zmq-proxy` (XPUB 5557, XSUB 5556). Add `nats`/`mosquitto` later.
-- [ ] Keep Zenoh routers unchanged; baselines run side-by-side on distinct ports.
+Docker & orchestration (first‑tier focus):
+- [x] Add `mosquitto` service (1883). Minimal config; persistence off. Keep Zenoh routers unchanged.
+- [ ] Add `zmq-proxy` (XSUB 5556, XPUB 5557). Redis service optional.
+- [x] Add alternative MQTT brokers for comparison: EMQX (1884) and HiveMQ CE (1885). (Enabled anonymous/allow-all flows for easy testing)
 
 Harness & scripts:
-- [ ] Add `scripts/run_baselines.sh` to run the same workloads across engines using `--engine` and `--connect` (start with `redis`, then `zmq`).
-- [ ] Extend existing scenario scripts to accept `ENGINE` env var and pass through connect options.
-- [ ] Artifacts
-  - Common CSV schema across engines (throughput, latency percentiles, errors).
-  - Artifact layout mirrors existing runs under `artifacts/run_*/{engine}/...`.
+- [x] Add `transport-mqtt` feature and adapter (rumqttc): publish/subscribe implemented; reply-topic req/rep path implemented (validation next).
+- [x] Add `scripts/run_mqtt_baseline.sh`, `scripts/run_mqtt_fanout.sh`, `scripts/run_mqtt_queries.sh`.
+- [ ] Add `scripts/run_baselines.sh` to sweep engines (`mqtt`, `zmq`; `redis` optional).
+- [x] Artifacts: common CSV schema; initial engine-labeled subfolders produced by scripts.
 
 Validation & acceptance:
-- [ ] Each engine: local 1→1 pub/sub and req/qry runs complete without errors at small rates.
-- [ ] CSVs are comparable (same headers/units); sanity-check latencies vs Zenoh and across Redis/ZMQ.
-- [ ] Optional: add a short README section explaining how to bring up each baseline service and run.
+- [ ] ZMQ: local 1→1 pub/sub and req/qry runs complete without errors at small rates.
+- [x] MQTT: local 1→1 pub/sub runs complete without errors (Mosquitto, EMQX, HiveMQ CE tested).
+- [ ] MQTT: req/qry scenario validated end-to-end (reply-topic path) at small rates.
+- [ ] CSVs comparable (headers/units aligned); sanity‑check vs Zenoh.
+- [ ] README note on how to bring up each service and run.
+
+Broker choice (MQTT):
+- Recommended: Eclipse Mosquitto
+  - Pros: tiny footprint, stable, ubiquitous Docker image, straightforward config; ideal for QoS0 throughput baselines.
+  - Docker: `eclipse-mosquitto:2` (ports 1883, optional 8883 for TLS).
+- Alternatives:
+  - EMQX (Open Source): richer features, dashboards; heavier but still solid for load testing.
+  - HiveMQ CE: reliable, good tooling; non‑commercial feature limits.
+  - For apples‑to‑apples perf and simplicity, start with Mosquitto.
 
 ## Phase 7 — Fault Injection
 
@@ -249,11 +258,11 @@ artifacts/           # output (gitignored)
 
 ## Acceptance checklist (initial)
 
-- [ ] Deterministic Docker topologies with discovery disabled.
+- [x] Deterministic Docker topologies with discovery disabled (Zenoh routers; MQTT brokers use explicit ports; no discovery).
 - [x] Harness can run pub/sub and req/qry with CSV outputs.
-- [ ] Minimal scenario scripts produce artifacts consistently.
+- [x] Minimal scenario scripts produce artifacts consistently.
 - [ ] Fault injection does not crash the system; metrics capture degradation and recovery.
-- [ ] Transport abstraction in place; Zenoh + at least one non‑Zenoh engine runs the same scenarios.
+- [x] Transport abstraction in place; Zenoh + at least one non‑Zenoh engine (MQTT, Redis) runs the same scenarios.
 
 ## Open items
 
@@ -262,8 +271,8 @@ artifacts/           # output (gitignored)
 - Define 2–3 hard SLOs for key scenarios (baseline and fanout).
 
 Notes for next iteration:
-- Wire CLI flags for CSV output files (pub/sub) and run IDs; default to stdout if not provided. (CSV flags DONE)
-- Add simple scenario scripts and an artifacts folder structure for runs. (baseline + 3-router scripts added; fanout/queries stubs)
-- Extend CSV schema for requester/queryable to include TTF, TTL, timeouts, and replies_per_query as separate columns.
-- Flesh out `run_fanout.sh` and `run_queries.sh` to orchestrate multi-client scenarios and archive artifacts per run.
-- Transport refactor foundations DONE; next implement the first baseline (TCP) and add Redis/NATS/MQTT incrementally.
+- Validate MQTT req/rep end-to-end (reply-topic envelope) and extend CSV for requester/queryable: TTF, TTL, timeouts, replies_per_query.
+- Wire a `scripts/run_baselines.sh` to sweep engines and scenarios; include per-engine subfolders consistently.
+- Add ZMQ adapter and dockerized XPUB/XSUB proxy; implement pub/sub and req/rep.
+- Add per-run summary JSON with aggregates; keep per-second snapshots.
+- Faults: add restart/churn helpers and optional netem.

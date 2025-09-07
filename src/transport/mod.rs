@@ -7,6 +7,8 @@ pub mod config;
 pub mod mock;
 #[cfg(feature = "transport-redis")]
 pub mod redis;
+#[cfg(feature = "transport-mqtt")]
+pub mod mqtt;
 
 use std::collections::BTreeMap;
 use std::pin::Pin;
@@ -22,6 +24,7 @@ pub enum Engine {
     Zenoh,
     Tcp,
     Redis,
+    Mqtt,
     #[cfg(any(test, feature = "transport-mock"))]
     Mock,
 }
@@ -174,6 +177,16 @@ impl TransportBuilder {
                 #[cfg(not(feature = "transport-redis"))]
                 {
                     Err(TransportError::Connect("redis feature disabled".into()))
+                }
+            }
+            Engine::Mqtt => {
+                #[cfg(feature = "transport-mqtt")]
+                {
+                    return crate::transport::mqtt::connect(_opts).await;
+                }
+                #[cfg(not(feature = "transport-mqtt"))]
+                {
+                    Err(TransportError::Connect("mqtt feature disabled".into()))
                 }
             }
             #[cfg(any(test, feature = "transport-mock"))]
