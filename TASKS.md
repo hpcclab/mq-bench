@@ -56,15 +56,18 @@ Done when: CSV outputs include throughput and latency stats; runs complete witho
 
 ## Phase R — Transport Abstraction Refactor (for Baselines & Extensibility)
 
-- [ ] Introduce a transport abstraction trait to decouple roles from Zenoh specifics.
-  - Interface sketch: `connect(options)`, `publish(topic, bytes)`, `subscribe(expr) -> stream<bytes>`, `request(subject, bytes) -> response_stream`.
-  - Error model: unify into a small enum; map Zenoh/client-specific errors internally.
-- [ ] Extract shared wire/payload logic
-  - Keep `payload::MessageHeader` as the canonical header; make use optional per-transport.
-  - Add a small `wire` module with helpers for framing (for TCP baseline).
-- [ ] Adapter: implement `Transport` for Zenoh (feature `transport-zenoh`, default-on).
-- [ ] Refactor roles (`publisher`, `subscriber`, `requester`, `queryable`) to use the `Transport` trait.
-  - Preserve existing CLIs/metrics; only the transport binding changes under the hood.
+- [x] Introduce a transport abstraction trait to decouple roles from Zenoh specifics.
+  - Implemented with handler-based APIs: `subscribe(expr, handler)` and `register_queryable(prefix, handler)` to minimize overhead.
+  - Traits for guards/handles: `Subscription`, `Publisher`, `QueryRegistration`.
+  - Error model unified in a small enum; adapters map engine-specific errors.
+- [x] Extract shared wire/payload logic
+  - `payload::MessageHeader` is the canonical 24-byte header (seq, ts, len) and remains fixed for comparability.
+  - `Payload` supports zero-copy via Zenoh ZBytes; conversion helpers (`as_cow`, `into_bytes`).
+- [x] Adapter: implement `Transport` for Zenoh (feature default-on).
+  - Publish hot-path fixed (no per-message declare); reusable declared publisher added.
+- [x] Refactor roles (`publisher`, `subscriber`, `requester`, `queryable`) to use the `Transport` trait.
+  - Subscriber callback does minimal work and batches metrics in a worker.
+  - Queryable uses handler model; returns a guard for clean shutdown.
 - [ ] CLI: add `--engine` enum with values: `zenoh` (default), `tcp`, `redis` (others later).
   - Add generic `--connect` (repeatable `KEY=VALUE`) to pass engine-specific options.
   - Back-compat: `--endpoint` still works for `zenoh`; translate into `--connect`.
@@ -260,4 +263,4 @@ Notes for next iteration:
 - Add simple scenario scripts and an artifacts folder structure for runs. (baseline + 3-router scripts added; fanout/queries stubs)
 - Extend CSV schema for requester/queryable to include TTF, TTL, timeouts, and replies_per_query as separate columns.
 - Flesh out `run_fanout.sh` and `run_queries.sh` to orchestrate multi-client scenarios and archive artifacts per run.
-- Begin transport refactor (Phase R), then implement the first baseline (TCP) and add NATS/Redis/MQTT incrementally.
+- Transport refactor foundations DONE; next implement the first baseline (TCP) and add Redis/NATS/MQTT incrementally.

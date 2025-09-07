@@ -2,6 +2,8 @@
 
 A minimal, scriptable benchmarking tool for Zenoh (v1.5.1), built in Rust with a Docker-based 3-router star cluster. Focus: pub/sub and request/reply with CSV metrics.
 
+Note: The harness now uses a transport abstraction internally (Zenoh adapter by default). This keeps the CLI unchanged today while enabling non‑Zenoh baselines (TCP, Redis, etc.) to be added next.
+
 ## Features
 - Docker Compose 3-router star topology (TCP): router2 → router1 ← router3
 - Rust harness (tokio + zenoh 1.5.1) with CLI roles: pub, sub, req, qry
@@ -9,6 +11,12 @@ A minimal, scriptable benchmarking tool for Zenoh (v1.5.1), built in Rust with a
 - Requester with QPS pacing, concurrency, and builder-level timeouts
 - Subscriber with latency measurement (ns timestamps embedded in payload)
 - CSV-style snapshots to stdout (or CSV file via --csv)
+
+Performance-focused implementation details
+- Handler-based subscribe and queryable registration (lower overhead than streams)
+- Reusable declared publisher for hot-path sends (or direct session.put)
+- Zero-copy payload path with ZBytes (header remains fixed 24 bytes)
+- Minimal work in callbacks; batching and CSV flushing for live tailing
 
 ## Quick start
 
@@ -48,7 +56,9 @@ Subscriber stats - Received: 20, Errors: 0, Rate: 4.00 msg/s, P99 Latency: 3.01m
 
 - Publisher (pub)
   - `--endpoint` tcp host:port, e.g. `tcp/127.0.0.1:7449`
-  - Topic/key is currently the `topic_prefix` argument in the top-level CLI (defaults to `bench/topic`)
+  - Topic/key selection
+    - `--topic-prefix` base key (defaults to `bench/topic`)
+    - Multi-topic: `--topics N` and `--publishers M` to create M logical publishers spread over N topics
   - `--payload` size in bytes
     - `--rate` messages per second (omitted or <= 0 means unlimited)
     - `--duration` seconds
@@ -132,6 +142,11 @@ Notes:
 - Use wildcard expressions on the subscriber (`bench/topic/**`) to receive all indices without spawning per-topic subscribers.
 - For very large topic counts, monitor CPU and consider lowering `--rate` per publisher.
 
+Performance tips
+- Build with `--release` for high-rate runs.
+- Keep the subscriber running before starting publishers to avoid warm-up drops.
+- Use a single wildcard subscriber for aggregation when stressing many topics.
+
 ## Topology
 
 Docker Compose defines a 3-router star and exposes ports:
@@ -142,6 +157,7 @@ Docker Compose defines a 3-router star and exposes ports:
 Configs in `config/` have discovery disabled to ensure deterministic static peering.
 
 ## Roadmap
+- Phase R: transport abstraction (done for Zenoh; adapters for other engines next)
 - Phase 4: requester/queryable minimal functionality (QPS, timeouts, concurrency)
 - Phase 5: run summary JSON + optional Prometheus
 - Phase 6: scenario scripts to generate artifacts
@@ -151,6 +167,9 @@ Configs in `config/` have discovery disabled to ensure deterministic static peer
 - Ensure the right router port: sub on 7448, pub on 7449 for cross-router test
 - If messages don’t appear, wait a second; the subscriber must be running before the publisher
 - Check container logs: `docker compose logs -f router1`
+
+Advanced
+- If you observe low throughput, verify the build is in release mode and that the subscriber’s CSV shows non-zero itps/tps. The system flushes CSV after each snapshot so `tail -f` updates live.
 
 ## License
 MIT
