@@ -3,7 +3,7 @@ use mq_bench::transport::{Engine, ConnectOptions, TransportBuilder};
 
 #[tokio::test]
 async fn pub_sub_mock_smoke() {
-    let mut opts = ConnectOptions::default();
+    let opts = ConnectOptions::default();
     let t = TransportBuilder::connect(Engine::Mock, opts.clone()).await.expect("connect");
     let received = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let r2 = received.clone();
@@ -18,7 +18,7 @@ async fn pub_sub_mock_smoke() {
 
 #[tokio::test]
 async fn req_qry_mock_smoke() {
-    let mut opts = ConnectOptions::default();
+    let opts = ConnectOptions::default();
     let t = TransportBuilder::connect(Engine::Mock, opts.clone()).await.expect("connect");
     let _q = t.register_queryable("q1", Box::new(move |inq| {
         let responder = inq.responder;
