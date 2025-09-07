@@ -12,5 +12,5 @@ pub mod transport;
 pub mod wire;
 
 // Optional re-exports for convenience in downstream code/tests
-pub use transport::{Engine, ConnectOptions, TransportBuilder, Transport, TransportError};
 pub use metrics::stats::Stats;
+pub use transport::{ConnectOptions, Engine, Transport, TransportBuilder, TransportError};

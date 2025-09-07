@@ -14,12 +14,16 @@ pub fn frame(topic: &str, payload: Bytes) -> Bytes {
 }
 
 pub fn parse(mut buf: Bytes) -> Option<(String, Bytes)> {
-    if buf.len() < 6 { return None; }
+    if buf.len() < 6 {
+        return None;
+    }
     // First 4 bytes were total (excluding the 4), which we don't need here since we already have the buffer.
     let _ = buf.split_to(4); // drop len
     let topic_len_bytes = buf.split_to(2);
     let topic_len = u16::from_le_bytes([topic_len_bytes[0], topic_len_bytes[1]]) as usize;
-    if buf.len() < topic_len { return None; }
+    if buf.len() < topic_len {
+        return None;
+    }
     let topic_bytes = buf.split_to(topic_len);
     let topic = String::from_utf8(topic_bytes.to_vec()).ok()?;
     Some((topic, buf))

@@ -7,12 +7,12 @@ use tokio::sync::RwLock;
 pub struct Stats {
     // Latency histogram (nanosecond precision)
     latency_hist: RwLock<Histogram<u64>>,
-    
+
     // Counters
     pub sent_count: AtomicU64,
     pub received_count: AtomicU64,
     pub error_count: AtomicU64,
-    
+
     // Timing
     start_time: Instant,
     last_snapshot: RwLock<Instant>,
@@ -43,39 +43,48 @@ impl Stats {
             first_received_time: RwLock::new(None),
         }
     }
-    
+
     /// Record a sent message
     pub async fn record_sent(&self) {
-    self.sent_count.fetch_add(1, Ordering::Relaxed);
-    let mut first = self.first_sent_time.write().await;
-    if first.is_none() { *first = Some(Instant::now()); }
+        self.sent_count.fetch_add(1, Ordering::Relaxed);
+        let mut first = self.first_sent_time.write().await;
+        if first.is_none() {
+            *first = Some(Instant::now());
+        }
     }
-    
+
     /// Record a received message with latency
     pub async fn record_received(&self, latency_ns: u64) {
-    self.received_count.fetch_add(1, Ordering::Relaxed);
-    let mut first = self.first_received_time.write().await;
-    if first.is_none() { *first = Some(Instant::now()); }
-        
+        self.received_count.fetch_add(1, Ordering::Relaxed);
+        let mut first = self.first_received_time.write().await;
+        if first.is_none() {
+            *first = Some(Instant::now());
+        }
+
         if let Ok(mut hist) = self.latency_hist.try_write() {
             let _ = hist.record(latency_ns);
         }
     }
-    
+
     /// Record an error
     pub async fn record_error(&self) {
-    self.error_count.fetch_add(1, Ordering::Relaxed);
+        self.error_count.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record a batch of received latencies with minimal locking
     pub async fn record_received_batch(&self, latencies_ns: &[u64]) {
-    if latencies_ns.is_empty() { return; }
-    // Bump received count once
-    self.received_count.fetch_add(latencies_ns.len() as u64, Ordering::Relaxed);
+        if latencies_ns.is_empty() {
+            return;
+        }
+        // Bump received count once
+        self.received_count
+            .fetch_add(latencies_ns.len() as u64, Ordering::Relaxed);
         // Set first_received_time if unset
         {
             let mut first = self.first_received_time.write().await;
-            if first.is_none() { *first = Some(Instant::now()); }
+            if first.is_none() {
+                *first = Some(Instant::now());
+            }
         }
         // Record all latencies under a single histogram write lock
         let mut hist = self.latency_hist.write().await;
@@ -83,14 +92,14 @@ impl Stats {
             let _ = hist.record(lat);
         }
     }
-    
+
     /// Get current snapshot of statistics
     pub async fn snapshot(&self) -> StatsSnapshot {
         let now = Instant::now();
-    let sent = self.sent_count.load(Ordering::Relaxed);
-    let received = self.received_count.load(Ordering::Relaxed);
-    let errors = self.error_count.load(Ordering::Relaxed);
-        
+        let sent = self.sent_count.load(Ordering::Relaxed);
+        let received = self.received_count.load(Ordering::Relaxed);
+        let errors = self.error_count.load(Ordering::Relaxed);
+
         let hist = self.latency_hist.read().await;
         let p50 = hist.value_at_quantile(0.5);
         let p95 = hist.value_at_quantile(0.95);
@@ -98,7 +107,7 @@ impl Stats {
         let min = hist.min();
         let max = hist.max();
         let mean = hist.mean();
-        
+
         let total_elapsed = now.duration_since(self.start_time);
         let since_last = {
             let mut last = self.last_snapshot.write().await;
@@ -118,9 +127,19 @@ impl Stats {
             *last = received;
             delta
         };
-        
-        let since_first_sent = self.first_sent_time.read().await.map(|t| now.checked_duration_since(t)).flatten();
-        let since_first_received = self.first_received_time.read().await.map(|t| now.checked_duration_since(t)).flatten();
+
+        let since_first_sent = self
+            .first_sent_time
+            .read()
+            .await
+            .map(|t| now.checked_duration_since(t))
+            .flatten();
+        let since_first_received = self
+            .first_received_time
+            .read()
+            .await
+            .map(|t| now.checked_duration_since(t))
+            .flatten();
 
         StatsSnapshot {
             timestamp: SystemTime::now()
@@ -144,13 +163,13 @@ impl Stats {
             latency_ns_mean: mean,
         }
     }
-    
+
     /// Reset all statistics
     #[allow(dead_code)]
     pub async fn reset(&self) {
-    self.sent_count.store(0, Ordering::Relaxed);
-    self.received_count.store(0, Ordering::Relaxed);
-    self.error_count.store(0, Ordering::Relaxed);
+        self.sent_count.store(0, Ordering::Relaxed);
+        self.received_count.store(0, Ordering::Relaxed);
+        self.error_count.store(0, Ordering::Relaxed);
         self.latency_hist.write().await.reset();
         *self.last_snapshot.write().await = Instant::now();
     }
@@ -191,7 +210,7 @@ impl StatsSnapshot {
             0.0
         }
     }
-    
+
     /// Calculate overall throughput
     pub fn total_throughput(&self) -> f64 {
         // Prefer window from first receive for subscribers; fallback to first sent; else start_time
@@ -205,12 +224,20 @@ impl StatsSnapshot {
         if let Some(d) = duration_opt {
             let secs = d.as_secs_f64();
             if secs > 0.0 {
-                let base = if self.received_count > 0 { self.received_count } else { self.sent_count };
+                let base = if self.received_count > 0 {
+                    self.received_count
+                } else {
+                    self.sent_count
+                };
                 base as f64 / secs
-            } else { 0.0 }
-        } else { 0.0 }
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
     }
-    
+
     /// Convert to CSV row
     pub fn to_csv_row(&self) -> String {
         format!(
@@ -229,7 +256,7 @@ impl StatsSnapshot {
             self.latency_ns_mean
         )
     }
-    
+
     /// CSV header
     pub fn csv_header() -> &'static str {
         "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p50,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean"
@@ -275,7 +302,11 @@ mod tests {
         let snap = stats.snapshot().await;
         assert_eq!(snap.interval_received_count, 20);
         let rate = snap.interval_throughput();
-        assert!(rate > 0.0, "interval throughput should be positive, got {}", rate);
+        assert!(
+            rate > 0.0,
+            "interval throughput should be positive, got {}",
+            rate
+        );
 
         // Next interval with no messages should go back to ~0
         tokio_sleep(Duration::from_millis(50)).await;

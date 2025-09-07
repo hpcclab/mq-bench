@@ -1,5 +1,5 @@
 use std::time::Duration;
-use tokio::time::{interval, Interval, MissedTickBehavior};
+use tokio::time::{Interval, MissedTickBehavior, interval};
 
 /// Rate controller for open-loop message sending
 pub struct RateController {
@@ -8,8 +8,8 @@ pub struct RateController {
     ticker: Interval,
     tokens: u32,
     tokens_per_tick: u32,
-    frac_per_tick: u32,   // fixed-point Q24.8-scale fractional tokens per tick
-    frac_accum: u32,      // accumulator for fractional tokens
+    frac_per_tick: u32, // fixed-point Q24.8-scale fractional tokens per tick
+    frac_accum: u32,    // accumulator for fractional tokens
     max_tokens: u32,
 }
 
@@ -42,7 +42,7 @@ impl RateController {
             max_tokens,
         }
     }
-    
+
     /// Wait until it's time to send the next message
     #[inline(always)]
     pub async fn wait_for_next(&mut self) {
@@ -69,7 +69,7 @@ impl RateController {
             }
         }
     }
-    
+
     /// Get configured interval between messages
     #[allow(dead_code)]
     pub fn interval(&self) -> Duration {
@@ -90,15 +90,15 @@ mod tests {
     // It doesn't aim for perfect accuracy, just that the average interval is in the right ballpark.
     #[tokio::test]
     async fn rate_controller_spaces_events() {
-    // 50 msg/s => ~20ms interval
-    let mut rc = RateController::new(50.0);
-    let expected = Duration::from_millis(20);
+        // 50 msg/s => ~20ms interval
+        let mut rc = RateController::new(50.0);
+        let expected = Duration::from_millis(20);
 
         let mut times: Vec<TokioInstant> = Vec::new();
 
-    // Warm-up first token
-    rc.wait_for_next().await;
-    times.push(TokioInstant::now());
+        // Warm-up first token
+        rc.wait_for_next().await;
+        times.push(TokioInstant::now());
 
         // Collect 10 ticks
         for _ in 0..10 {
@@ -118,8 +118,17 @@ mod tests {
         let lower = expected.mul_f32(0.5); // >= 10ms
         let upper = expected.mul_f32(5.0); // <= 100ms
 
-        assert!(avg >= lower, "avg interval too small: {:?} < {:?}", avg, lower);
-        assert!(avg <= upper, "avg interval too large: {:?} > {:?}", avg, upper);
+        assert!(
+            avg >= lower,
+            "avg interval too small: {:?} < {:?}",
+            avg,
+            lower
+        );
+        assert!(
+            avg <= upper,
+            "avg interval too large: {:?} > {:?}",
+            avg,
+            upper
+        );
     }
-
 }

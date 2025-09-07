@@ -25,7 +25,9 @@ pub struct SubscriberConfig {
 
 pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     println!("Starting subscriber:");
-    if let Some(ep) = config.connect.params.get("endpoint") { println!("  Endpoint: {}", ep); }
+    if let Some(ep) = config.connect.params.get("endpoint") {
+        println!("  Endpoint: {}", ep);
+    }
     println!("  Engine: {:?}", config.engine);
     println!("  Key: {}", config.key_expr);
     // Initialize Transport (Zenoh engine by default)
@@ -111,16 +113,19 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     // Subscribe via Transport with a handler
     let handler_tx = tx.clone();
     let subscription = transport
-        .subscribe(&config.key_expr, Box::new(move |msg: TransportMessage| {
-            // Minimal callback: copy 24-byte header and enqueue with receive timestamp
-            let mut hdr = [0u8; 24];
-            let bytes = msg.payload.as_cow();
-            if bytes.len() >= 24 {
-                hdr.copy_from_slice(&bytes[..24]);
-                let recv = now_unix_ns_estimate();
-                let _ = handler_tx.try_send((recv, hdr));
-            }
-        }))
+        .subscribe(
+            &config.key_expr,
+            Box::new(move |msg: TransportMessage| {
+                // Minimal callback: copy 24-byte header and enqueue with receive timestamp
+                let mut hdr = [0u8; 24];
+                let bytes = msg.payload.as_cow();
+                if bytes.len() >= 24 {
+                    hdr.copy_from_slice(&bytes[..24]);
+                    let recv = now_unix_ns_estimate();
+                    let _ = handler_tx.try_send((recv, hdr));
+                }
+            }),
+        )
         .await
         .map_err(|e| anyhow::Error::msg(format!("subscribe error: {}", e)))?;
     println!("Subscribed to key expression: {}", config.key_expr);

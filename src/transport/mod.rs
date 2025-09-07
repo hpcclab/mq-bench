@@ -1,23 +1,23 @@
 //! Transport abstraction: trait, types, and builder factory.
 
-#[cfg(feature = "transport-zenoh")]
-pub mod zenoh;
 pub mod config;
 #[cfg(any(test, feature = "transport-mock"))]
 pub mod mock;
-#[cfg(feature = "transport-redis")]
-pub mod redis;
 #[cfg(feature = "transport-mqtt")]
 pub mod mqtt;
+#[cfg(feature = "transport-redis")]
+pub mod redis;
+#[cfg(feature = "transport-zenoh")]
+pub mod zenoh;
 
 use std::collections::BTreeMap;
 use std::pin::Pin;
 
-use bytes::Bytes;
-use std::borrow::Cow;
-use futures::Stream;
 #[cfg(feature = "transport-zenoh")]
 use ::zenoh::bytes::ZBytes;
+use bytes::Bytes;
+use futures::Stream;
+use std::borrow::Cow;
 
 #[derive(Clone, Debug)]
 pub enum Engine {
@@ -36,13 +36,20 @@ pub struct ConnectOptions {
 
 #[derive(thiserror::Error, Debug)]
 pub enum TransportError {
-    #[error("connect: {0}")] Connect(String),
-    #[error("publish: {0}")] Publish(String),
-    #[error("subscribe: {0}")] Subscribe(String),
-    #[error("request: {0}")] Request(String),
-    #[error("timeout")] Timeout,
-    #[error("disconnected")] Disconnected,
-    #[error("other: {0}")] Other(String),
+    #[error("connect: {0}")]
+    Connect(String),
+    #[error("publish: {0}")]
+    Publish(String),
+    #[error("subscribe: {0}")]
+    Subscribe(String),
+    #[error("request: {0}")]
+    Request(String),
+    #[error("timeout")]
+    Timeout,
+    #[error("disconnected")]
+    Disconnected,
+    #[error("other: {0}")]
+    Other(String),
 }
 
 impl TransportError {
@@ -51,7 +58,8 @@ impl TransportError {
     }
 }
 
-pub type TransportStream = Pin<Box<dyn Stream<Item = Result<TransportMessage, TransportError>> + Send>>; // legacy
+pub type TransportStream =
+    Pin<Box<dyn Stream<Item = Result<TransportMessage, TransportError>> + Send>>; // legacy
 
 #[derive(Clone, Debug)]
 pub struct TransportMessage {
@@ -76,9 +84,13 @@ pub enum Payload {
 }
 
 impl Payload {
-    pub fn from_bytes(b: Bytes) -> Self { Payload::Bytes(b) }
+    pub fn from_bytes(b: Bytes) -> Self {
+        Payload::Bytes(b)
+    }
     #[cfg(feature = "transport-zenoh")]
-    pub fn from_zenoh(z: ZBytes) -> Self { Payload::Zenoh(z) }
+    pub fn from_zenoh(z: ZBytes) -> Self {
+        Payload::Zenoh(z)
+    }
     pub fn as_cow(&self) -> Cow<'_, [u8]> {
         match self {
             Payload::Bytes(b) => Cow::Borrowed(b.as_ref()),
@@ -128,12 +140,20 @@ pub trait Transport: Send + Sync {
     // async fn publish(&self, topic: &str, payload: Bytes) -> Result<(), TransportError>;
     // Handler-based subscribe for better perf and adapter flexibility.
     // Returns a subscription handle which must be kept alive; dropping or shutdown stops delivery.
-    async fn subscribe(&self, expr: &str, handler: Box<dyn Fn(TransportMessage) + Send + Sync + 'static>) -> Result<Box<dyn Subscription>, TransportError>;
+    async fn subscribe(
+        &self,
+        expr: &str,
+        handler: Box<dyn Fn(TransportMessage) + Send + Sync + 'static>,
+    ) -> Result<Box<dyn Subscription>, TransportError>;
     // Pre-declare publisher for high-throughput publish on the same topic.
     async fn create_publisher(&self, topic: &str) -> Result<Box<dyn Publisher>, TransportError>;
     async fn request(&self, subject: &str, payload: Bytes) -> Result<Payload, TransportError>;
     // Handler-based queryable registration. Returns a guard handle to keep it alive.
-    async fn register_queryable(&self, subject: &str, handler: Box<dyn Fn(IncomingQuery) + Send + Sync + 'static>) -> Result<Box<dyn QueryRegistration>, TransportError>;
+    async fn register_queryable(
+        &self,
+        subject: &str,
+        handler: Box<dyn Fn(IncomingQuery) + Send + Sync + 'static>,
+    ) -> Result<Box<dyn QueryRegistration>, TransportError>;
     async fn shutdown(&self) -> Result<(), TransportError>;
     async fn health_check(&self) -> Result<(), TransportError>;
 }
@@ -146,7 +166,9 @@ pub trait Subscription: Send + Sync {
 #[async_trait::async_trait]
 pub trait Publisher: Send + Sync {
     async fn publish(&self, payload: Bytes) -> Result<(), TransportError>;
-    async fn shutdown(&self) -> Result<(), TransportError> { Ok(()) }
+    async fn shutdown(&self) -> Result<(), TransportError> {
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -157,7 +179,10 @@ pub trait QueryRegistration: Send + Sync {
 pub struct TransportBuilder;
 
 impl TransportBuilder {
-    pub async fn connect(engine: Engine, opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
+    pub async fn connect(
+        engine: Engine,
+        opts: ConnectOptions,
+    ) -> Result<Box<dyn Transport>, TransportError> {
         match engine {
             Engine::Zenoh => {
                 #[cfg(feature = "transport-zenoh")]

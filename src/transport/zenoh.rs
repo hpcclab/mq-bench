@@ -6,8 +6,8 @@ use bytes::Bytes;
 use tokio::sync::Mutex;
 
 use super::{
-    ConnectOptions, IncomingQuery, Payload, QueryResponder, QueryResponderInner,
-    Transport, TransportError, TransportMessage,
+    ConnectOptions, IncomingQuery, Payload, QueryResponder, QueryResponderInner, Transport,
+    TransportError, TransportMessage,
 };
 #[allow(unused_imports)]
 use zenoh::bytes::ZBytes;
@@ -19,7 +19,11 @@ pub struct ZenohTransport {
 pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
     let mut cfg = zenoh::config::Config::default();
     // Mode configurable via connect param: mode=client|peer (default: client)
-    let mode = opts.params.get("mode").cloned().unwrap_or_else(|| "client".to_string());
+    let mode = opts
+        .params
+        .get("mode")
+        .cloned()
+        .unwrap_or_else(|| "client".to_string());
     cfg.insert_json5("mode", &format!("\"{}\"", mode))
         .map_err(|e| TransportError::Connect(e.to_string()))?;
     if let Some(eps) = opts
@@ -74,7 +78,10 @@ impl Transport for ZenohTransport {
         }))
     }
 
-    async fn create_publisher(&self, topic: &str) -> Result<Box<dyn super::Publisher>, TransportError> {
+    async fn create_publisher(
+        &self,
+        topic: &str,
+    ) -> Result<Box<dyn super::Publisher>, TransportError> {
         let pub_decl = self
             .session
             .declare_publisher(topic.to_string())
@@ -101,7 +108,11 @@ impl Transport for ZenohTransport {
         }
     }
 
-    async fn register_queryable(&self, subject: &str, handler: Box<dyn Fn(IncomingQuery) + Send + Sync + 'static>) -> Result<Box<dyn super::QueryRegistration>, TransportError> {
+    async fn register_queryable(
+        &self,
+        subject: &str,
+        handler: Box<dyn Fn(IncomingQuery) + Send + Sync + 'static>,
+    ) -> Result<Box<dyn super::QueryRegistration>, TransportError> {
         let handler = Arc::new(handler);
         let h2 = handler.clone();
         let q = self
@@ -115,14 +126,18 @@ impl Transport for ZenohTransport {
                     subject,
                     payload: Payload::from_zenoh(payload),
                     correlation: None,
-                    responder: QueryResponder { inner: Arc::new(responder) },
+                    responder: QueryResponder {
+                        inner: Arc::new(responder),
+                    },
                 };
                 (h2)(incoming);
             })
             .await
             .map_err(|e| TransportError::Subscribe(e.to_string()))?;
         let boxed: Box<dyn std::any::Any + Send> = Box::new(q);
-    Ok(Box::new(ZenohQueryRegistration { inner: Mutex::new(Some(boxed)) }))
+        Ok(Box::new(ZenohQueryRegistration {
+            inner: Mutex::new(Some(boxed)),
+        }))
     }
 
     async fn shutdown(&self) -> Result<(), TransportError> {
@@ -180,7 +195,7 @@ struct ZenohQueryRegistration {
 #[async_trait::async_trait]
 impl super::QueryRegistration for ZenohQueryRegistration {
     async fn shutdown(&self) -> Result<(), TransportError> {
-    let _ = self.inner.lock().await.take();
+        let _ = self.inner.lock().await.take();
         Ok(())
     }
 }
@@ -192,7 +207,12 @@ struct ZenohPublisher {
 #[async_trait::async_trait]
 impl super::Publisher for ZenohPublisher {
     async fn publish(&self, payload: Bytes) -> Result<(), TransportError> {
-        self.inner.put(payload).await.map_err(|e| TransportError::Publish(e.to_string()))
+        self.inner
+            .put(payload)
+            .await
+            .map_err(|e| TransportError::Publish(e.to_string()))
     }
-    async fn shutdown(&self) -> Result<(), TransportError> { Ok(()) }
+    async fn shutdown(&self) -> Result<(), TransportError> {
+        Ok(())
+    }
 }

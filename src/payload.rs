@@ -15,7 +15,7 @@ impl MessageHeader {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
-        
+
         Self {
             seq,
             timestamp_ns,
@@ -37,11 +37,17 @@ impl MessageHeader {
         if buf.len() < 24 {
             return Err("Buffer too short for header".to_string());
         }
-        
-        let seq = u64::from_le_bytes([buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]]);
-        let timestamp_ns = u64::from_le_bytes([buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]]);
-        let payload_size = usize::from_le_bytes([buf[16], buf[17], buf[18], buf[19], buf[20], buf[21], buf[22], buf[23]]);
-        
+
+        let seq = u64::from_le_bytes([
+            buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+        ]);
+        let timestamp_ns = u64::from_le_bytes([
+            buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15],
+        ]);
+        let payload_size = usize::from_le_bytes([
+            buf[16], buf[17], buf[18], buf[19], buf[20], buf[21], buf[22], buf[23],
+        ]);
+
         Ok(Self {
             seq,
             timestamp_ns,
@@ -55,21 +61,21 @@ pub fn generate_payload(seq: u64, size: usize) -> Vec<u8> {
     if size < 24 {
         panic!("Payload size must be at least 24 bytes for header");
     }
-    
+
     let header = MessageHeader::new(seq, size);
     let header_bytes = header.encode();
-    
+
     // Create payload with header + pattern fill
     let mut payload = Vec::with_capacity(size);
     payload.extend_from_slice(&header_bytes);
-    
+
     // Fill remaining bytes with pattern
     let pattern = b"ZENOH_BENCH";
     let remaining = size - 24;
     for i in 0..remaining {
         payload.push(pattern[i % pattern.len()]);
     }
-    
+
     payload
 }
 
