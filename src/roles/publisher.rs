@@ -11,7 +11,8 @@ use tokio::signal;
 use tokio::time::interval;
 
 pub struct PublisherConfig {
-    pub endpoint: String,
+    pub engine: Engine,
+    pub connect: ConnectOptions,
     pub key_expr: String,
     pub payload_size: usize,
     pub rate: Option<f64>,
@@ -25,7 +26,8 @@ pub struct PublisherConfig {
 
 pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     println!("Starting publisher:");
-    println!("  Endpoint: {}", config.endpoint);
+    if let Some(ep) = config.connect.params.get("endpoint") { println!("  Endpoint: {}", ep); }
+    println!("  Engine: {:?}", config.engine);
     println!("  Key: {}", config.key_expr);
     println!("  Payload size: {} bytes", config.payload_size);
     if let Some(r) = config.rate { println!("  Rate: {:.2} msg/s", r); } else { println!("  Rate: unlimited (no delay)"); }
@@ -34,13 +36,11 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     } else {
         println!("  Duration: unlimited (until Ctrl+C)");
     }
-    // Initialize Transport (default to Zenoh engine; map endpoint to connect options)
-    let mut opts = ConnectOptions::default();
-    opts.params.insert("endpoint".into(), config.endpoint.clone());
-    let transport: Box<dyn Transport> = TransportBuilder::connect(Engine::Zenoh, opts)
+    // Initialize Transport (generic engine + connect options)
+    let transport: Box<dyn Transport> = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
         .await
         .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
-    println!("Connected via transport: Zenoh");
+    println!("Connected via transport: {:?}", config.engine);
     // Pre-declare publisher for performance
     let publisher = transport.create_publisher(&config.key_expr)
         .await

@@ -1,0 +1,16 @@
+//! mq-bench library crate exposing modules for reuse and testing.
+
+pub mod config;
+pub mod logging;
+pub mod metrics;
+pub mod output;
+pub mod payload;
+pub mod rate;
+pub mod roles;
+pub mod time_sync;
+pub mod transport;
+pub mod wire;
+
+// Optional re-exports for convenience in downstream code/tests
+pub use transport::{Engine, ConnectOptions, TransportBuilder, Transport, TransportError};
+pub use metrics::stats::Stats;

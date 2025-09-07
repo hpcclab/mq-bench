@@ -15,7 +15,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1.0"
-zenoh = "1.5.1"
 futures = "0.3"
 flume = "0.11"
 bytes = "1"
@@ -23,10 +22,19 @@ thiserror = "2"
 async-trait = "0.1"
 
 [features]
-default = ["transport-zenoh"]
-transport-zenoh = []
+default = ["transport-zenoh", "transport-redis"]
+transport-zenoh = ["dep:zenoh"]
 transport-tcp = []
-transport-redis = []
+transport-redis = ["dep:redis"]
+transport-mock = []
+
+[dependencies.zenoh]
+version = "1.5.1"
+optional = true
+[dependencies.redis]
+version = "0.32"
+optional = true
+features = ["tokio-comp", "connection-manager"]
 
 [profile.release]
 lto = true

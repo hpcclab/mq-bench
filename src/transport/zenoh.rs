@@ -1,10 +1,8 @@
 //! Zenoh adapter implementing the Transport trait.
 
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 use bytes::Bytes;
-use flume::Receiver;
-use futures::{Stream, stream};
 
 use super::{
     ConnectOptions, IncomingQuery, Payload, QueryResponder, QueryResponderInner,
@@ -48,13 +46,6 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
 
 #[async_trait::async_trait]
 impl Transport for ZenohTransport {
-    async fn publish(&self, topic: &str, payload: Bytes) -> Result<(), TransportError> {
-        self.session
-            .put(topic, payload)
-            .await
-            .map_err(|e| TransportError::Publish(e.to_string()))
-    }
-
     async fn subscribe(
         &self,
         expr: &str,
@@ -165,20 +156,6 @@ impl QueryResponderInner for ZenohResponder {
     async fn end(&self) -> Result<(), TransportError> {
         Ok(())
     }
-}
-
-fn flume_to_stream<T: Send + 'static>(
-    rx: Receiver<T>,
-    guard: Option<Box<dyn Send>>,
-) -> Pin<Box<dyn Stream<Item = T> + Send>> {
-    // Capture both the receiver and guard in the stream state so the guard stays alive
-    let state = (rx, guard);
-    Box::pin(stream::unfold(state, |(rx, guard)| async move {
-        match rx.recv_async().await {
-            Ok(item) => Some((item, (rx, guard))),
-            Err(_) => None,
-        }
-    }))
 }
 
 struct ZenohSubscription {

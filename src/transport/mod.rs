@@ -3,6 +3,10 @@
 #[cfg(feature = "transport-zenoh")]
 pub mod zenoh;
 pub mod config;
+#[cfg(any(test, feature = "transport-mock"))]
+pub mod mock;
+#[cfg(feature = "transport-redis")]
+pub mod redis;
 
 use std::collections::BTreeMap;
 use std::pin::Pin;
@@ -18,6 +22,8 @@ pub enum Engine {
     Zenoh,
     Tcp,
     Redis,
+    #[cfg(any(test, feature = "transport-mock"))]
+    Mock,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -116,7 +122,7 @@ impl QueryResponder {
 
 #[async_trait::async_trait]
 pub trait Transport: Send + Sync {
-    async fn publish(&self, topic: &str, payload: Bytes) -> Result<(), TransportError>;
+    // async fn publish(&self, topic: &str, payload: Bytes) -> Result<(), TransportError>;
     // Handler-based subscribe for better perf and adapter flexibility.
     // Returns a subscription handle which must be kept alive; dropping or shutdown stops delivery.
     async fn subscribe(&self, expr: &str, handler: Box<dyn Fn(TransportMessage) + Send + Sync + 'static>) -> Result<Box<dyn Subscription>, TransportError>;
@@ -159,6 +165,20 @@ impl TransportBuilder {
                 {
                     Err(TransportError::Connect("zenoh feature disabled".into()))
                 }
+            }
+            Engine::Redis => {
+                #[cfg(feature = "transport-redis")]
+                {
+                    return crate::transport::redis::connect(_opts).await;
+                }
+                #[cfg(not(feature = "transport-redis"))]
+                {
+                    Err(TransportError::Connect("redis feature disabled".into()))
+                }
+            }
+            #[cfg(any(test, feature = "transport-mock"))]
+            Engine::Mock => {
+                return crate::transport::mock::connect(_opts).await;
             }
             _ => Err(TransportError::Connect("engine not yet implemented".into())),
         }

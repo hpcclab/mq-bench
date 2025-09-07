@@ -68,12 +68,12 @@ Done when: CSV outputs include throughput and latency stats; runs complete witho
 - [x] Refactor roles (`publisher`, `subscriber`, `requester`, `queryable`) to use the `Transport` trait.
   - Subscriber callback does minimal work and batches metrics in a worker.
   - Queryable uses handler model; returns a guard for clean shutdown.
-- [ ] CLI: add `--engine` enum with values: `zenoh` (default), `tcp`, `redis` (others later).
-  - Add generic `--connect` (repeatable `KEY=VALUE`) to pass engine-specific options.
-  - Back-compat: `--endpoint` still works for `zenoh`; translate into `--connect`.
-- [ ] Features and deps
-  - Add Cargo features per engine to keep deps optional. Prioritize: `transport-tcp`, `transport-redis`.
-  - CI/build profiles compile only `zenoh` by default; others via `--features`.
+- [x] CLI: add `--engine` enum with values: `zenoh` (default), `redis`, `zmq`, `tcp` (others later).
+  - [x] Add generic `--connect` (repeatable `KEY=VALUE`) to pass engine-specific options.
+  - [x] Back-compat: `--endpoint` still works for `zenoh`; translate into `--connect`.
+- [x] Features and deps
+  - [x] Add Cargo features per engine to keep deps optional. Prioritize: `transport-redis`, `transport-zmq` (move `transport-tcp` to later).
+  - [x] Build profiles compile only `zenoh` by default; others via `--features`.
 - [ ] Testing
   - Add a mock transport to unit-test roles without a broker.
   - Smoke test: run pub/sub and req/qry with `--engine zenoh` to ensure no regressions.
@@ -165,13 +165,16 @@ Done when: scripts can run with routers up and produce artifact folders for each
 
 Baseline engines to implement after the refactor above (prioritized first-tier, then later-stage):
 
-- [ ] Raw TCP (reference ceiling) — FIRST TIER
+- [ ] Redis — FIRST TIER (start with this)
+  - Use `redis` crate; Pub/Sub for topics; Req/Rep via LIST (RPUSH/BLPOP) or Redis Streams.
+  - CLI: `--connect url=redis://127.0.0.1:6379`.
+- [ ] ZeroMQ (ZMQ) — FIRST TIER
+  - Use `zmq` crate; Pub/Sub via XPUB/XSUB proxy (topics as prefix); Req/Rep via REQ/REP (pool for concurrency).
+  - CLI: `--connect xsub=tcp://HOST:5556,xpub=tcp://HOST:5557` for pub/sub; `req_url=tcp://HOST:5560` (requester), `req_bind=tcp://0.0.0.0:5560` (queryable).
+- [ ] Raw TCP (reference ceiling) — LATER STAGE
   - Client/server over `tokio::net::TcpStream` with simple length-prefixed frames.
   - Pub/Sub emulation: prefix each frame with topic length + topic bytes + payload.
   - Req/Rep: correlation id in header; echo server for baseline.
-- [ ] Redis — FIRST TIER
-  - Use `redis` crate; Pub/Sub for topics; Req/Rep via LIST (RPUSH/BLPOP) or Redis Streams.
-  - CLI: `--connect url=redis://127.0.0.1:6379`.
 - [ ] NATS — LATER STAGE
   - Use `async-nats` crate; pub/sub and request/reply.
   - CLI: `--connect url=nats://127.0.0.1:4222`.
@@ -182,11 +185,11 @@ Baseline engines to implement after the refactor above (prioritized first-tier, 
   - Use `tonic` for bidi-stream (pub/sub-like) and unary (req/rep) baselines.
 
 Docker & orchestration (first-tier focus initially):
-- [ ] Extend `docker-compose.yml` with services: `redis` (6379). Add `nats`/`mosquitto` later.
+- [ ] Extend `docker-compose.yml` with services: `redis` (6379) and `zmq-proxy` (XPUB 5557, XSUB 5556). Add `nats`/`mosquitto` later.
 - [ ] Keep Zenoh routers unchanged; baselines run side-by-side on distinct ports.
 
 Harness & scripts:
-- [ ] Add `scripts/run_baselines.sh` to run the same workloads across engines using `--engine` and `--connect` (start with `tcp`, `redis`).
+- [ ] Add `scripts/run_baselines.sh` to run the same workloads across engines using `--engine` and `--connect` (start with `redis`, then `zmq`).
 - [ ] Extend existing scenario scripts to accept `ENGINE` env var and pass through connect options.
 - [ ] Artifacts
   - Common CSV schema across engines (throughput, latency percentiles, errors).
@@ -194,7 +197,7 @@ Harness & scripts:
 
 Validation & acceptance:
 - [ ] Each engine: local 1→1 pub/sub and req/qry runs complete without errors at small rates.
-- [ ] CSVs are comparable (same headers/units); sanity-check latencies vs TCP baseline.
+- [ ] CSVs are comparable (same headers/units); sanity-check latencies vs Zenoh and across Redis/ZMQ.
 - [ ] Optional: add a short README section explaining how to bring up each baseline service and run.
 
 ## Phase 7 — Fault Injection

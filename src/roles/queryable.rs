@@ -10,7 +10,8 @@ use tokio::signal;
 use tokio::time::{interval, sleep};
 
 pub struct QueryableConfig {
-	pub endpoint: String,
+	pub engine: Engine,
+	pub connect: ConnectOptions,
 	pub serve_prefix: Vec<String>,
 	pub reply_size: usize,
 	pub proc_delay_ms: u64,
@@ -19,19 +20,20 @@ pub struct QueryableConfig {
 	// Aggregation/external snapshot support
 	pub shared_stats: Option<Arc<Stats>>, // when set, use this shared collector
 	pub disable_internal_snapshot: bool,  // when true, do not launch internal snapshot logger
+	// Test-only convenience: stop automatically after N seconds if provided
+	pub test_stop_after_secs: Option<u64>,
 }
 
 pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
 	println!("Starting queryable:");
-	println!("  Endpoint: {}", config.endpoint);
+	if let Some(ep) = config.connect.params.get("endpoint") { println!("  Endpoint: {}", ep); }
+	println!("  Engine: {:?}", config.engine);
 	println!("  Prefixes: {:?}", config.serve_prefix);
 	println!("  Reply size: {} bytes", config.reply_size);
 	println!("  Processing delay: {} ms", config.proc_delay_ms);
 
 	// Transport session
-	let mut opts = ConnectOptions::default();
-	opts.params.insert("endpoint".into(), config.endpoint.clone());
-	let transport = TransportBuilder::connect(Engine::Zenoh, opts)
+	let transport = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
 		.await
 		.map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
 
@@ -92,11 +94,15 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
 
 	println!("Queryable(s) registered. Waiting for queries...");
 
-	// Wait for Ctrl+C
-	tokio::select! {
-		_ = signal::ctrl_c() => {
-			println!("Ctrl+C received, stopping queryable");
+	// Wait for Ctrl+C or optional test timeout
+	if let Some(s) = config.test_stop_after_secs {
+		tokio::select! {
+			_ = tokio::time::sleep(Duration::from_secs(s)) => {}
+			_ = signal::ctrl_c() => {}
 		}
+	} else {
+		signal::ctrl_c().await?;
+		println!("Ctrl+C received, stopping queryable");
 	}
 
 	// Final stats

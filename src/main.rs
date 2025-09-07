@@ -1,23 +1,15 @@
-use crate::metrics::stats::Stats;
-use crate::output::OutputWriter;
+use mq_bench::metrics::stats::Stats;
+use mq_bench::output::OutputWriter;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use futures::future::join_all;
-use roles::publisher::{PublisherConfig, run_publisher};
-use roles::queryable::{QueryableConfig, run_queryable};
-use roles::requester::{RequesterConfig, run_requester};
-use roles::subscriber::{SubscriberConfig, run_subscriber};
+use mq_bench::roles::publisher::{PublisherConfig, run_publisher};
+use mq_bench::roles::queryable::{QueryableConfig, run_queryable};
+use mq_bench::roles::requester::{RequesterConfig, run_requester};
+use mq_bench::roles::subscriber::{SubscriberConfig, run_subscriber};
 use std::sync::Arc;
-
-mod config;
-mod logging;
-mod metrics;
-mod output;
-mod payload;
-mod rate;
-mod roles;
-mod time_sync;
-mod transport;
+use mq_bench::transport::config::{parse_engine, parse_connect_kv};
+use mq_bench::transport::Engine;
 
 #[derive(Parser)]
 #[command(name = "mq-bench")]
@@ -47,9 +39,17 @@ struct Cli {
 enum Commands {
     /// Publisher role
     Pub {
-        /// Zenoh endpoints to connect to
-        #[arg(long, required = true)]
-        endpoint: Vec<String>,
+    /// Messaging engine (zenoh|tcp|redis)
+    #[arg(long, default_value = "zenoh")]
+    engine: String,
+
+    /// Engine connect options as KEY=VALUE (repeatable)
+    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+    connect: Vec<String>,
+
+    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+    #[arg(long)]
+    endpoint: Vec<String>,
 
         /// Topic prefix
         #[arg(long, default_value = "bench/topic")]
@@ -85,9 +85,17 @@ enum Commands {
     },
     /// Subscriber role
     Sub {
-        /// Zenoh endpoints to connect to
-        #[arg(long, required = true)]
-        endpoint: Vec<String>,
+    /// Messaging engine (zenoh|tcp|redis)
+    #[arg(long, default_value = "zenoh")]
+    engine: String,
+
+    /// Engine connect options as KEY=VALUE (repeatable)
+    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+    connect: Vec<String>,
+
+    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+    #[arg(long)]
+    endpoint: Vec<String>,
 
         /// Key expression to subscribe to
         #[arg(long, default_value = "bench/**")]
@@ -107,9 +115,17 @@ enum Commands {
     },
     /// Requester role
     Req {
-        /// Zenoh endpoints to connect to
-        #[arg(long, required = true)]
-        endpoint: Vec<String>,
+    /// Messaging engine (zenoh|tcp|redis)
+    #[arg(long, default_value = "zenoh")]
+    engine: String,
+
+    /// Engine connect options as KEY=VALUE (repeatable)
+    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+    connect: Vec<String>,
+
+    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+    #[arg(long)]
+    endpoint: Vec<String>,
 
         /// Key expression for queries
         #[arg(long, required = true)]
@@ -137,9 +153,17 @@ enum Commands {
     },
     /// Queryable role
     Qry {
-        /// Zenoh endpoints to connect to
-        #[arg(long, required = true)]
-        endpoint: Vec<String>,
+    /// Messaging engine (zenoh|tcp|redis)
+    #[arg(long, default_value = "zenoh")]
+    engine: String,
+
+    /// Engine connect options as KEY=VALUE (repeatable)
+    #[arg(long, value_parser = clap::builder::NonEmptyStringValueParser::new())]
+    connect: Vec<String>,
+
+    /// Back-compat: Zenoh endpoints (maps to connect endpoint=...)
+    #[arg(long)]
+    endpoint: Vec<String>,
 
         /// Key prefixes to serve
         #[arg(long, required = true)]
@@ -168,7 +192,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Initialize logging
-    logging::init(&cli.log_level)?;
+    mq_bench::logging::init(&cli.log_level)?;
 
     println!(
         "mq-bench starting with run_id: {}",
@@ -184,6 +208,8 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Pub {
+            engine,
+            connect,
             endpoint,
             topic_prefix,
             topics,
@@ -194,7 +220,12 @@ async fn main() -> Result<()> {
             reliability: _reliability,
             csv,
         } => {
-            let endpoint = endpoint.first().unwrap().clone();
+            // Parse engine and connect opts (support legacy --endpoint)
+            let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
+            let mut conn = parse_connect_kv(&connect);
+            if conn.params.is_empty() {
+                if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }
+            }
             let mut handles = Vec::new();
             // Externalize snapshotting always (single or multiple)
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
@@ -231,7 +262,8 @@ async fn main() -> Result<()> {
                     topic_prefix.clone()
                 };
                 let cfg = PublisherConfig {
-                    endpoint: endpoint.clone(),
+                    engine: engine.clone(),
+                    connect: conn.clone(),
                     key_expr,
                     payload_size: payload as usize,
                     rate: match rate { Some(v) if v > 0 => Some(v as f64), _ => None },
@@ -260,13 +292,17 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Sub {
+            engine,
+            connect,
             endpoint,
             expr,
             subscribers,
             reliability: _,
             csv,
         } => {
-            let endpoint = endpoint.first().unwrap().clone();
+            let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
+            let mut conn = parse_connect_kv(&connect);
+            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
             let mut handles = Vec::new();
             // Externalize snapshotting always
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
@@ -296,12 +332,14 @@ async fn main() -> Result<()> {
             };
             for _i in 0..subscribers {
                 let cfg = SubscriberConfig {
-                    endpoint: endpoint.clone(),
+                    engine: engine.clone(),
+                    connect: conn.clone(),
                     key_expr: expr.clone(),
                     output_file: None,
                     snapshot_interval_secs: snapshot_interval_secs,
                     shared_stats: shared_stats.clone(),
                     disable_internal_snapshot: true,
+                    test_stop_after_secs: None,
                 };
                 handles.push(tokio::spawn(async move {
                     let _ = run_subscriber(cfg).await;
@@ -321,6 +359,8 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Req {
+            engine,
+            connect,
             endpoint,
             key_expr,
             qps,
@@ -329,7 +369,9 @@ async fn main() -> Result<()> {
             duration,
             csv,
         } => {
-            let endpoint = endpoint.first().unwrap().clone();
+            let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
+            let mut conn = parse_connect_kv(&connect);
+            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
             // Externalize snapshotting even for single requester
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
             let mut agg_output = if let Some(ref path) = csv {
@@ -358,7 +400,8 @@ async fn main() -> Result<()> {
                     None
                 };
             let config = RequesterConfig {
-                endpoint,
+                engine: engine.clone(),
+                connect: conn,
                 key_expr,
                 qps: match qps { Some(v) if v > 0 => Some(v as u32), _ => None },
                 concurrency,
@@ -383,6 +426,8 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Commands::Qry {
+            engine,
+            connect,
             endpoint,
             serve_prefix,
             reply_size,
@@ -390,7 +435,9 @@ async fn main() -> Result<()> {
             reliability: _rel,
             csv,
         } => {
-            let endpoint = endpoint.first().unwrap().clone();
+            let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
+            let mut conn = parse_connect_kv(&connect);
+            if conn.params.is_empty() { if let Some(ep) = endpoint.first() { conn.params.insert("endpoint".into(), ep.clone()); }}
             // Externalize snapshotting
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
             let mut agg_output = if let Some(ref path) = csv {
@@ -419,7 +466,8 @@ async fn main() -> Result<()> {
                     None
                 };
             let config = QueryableConfig {
-                endpoint,
+                engine: engine.clone(),
+                connect: conn,
                 serve_prefix,
                 reply_size: reply_size as usize,
                 proc_delay_ms: proc_delay,
@@ -427,6 +475,7 @@ async fn main() -> Result<()> {
                 snapshot_interval_secs,
                 shared_stats: shared_stats.clone(),
                 disable_internal_snapshot: true,
+                test_stop_after_secs: None,
             };
             run_queryable(config).await?;
             if let Some(stats) = shared_stats {

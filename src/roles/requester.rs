@@ -14,7 +14,8 @@ use futures::stream::{FuturesUnordered, StreamExt};
 use flume;
 
 pub struct RequesterConfig {
-	pub endpoint: String,
+	pub engine: Engine,
+	pub connect: ConnectOptions,
 	pub key_expr: String,
 	pub qps: Option<u32>,
 	pub concurrency: u32,
@@ -29,7 +30,8 @@ pub struct RequesterConfig {
 
 pub async fn run_requester(config: RequesterConfig) -> Result<()> {
 	println!("Starting requester:");
-	println!("  Endpoint: {}", config.endpoint);
+	if let Some(ep) = config.connect.params.get("endpoint") { println!("  Endpoint: {}", ep); }
+	println!("  Engine: {:?}", config.engine);
 	println!("  Key expr: {}", config.key_expr);
 	if let Some(q) = config.qps { println!("  QPS: {}", q); } else { println!("  QPS: unlimited (no delay)"); }
 	println!("  Concurrency: {}", config.concurrency);
@@ -37,10 +39,8 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
 	println!("  Duration: {} s", config.duration_secs);
 
 	// Transport session
-	let mut opts = ConnectOptions::default();
-	opts.params.insert("endpoint".into(), config.endpoint.clone());
 	let transport: Arc<Box<dyn crate::transport::Transport>> = Arc::from(
-		TransportBuilder::connect(Engine::Zenoh, opts)
+		TransportBuilder::connect(config.engine.clone(), config.connect.clone())
 			.await
 			.map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?
 	);

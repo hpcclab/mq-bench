@@ -11,27 +11,28 @@ use tokio::signal;
 use tokio::time::interval;
 
 pub struct SubscriberConfig {
-    pub endpoint: String,
+    pub engine: Engine,
+    pub connect: ConnectOptions,
     pub key_expr: String,
     pub output_file: Option<String>,
     pub snapshot_interval_secs: u64,
     // Aggregation/external snapshot support
     pub shared_stats: Option<Arc<Stats>>, // when set, use this shared collector
     pub disable_internal_snapshot: bool,  // when true, do not launch internal snapshot logger
+    // Test-only convenience: stop automatically after N seconds if provided
+    pub test_stop_after_secs: Option<u64>,
 }
 
 pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     println!("Starting subscriber:");
-    println!("  Endpoint: {}", config.endpoint);
+    if let Some(ep) = config.connect.params.get("endpoint") { println!("  Endpoint: {}", ep); }
+    println!("  Engine: {:?}", config.engine);
     println!("  Key: {}", config.key_expr);
     // Initialize Transport (Zenoh engine by default)
-    let mut opts = ConnectOptions::default();
-    opts.params
-        .insert("endpoint".into(), config.endpoint.clone());
-    let transport = TransportBuilder::connect(Engine::Zenoh, opts)
+    let transport = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
         .await
         .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
-    println!("Connected via transport: Zenoh");
+    println!("Connected via transport: {:?}", config.engine);
 
     // Initialize statistics (use shared if provided)
     let stats = if let Some(s) = &config.shared_stats {
@@ -124,8 +125,15 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
         .map_err(|e| anyhow::Error::msg(format!("subscribe error: {}", e)))?;
     println!("Subscribed to key expression: {}", config.key_expr);
 
-    // Wait for Ctrl+C or until process exits; callbacks will keep updating stats
-    signal::ctrl_c().await?;
+    // Wait for Ctrl+C or optional test timeout; callbacks will keep updating stats
+    if let Some(s) = config.test_stop_after_secs {
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(s)) => {}
+            _ = signal::ctrl_c() => {}
+        }
+    } else {
+        signal::ctrl_c().await?;
+    }
     println!("Ctrl+C received, stopping subscriber");
 
     // Final statistics
