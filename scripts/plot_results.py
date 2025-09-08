@@ -16,6 +16,7 @@ Outputs:
 import argparse
 import csv
 import os
+import math
 import re
 import sys
 from collections import defaultdict
@@ -70,11 +71,19 @@ def main() -> int:
         return 0
 
     payloads = unique_sorted(r["payload"] for r in records)
-    rates = unique_sorted(r["rate"] for r in records)
     transports = unique_sorted(r["transport"] for r in records)
 
+    # For rate-based plots, ignore fanout runs and any rows with non-positive rate or NaN metrics
+    rate_records = [
+        r for r in records
+        if not str(r["transport"]).startswith("fanout-")
+           and (r["rate"] or 0) > 0
+           and math.isfinite(r.get("sub_tps", float("nan")))
+    ]
+    rates = unique_sorted(r["rate"] for r in rate_records)
+
     by_pt = defaultdict(list)
-    for r in records:
+    for r in rate_records:
         by_pt[(r["payload"], r["transport"])].append(r)
 
     # Throughput vs offered rate
@@ -110,7 +119,10 @@ def main() -> int:
                 if not vals:
                     continue
                 xs.append(rate)
-                ys.append(vals[0]["p99_ms"])
+                p99 = vals[0]["p99_ms"]
+                if not math.isfinite(p99):
+                    continue
+                ys.append(p99)
             if xs:
                 ax.plot(xs, ys, marker="o", label=t)
         ax.set_title(f"P99 latency vs Offered Rate (payload={payload}B)")
@@ -140,7 +152,8 @@ def main() -> int:
                 "rate": r["rate"],
                 "subs": subs,
                 "sub_tps": r["sub_tps"],
-                "label": t.rsplit("-s", 1)[0],
+                # Normalize label e.g. fanout-mqtt-hivemq-s8 -> fanout-mqtt-hivemq
+                "label": t[: t.rfind("-s")],
             })
 
     if fanout_rows:
@@ -156,8 +169,8 @@ def main() -> int:
             fig, ax = plt.subplots(figsize=(7, 4))
             for label, lst in by_label.items():
                 lst = sorted(lst, key=lambda x: x["subs"])
-                xs = [x["subs"] for x in lst]
-                ys = [x["sub_tps"] for x in lst]
+                xs = [x["subs"] for x in lst if math.isfinite(x.get("sub_tps", float("nan")))]
+                ys = [x["sub_tps"] for x in lst if math.isfinite(x.get("sub_tps", float("nan")))]
                 ax.plot(xs, ys, marker="o", label=label)
             ax.set_title(f"Delivered throughput vs Fanout (payload={payload}B, rate={rate}/s)")
             ax.set_xlabel("Fanout (subscribers)")
