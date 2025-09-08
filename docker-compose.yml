@@ -26,6 +26,13 @@ services:
       - "1885:1883"   # MQTT TCP
       - "8081:8080"   # Dashboard (optional)
 
+  nats:
+    image: nats:2
+    container_name: nats
+    command: ["-p", "4222"]
+    ports:
+      - "4222:4222"   # NATS TCP
+
   redis:
     image: redis:7-alpine
     container_name: redis

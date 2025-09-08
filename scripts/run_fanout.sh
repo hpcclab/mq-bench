@@ -4,13 +4,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 # Fanout scenario: 1 publisher → N subscribers.
-# Now supports multiple transports via ENGINE env var: zenoh|mqtt|redis
+# Now supports multiple transports via ENGINE env var: zenoh|mqtt|redis|nats
 # Usage: scripts/run_fanout.sh [RUN_ID] [SUBS=4] [RATE=10000] [DURATION=30]
 # Env:
-#   ENGINE=zenoh (default) | mqtt | redis
+#   ENGINE=zenoh (default) | mqtt | redis | nats
 #   For zenoh:   ENDPOINT_SUB=tcp/127.0.0.1:7448  ENDPOINT_PUB=tcp/127.0.0.1:7447  [optional] ZENOH_MODE=
 #   For mqtt:    MQTT_HOST=127.0.0.1  MQTT_PORT=1883
 #   For redis:   REDIS_URL=redis://127.0.0.1:6379
+#   For nats:    NATS_HOST=127.0.0.1  NATS_PORT=4222
 
 RUN_ID=${1:-${RUN_ID:-run_$(date +%Y%m%d_%H%M%S)}}
 SUBS=${2:-${SUBS:-4}}
@@ -23,7 +24,7 @@ ENGINE="${ENGINE:-zenoh}"
 ART_DIR="artifacts/${RUN_ID}/fanout_singlesite"
 BIN="./target/release/mq-bench"
 ENDPOINT_PUB="${ENDPOINT_PUB:-tcp/127.0.0.1:7447}"
-ENDPOINT_SUB="${ENDPOINT_SUB:-tcp/127.0.0.1:7448}"
+ENDPOINT_SUB="${ENDPOINT_SUB:-tcp/127.0.0.1:7447}"
 MQTT_HOST="${MQTT_HOST:-127.0.0.1}"
 MQTT_PORT="${MQTT_PORT:-1883}"
 REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"

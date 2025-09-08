@@ -43,6 +43,11 @@ make_connect_args() {
 			local port="${MQTT_PORT:-1883}"
 			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}")
 			;;
+		nats)
+			local host="${NATS_HOST:-127.0.0.1}"
+			local port="${NATS_PORT:-4222}"
+			_out=(--engine nats --connect "host=${host}" --connect "port=${port}")
+			;;
 		redis)
 			local url="${REDIS_URL:-redis://127.0.0.1:6379}"
 			_out=(--engine redis --connect "url=${url}")

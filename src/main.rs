@@ -42,7 +42,7 @@ struct Cli {
 enum Commands {
     /// Publisher role
     Pub {
-        /// Messaging engine (zenoh|tcp|redis)
+        /// Messaging engine (zenoh|mqtt|redis|nats)
         #[arg(long, default_value = "zenoh")]
         engine: String,
 
@@ -93,7 +93,7 @@ enum Commands {
     /// Multi-topic publisher (single process, many keys)
     #[command(name = "mt-pub")]
     MtPub {
-        /// Messaging engine (zenoh|mqtt|redis)
+        /// Messaging engine (zenoh|mqtt|redis|nats)
         #[arg(long, default_value = "zenoh")]
         engine: String,
 
@@ -150,7 +150,7 @@ enum Commands {
     /// Multi-topic subscriber: spawn many per-key subscriptions
     #[command(name = "mt-sub")]
     MtSub {
-        /// Messaging engine (zenoh|mqtt|redis)
+        /// Messaging engine (zenoh|mqtt|redis|nats)
         #[arg(long, default_value = "zenoh")]
         engine: String,
 
@@ -198,7 +198,7 @@ enum Commands {
     },
     /// Subscriber role
     Sub {
-        /// Messaging engine (zenoh|tcp|redis)
+        /// Messaging engine (zenoh|mqtt|redis|nats)
         #[arg(long, default_value = "zenoh")]
         engine: String,
 
@@ -228,7 +228,7 @@ enum Commands {
     },
     /// Requester role
     Req {
-        /// Messaging engine (zenoh|tcp|redis)
+        /// Messaging engine (zenoh|mqtt|redis|nats)
         #[arg(long, default_value = "zenoh")]
         engine: String,
 
@@ -266,7 +266,7 @@ enum Commands {
     },
     /// Queryable role
     Qry {
-        /// Messaging engine (zenoh|tcp|redis)
+        /// Messaging engine (zenoh|mqtt|redis|nats)
         #[arg(long, default_value = "zenoh")]
         engine: String,
 

@@ -7,6 +7,8 @@ pub mod mock;
 pub mod mqtt;
 #[cfg(feature = "transport-redis")]
 pub mod redis;
+#[cfg(feature = "transport-nats")]
+pub mod nats;
 #[cfg(feature = "transport-zenoh")]
 pub mod zenoh;
 
@@ -25,6 +27,7 @@ pub enum Engine {
     Tcp,
     Redis,
     Mqtt,
+    Nats,
     #[cfg(any(test, feature = "transport-mock"))]
     Mock,
 }
@@ -212,6 +215,16 @@ impl TransportBuilder {
                 #[cfg(not(feature = "transport-mqtt"))]
                 {
                     Err(TransportError::Connect("mqtt feature disabled".into()))
+                }
+            }
+            Engine::Nats => {
+                #[cfg(feature = "transport-nats")]
+                {
+                    return crate::transport::nats::connect(opts).await;
+                }
+                #[cfg(not(feature = "transport-nats"))]
+                {
+                    Err(TransportError::Connect("nats feature disabled".into()))
                 }
             }
             #[cfg(any(test, feature = "transport-mock"))]
