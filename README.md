@@ -1,32 +1,37 @@
-# mq-bench — Zenoh Cluster Stress Testing Harness
+# mq-bench — Messaging transport benchmarking (MQTT + Redis + NATS + Zenoh)
 
-A minimal, scriptable benchmarking tool for Zenoh (v1.5.1), built in Rust with a Docker-based 3-router star cluster. Focus: pub/sub and request/reply with CSV metrics.
+A minimal, scriptable benchmarking tool for pub/sub and request/reply with CSV metrics. Built in Rust with Tokio. Ships a Docker Compose stack with MQTT (Mosquitto/EMQX/HiveMQ), Redis, NATS, and an optional Zenoh 3-router star.
 
-Note: The harness now uses a transport abstraction internally (Zenoh adapter by default). This keeps the CLI unchanged today while enabling non‑Zenoh baselines (TCP, Redis, etc.) to be added next.
+The harness uses a pluggable transport abstraction with adapters for MQTT, Redis, NATS, and Zenoh (1.5.1). Select an engine via `--engine` and pass connection options via `--connect KEY=VALUE`.
 
 ## Features
-- Docker Compose 3-router star topology (TCP): router2 → router1 ← router3
-- Rust harness (tokio + zenoh 1.5.1) with CLI roles: pub, sub, req, qry
+- Docker Compose stack: MQTT (Mosquitto/EMQX/HiveMQ), Redis, NATS, plus an optional Zenoh 3-router star (router2 → router1 ← router3)
+- Roles: pub, sub, req, qry; plus multi-topic mt-pub/mt-sub
 - Open-loop publisher with rate control
-- Requester with QPS pacing, concurrency, and builder-level timeouts
+- Requester with QPS pacing, concurrency, and timeouts
 - Subscriber with latency measurement (ns timestamps embedded in payload)
-- CSV-style snapshots to stdout (or CSV file via --csv)
+- CSV snapshots to stdout or file (`--csv`)
 
 Performance-focused implementation details
-- Handler-based subscribe and queryable registration (lower overhead than streams)
-- Reusable declared publisher for hot-path sends (or direct session.put)
-- Zero-copy payload path with ZBytes (header remains fixed 24 bytes)
-- Minimal work in callbacks; batching and CSV flushing for live tailing
+- Handler-based subscribe and query registration (lower overhead than streams)
+- Reusable declared publisher for hot-path sends
+- Payload header is fixed 24 bytes; subscribers decode for E2E latency
+- Batching and CSV flushing for live tailing
+
+Transports (current)
+- mqtt, redis, nats, zenoh
+  - Wildcards: use slash style in CLI (e.g., `bench/**`). Adapters map to engine-native patterns (e.g., NATS `a.>`).
+  - Topics: use slash form in CLI (e.g., `bench/topic`); adapters map as needed (e.g., NATS uses dots under the hood).
 
 ## Quick start
 
-1) Bring up the routers
+1) Bring up services (MQTT/Redis/NATS; Zenoh routers optional)
 
 ```bash
 # From repo root
 docker compose up -d
 # Verify ports
-# router1: 7447, router2: 7448, router3: 7449
+# Redis: 6379 | NATS: 4222 | MQTT: 1883/1884/1885 | Zenoh: 7447/7448/7449 (optional)
 ```
 
 2) Build the harness
@@ -35,14 +40,29 @@ docker compose up -d
 cargo build --release
 ```
 
-3) Run a cross-router pub/sub sanity test
+3) Run quick pub/sub sanity tests
 
-- Subscribe on router2 (7448):
+MQTT (defaults to Mosquitto on 1883)
+```bash
+./target/release/mq-bench sub --engine mqtt --connect host=127.0.0.1 --connect port=1883 --expr bench/topic
+./target/release/mq-bench pub --engine mqtt --connect host=127.0.0.1 --connect port=1883 --topic-prefix bench/topic --payload 200 --rate 5 --duration 10
+```
+
+Redis
+```bash
+./target/release/mq-bench sub --engine redis --connect url=redis://127.0.0.1:6379 --expr bench/topic
+./target/release/mq-bench pub --engine redis --connect url=redis://127.0.0.1:6379 --topic-prefix bench/topic --payload 200 --rate 5 --duration 10
+```
+
+NATS (default port 4222)
+```bash
+./target/release/mq-bench sub --engine nats --connect host=127.0.0.1 --connect port=4222 --expr bench/topic
+./target/release/mq-bench pub --engine nats --connect host=127.0.0.1 --connect port=4222 --topic-prefix bench/topic --payload 200 --rate 5 --duration 10
+```
+
+Zenoh (optional cross-router: sub on router2/7448, pub to router3/7449)
 ```bash
 ./target/release/mq-bench sub --endpoint tcp/127.0.0.1:7448 --expr bench/topic
-```
-- Publish on router3 (7449):
-```bash
 ./target/release/mq-bench pub --endpoint tcp/127.0.0.1:7449 --payload 200 --rate 5 --duration 10
 ```
 
@@ -52,25 +72,33 @@ DEBUG: Received message seq=12, latency=1.10ms
 Subscriber stats - Received: 20, Errors: 0, Rate: 4.00 msg/s, P99 Latency: 3.01ms
 ```
 
-## CLI overview (current)
+## CLI overview
+
+Top-level:
+- `--run-id STRING` tag outputs/CSV (optional)
+- `--out-dir PATH` base artifacts directory (default `./artifacts`)
+- `--log-level trace|debug|info|warn|error` (default `info`)
+- `--snapshot-interval SECS` stats snapshot cadence (default `1`)
+
+All roles accept a transport engine and connection options:
+- `--engine zenoh|mqtt|redis|nats`
+- `--connect KEY=VALUE` (repeatable)
+- Zenoh back-compat: `--endpoint tcp/host:port` maps to `--connect endpoint=...`
 
 - Publisher (pub)
-  - `--endpoint` tcp host:port, e.g. `tcp/127.0.0.1:7449`
   - Topic/key selection
     - `--topic-prefix` base key (defaults to `bench/topic`)
-    - Multi-topic: `--topics N` and `--publishers M` to create M logical publishers spread over N topics
+    - Multi-topic: `--topics N` and `--publishers M` to create M logical publishers over N topics
   - `--payload` size in bytes
     - `--rate` messages per second (omitted or <= 0 means unlimited)
     - `--duration` seconds
   - `--csv path/to/pub.csv` to write CSV snapshots to a file (stdout if omitted)
 
 - Subscriber (sub)
-  - `--endpoint` tcp host:port, e.g. `tcp/127.0.0.1:7448`
-  - `--expr` key expression, e.g. `bench/topic`
+  - `--expr` key expression, e.g. `bench/topic` or `bench/**`
   - `--csv path/to/sub.csv` to write CSV snapshots to a file (stdout if omitted)
 
 - Requester (req)
-  - `--endpoint` tcp host:port, e.g. `tcp/127.0.0.1:7449`
   - `--key-expr` query key expression
   - `--qps` queries per second (omitted or <= 0 means unlimited)
   - `--concurrency` max in-flight
@@ -79,97 +107,103 @@ Subscriber stats - Received: 20, Errors: 0, Rate: 4.00 msg/s, P99 Latency: 3.01m
   - `--csv path/to/req.csv`
 
 - Queryable (qry)
-  - `--endpoint` tcp host:port, e.g. `tcp/127.0.0.1:7448`
   - `--serve-prefix` repeatable; prefixes to serve
   - `--reply-size` reply body size in bytes
   - `--proc-delay` processing delay per query (ms)
   - `--csv path/to/qry.csv`
 
+- Multi-topic publisher (mt-pub)
+  - `--topic-prefix` base key (e.g., `bench/topic`)
+  - Dimensions: `--tenants T --regions R --services S --shards K`
+  - `--publishers M` logical publishers (<= T*R*S*K; -1 uses total keys)
+  - `--mapping mdim|hash` key mapping across publishers
+  - `--payload`, `--rate`, `--duration`, `--csv`, `--share-transport`
+
+- Multi-topic subscriber (mt-sub)
+  - `--topic-prefix` base key (e.g., `bench/mtopic`)
+  - Dimensions: `--tenants T --regions R --services S --shards K`
+  - `--subscribers N` number of per-key subscriptions (<= total keys; -1 uses total keys)
+  - `--mapping mdim|hash`, `--duration`, `--csv`, `--share-transport`
+
 Tip: If you pass `--csv ./artifacts/run1/pub.csv` or `sub.csv`, parent directories will be created automatically.
 
-## Quick request/reply test
+Engine connect hints:
+- MQTT: `--connect host=127.0.0.1 --connect port=1883`
+- Redis: `--connect url=redis://127.0.0.1:6379`
+- NATS: `--connect host=127.0.0.1 --connect port=4222`
+- Zenoh: `--endpoint tcp/127.0.0.1:7448` (or `--connect endpoint=tcp/127.0.0.1:7448`)
 
-With the Docker routers up and the binary built:
+## Quick request/reply test (examples)
 
-1) Start a queryable on router2 (7448):
+With services up and the binary built:
+
+1) Start a queryable on Zenoh router2 (optional, 7448):
 
 ```bash
 ./target/release/mq-bench qry --endpoint tcp/127.0.0.1:7448 --serve-prefix bench/topic --reply-size 256 --proc-delay 0
 ```
 
-2) Run a requester on router3 (7449):
+2) Run a requester on Zenoh router3 (7449):
 
 ```bash
 ./target/release/mq-bench req --endpoint tcp/127.0.0.1:7449 --key-expr bench/topic --qps 1000 --concurrency 32 --timeout 2000 --duration 5
+```
+
+NATS
+```bash
+# Start a responder (subscribe and reply)
+./target/release/mq-bench qry --engine nats --connect host=127.0.0.1 --connect port=4222 \
+  --serve-prefix bench/topic --reply-size 256 --proc-delay 0
+
+# Run a requester
+./target/release/mq-bench req --engine nats --connect host=127.0.0.1 --connect port=4222 \
+  --key-expr bench/topic --qps 1000 --concurrency 32 --timeout 2000 --duration 5
+```
+
+Redis (simple list-based req/rep baseline)
+```bash
+./target/release/mq-bench qry --engine redis --connect url=redis://127.0.0.1:6379 \
+  --serve-prefix bench/topic --reply-size 256 --proc-delay 0
+
+./target/release/mq-bench req --engine redis --connect url=redis://127.0.0.1:6379 \
+  --key-expr bench/topic --qps 1000 --concurrency 32 --timeout 2000 --duration 5
 ```
 
 Notes:
 - Start the queryable before the requester.
 - Add `--csv path/to/req.csv` or `qry.csv` to save snapshots.
 
-## Large-scale multi-topic test
+## Multi-topic quick test
 
-Goal: stress routing/filtering with many distinct topic prefixes (e.g., thousands of keys) and verify throughput/latency remain reasonable.
-
-Recommended cross-router setup (subscriber on router2, publisher on router3):
-
-1) Start a wildcard subscriber that matches all topic indices:
+Publish over many keys and subscribe to all of them in one process:
 
 ```bash
-./target/release/mq-bench sub \
-  --endpoint tcp/127.0.0.1:7448 \
-  --expr "bench/topic/**" \
-  --csv ./artifacts/run-mtopics/sub_agg.csv
+# Subscriber over many keys
+./target/release/mq-bench mt-sub --engine mqtt --connect host=127.0.0.1 --connect port=1883 \
+  --topic-prefix bench/mtopic --tenants 4 --regions 2 --services 3 --shards 8 \
+  --subscribers -1 --duration 10
+
+# Matching publisher
+./target/release/mq-bench mt-pub --engine mqtt --connect host=127.0.0.1 --connect port=1883 \
+  --topic-prefix bench/mtopic --tenants 4 --regions 2 --services 3 --shards 8 \
+  --publishers -1 --payload 256 --rate 1000 --duration 10
 ```
 
-2) Run publishers across many topics. With the current CLI, each publisher i uses key `topic_prefix/(i % topics)`. To cover all topics evenly, set `--publishers >= --topics`.
+## Topology & services
 
-```bash
-./target/release/mq-bench pub \
-  --endpoint tcp/127.0.0.1:7449 \
-  --topic-prefix bench/topic \
-  --topics 1000 \
-  --publishers 1000 \
-  --payload 200 \
-  --rate 10 \
-  --duration 30 \
-  --csv ./artifacts/run-mtopics/pub.csv
-```
-
-Notes:
-- Start the subscriber first to avoid initial drops.
-- If `--publishers < --topics`, only the first `(publishers % topics)` topic indices will be active due to the current mapping.
-- Use wildcard expressions on the subscriber (`bench/topic/**`) to receive all indices without spawning per-topic subscribers.
-- For very large topic counts, monitor CPU and consider lowering `--rate` per publisher.
-
-Performance tips
-- Build with `--release` for high-rate runs.
-- Keep the subscriber running before starting publishers to avoid warm-up drops.
-- Use a single wildcard subscriber for aggregation when stressing many topics.
-
-## Topology
-
-Docker Compose defines a 3-router star and exposes ports:
-- router1: 7447
-- router2: 7448 → 7447 in container
-- router3: 7449 → 7447 in container
+Docker Compose defines optional services:
+- MQTT brokers: Mosquitto 1883, EMQX 1884, HiveMQ 1885
+- Redis: 6379
+- NATS: 4222
+- Zenoh star (optional): 7447; 7448→7447; 7449→7447
 
 Configs in `config/` have discovery disabled to ensure deterministic static peering.
 
-## Roadmap
-- Phase R: transport abstraction (done for Zenoh; adapters for other engines next)
-- Phase 4: requester/queryable minimal functionality (QPS, timeouts, concurrency)
-- Phase 5: run summary JSON + optional Prometheus
-- Phase 6: scenario scripts to generate artifacts
-- Phase 7: fault injection (router restarts, churn)
+## Scenario scripts
 
-## Troubleshooting
-- Ensure the right router port: sub on 7448, pub on 7449 for cross-router test
-- If messages don’t appear, wait a second; the subscriber must be running before the publisher
-- Check container logs: `docker compose logs -f router1`
-
-Advanced
-- If you observe low throughput, verify the build is in release mode and that the subscriber’s CSV shows non-zero itps/tps. The system flushes CSV after each snapshot so `tail -f` updates live.
-
-## License
-MIT
+- Generic, multi-transport:
+  - `scripts/run_baseline.sh` (ENGINE=zenoh|mqtt|redis|nats)
+  - `scripts/run_fanout.sh` (ENGINE=zenoh|mqtt|redis|nats)
+- Convenience wrappers:
+  - Baseline: `run_mqtt_baseline.sh`, `run_redis_baseline.sh`, `run_nats_baseline.sh`
+  - Fanout: `run_mqtt_fanout.sh`, `run_redis_fanout.sh`, `run_nats_fanout.sh`
