@@ -16,6 +16,7 @@ Outputs:
 import argparse
 import csv
 import os
+import re
 import sys
 from collections import defaultdict
 
@@ -120,6 +121,52 @@ def main() -> int:
         fig.tight_layout()
         fig.savefig(os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}.png"), dpi=150)
         plt.close(fig)
+
+    # Fanout plots: x = subscriber count, y = delivered throughput, per (payload, rate)
+    fanout_rows = []
+    subs_pat = re.compile(r"-s(\d+)$")
+    for r in records:
+        t = r["transport"]
+        if t.startswith("fanout-"):
+            m = subs_pat.search(t)
+            if not m:
+                continue
+            try:
+                subs = int(m.group(1))
+            except Exception:
+                continue
+            fanout_rows.append({
+                "payload": r["payload"],
+                "rate": r["rate"],
+                "subs": subs,
+                "sub_tps": r["sub_tps"],
+                "label": t.rsplit("-s", 1)[0],
+            })
+
+    if fanout_rows:
+        by_pr = defaultdict(list)  # (payload, rate) -> rows
+        for r in fanout_rows:
+            by_pr[(r["payload"], r["rate"])].append(r)
+        for (payload, rate), rows in by_pr.items():
+            # Group by label in case multiple fanout transport flavors exist
+            by_label = defaultdict(list)
+            for rr in rows:
+                by_label[rr["label"]].append(rr)
+
+            fig, ax = plt.subplots(figsize=(7, 4))
+            for label, lst in by_label.items():
+                lst = sorted(lst, key=lambda x: x["subs"])
+                xs = [x["subs"] for x in lst]
+                ys = [x["sub_tps"] for x in lst]
+                ax.plot(xs, ys, marker="o", label=label)
+            ax.set_title(f"Delivered throughput vs Fanout (payload={payload}B, rate={rate}/s)")
+            ax.set_xlabel("Fanout (subscribers)")
+            ax.set_ylabel("Delivered throughput (msg/s)")
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            fig.tight_layout()
+            fig.savefig(os.path.join(args.out_dir, f"fanout_throughput_payload{payload}_rate{rate}.png"), dpi=150)
+            plt.close(fig)
 
     print("[plot] Wrote plots to", args.out_dir)
     return 0

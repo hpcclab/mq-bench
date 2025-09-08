@@ -7,17 +7,37 @@ set -euo pipefail
 #   scripts/orchestrate_benchmarks.sh [--payloads "128 512 1024 4096"] \
 #     [--rates "1000 5000 10000"] [--duration 20] [--snapshot 5] \
 #     [--transports "zenoh mqtt redis"] [--mqtt-brokers "mosquitto:127.0.0.1:1883 emqx:127.0.0.1:1884 hivemq:127.0.0.1:1885"] \
-#     [--start-services] [--run-id-prefix PREFIX] [--summary PATH] [--plots-only] [--dry-run]
+#     [--fanout] [--fanout-subs "2 4 8"] [--fanout-rates "1000 5000 10000"] \
+#     [--start-services] [--run-id-prefix PREFIX] [--summary PATH] [--plots-only] [--dry-run] [--no-baseline]
 #
 # Notes:
 # - Requires: bash, cargo (for run_* scripts), python3 with matplotlib (for plots).
 # - Produces: results/benchmark_<timestamp>/{raw_data,plots}/
+#
+# Examples:
+# - Full baseline sweep (zenoh+mqtt+redis) with default payloads/rates:
+#   scripts/orchestrate_benchmarks.sh --start-services
+# - Baseline sweep with custom payloads/rates and 30s duration:
+#   scripts/orchestrate_benchmarks.sh --payloads "256 1024 4096" --rates "1000 5000 10000" --duration 30
+# - MQTT across multiple brokers (override hosts/ports):
+#   scripts/orchestrate_benchmarks.sh --transports "mqtt" --mqtt-brokers "mosq:127.0.0.1:1883 emqx:127.0.0.1:1884 hive:127.0.0.1:1885"
+# - Fanout only (no baselines), sweep subscribers and use baseline rates:
+#   scripts/orchestrate_benchmarks.sh --no-baseline --fanout --fanout-subs "2 4 8 16"
+# - Fanout with dedicated rates and payload set:
+#   scripts/orchestrate_benchmarks.sh --no-baseline --fanout --fanout-subs "2 8 32" --fanout-rates "2000 8000" --payloads "1024"
+# - Plots only from the latest summary (no new runs):
+#   scripts/orchestrate_benchmarks.sh --plots-only
+# - Plots only from a specific summary file:
+#   scripts/orchestrate_benchmarks.sh --plots-only --summary results/benchmark_YYYYMMDD_HHMMSS/raw_data/summary.csv
+# - Dry-run (print actions without executing):
+#   scripts/orchestrate_benchmarks.sh --dry-run --payloads "128 512" --rates "1000 5000"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-PAYLOADS=(128 1024 16384)
-RATES=(1000 5000 10000 50000 100000 200000)
+# PAYLOADS=(128 1024 4096 16384)
+PAYLOADS=(1024 4096)
+RATES=(5000 10000 50000 100000 200000 400000)
 DURATION=20
 SNAPSHOT=5
 TRANSPORTS=(zenoh mqtt redis)
@@ -31,25 +51,52 @@ SUMMARY_OVERRIDE=""
 MQTT_BROKERS="mosquitto:127.0.0.1:1883 emqx:127.0.0.1:1884 hivemq:127.0.0.1:1885"
 declare -a MQTT_BROKERS_ARR=()
 
+# Fanout controls
+FANOUT_ENABLE=0
+FANOUT_SUBS="4 16 64 256 1024"
+FANOUT_RATES="1000"  # defaults to RATES if empty
+BASELINE_ENABLE=1
+
 usage() {
   sed -n '1,40p' "$0" | sed -n 's/^# \{0,1\}//p'
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --payloads) shift; IFS=' ' read -r -a PAYLOADS <<<"${1:-}" ;;
-    --rates) shift; IFS=' ' read -r -a RATES <<<"${1:-}" ;;
-    --duration) shift; DURATION=${1:-20} ;;
-    --snapshot) shift; SNAPSHOT=${1:-5} ;;
-    --transports) shift; IFS=' ' read -r -a TRANSPORTS <<<"${1:-}" ;;
-    --run-id-prefix) shift; RUN_ID_PREFIX=${1:-bench} ;;
-    --start-services) START_SERVICES=1 ;;
-  --plots-only) PLOTS_ONLY=1 ;;
-  --summary) shift; SUMMARY_OVERRIDE=${1:-} ;;
-  --mqtt-brokers) shift; MQTT_BROKERS=${1:-} ;;
-    --dry-run) DRY_RUN=1 ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "Unknown arg: $1"; usage; exit 2 ;;
+    --payloads)
+      shift; IFS=' ' read -r -a PAYLOADS <<<"${1:-}" ;;
+    --rates)
+      shift; IFS=' ' read -r -a RATES <<<"${1:-}" ;;
+    --duration)
+      shift; DURATION=${1:-20} ;;
+    --snapshot)
+      shift; SNAPSHOT=${1:-5} ;;
+    --transports)
+      shift; IFS=' ' read -r -a TRANSPORTS <<<"${1:-}" ;;
+    --run-id-prefix)
+      shift; RUN_ID_PREFIX=${1:-bench} ;;
+    --start-services)
+      START_SERVICES=1 ;;
+    --plots-only)
+      PLOTS_ONLY=1 ;;
+    --summary)
+      shift; SUMMARY_OVERRIDE=${1:-} ;;
+    --mqtt-brokers)
+      shift; MQTT_BROKERS=${1:-} ;;
+    --fanout)
+      FANOUT_ENABLE=1 ;;
+    --fanout-subs)
+      shift; FANOUT_SUBS=${1:-} ;;
+    --fanout-rates)
+      shift; FANOUT_RATES=${1:-} ;;
+    --no-baseline)
+      BASELINE_ENABLE=0 ;;
+    --dry-run)
+      DRY_RUN=1 ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "Unknown arg: $1"; usage; exit 2 ;;
   esac
   shift || true
 done
@@ -93,9 +140,14 @@ parse_and_append_summary() {
   local sub_csv pub_csv last_sub last_pub
   sub_csv="${art_dir}/sub.csv"
   pub_csv="${art_dir}/pub.csv"
+  # Fallback to sub_agg.csv if present (fanout)
   if [[ ! -f "${sub_csv}" ]]; then
-    log "WARN: Missing ${sub_csv}; skipping row"
-    return 0
+    if [[ -f "${art_dir}/sub_agg.csv" ]]; then
+      sub_csv="${art_dir}/sub_agg.csv"
+    else
+      log "WARN: Missing ${sub_csv}; skipping row"
+      return 0
+    fi
   fi
   # Read last rows (skip header)
   last_sub=$(tail -n +2 "${sub_csv}" | tail -n1 || true)
@@ -125,7 +177,44 @@ parse_and_append_summary() {
   p50_ms=$(ns_to_ms "${p50}")
   p95_ms=$(ns_to_ms "${p95}")
   p99_ms=$(ns_to_ms "${p99}")
-  echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${errors},${art_dir}" >> ""${SUMMARY_CSV}""
+  echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${errors},${art_dir}" >> "${SUMMARY_CSV}"
+}
+
+run_fanout_combo() {
+  local transport="$1" subs="$2" payload="$3" rate="$4"
+  local rid env_common cmd art_dir
+  env_common="SUBS=${subs} PAYLOAD=${payload} RATE=${rate} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT} KEY=bench/topic"
+  case "${transport}" in
+    zenoh)
+      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
+      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
+      cmd="ENGINE=zenoh ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      log "Running: fanout transport=zenoh, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
+      run "${cmd}"
+      parse_and_append_summary "fanout-zenoh-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
+      ;;
+    mqtt)
+      for tok in "${MQTT_BROKERS_ARR[@]}"; do
+        IFS=: read -r bname bhost bport <<<"${tok}"
+        rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_${bname}_s${subs}_p${payload}_r${rate}"
+        art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
+        cmd="ENGINE=mqtt MQTT_HOST=${bhost} MQTT_PORT=${bport} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+        log "Running: fanout transport=mqtt(${bname}), subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
+        run "${cmd}"
+        parse_and_append_summary "fanout-mqtt-${bname}-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
+      done
+      ;;
+    redis)
+      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
+      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
+      cmd="ENGINE=redis ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      log "Running: fanout transport=redis, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
+      run "${cmd}"
+      parse_and_append_summary "fanout-redis-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
+      ;;
+    *)
+      log "Unknown fanout transport: ${transport}"; return 1 ;;
+  esac
 }
 
 run_one_combo() {
@@ -179,13 +268,38 @@ main() {
   ensure_services
 
   if [[ $PLOTS_ONLY -eq 0 ]]; then
-    for t in "${TRANSPORTS[@]}"; do
-      for p in "${PAYLOADS[@]}"; do
-        for r in "${RATES[@]}"; do
-          run_one_combo "$t" "$p" "$r"
+    if [[ ${BASELINE_ENABLE} -eq 1 ]]; then
+      for t in "${TRANSPORTS[@]}"; do
+        for p in "${PAYLOADS[@]}"; do
+          for r in "${RATES[@]}"; do
+            run_one_combo "$t" "$p" "$r"
+          done
         done
       done
-    done
+    else
+      log "Skipping baseline runs (--no-baseline)"
+    fi
+
+    if [[ ${FANOUT_ENABLE} -eq 1 ]]; then
+      # Resolve fanout rates
+      local -a frates
+      if [[ -n "${FANOUT_RATES}" ]]; then
+        IFS=' ' read -r -a frates <<<"${FANOUT_RATES}"
+      else
+        frates=("${RATES[@]}")
+      fi
+      local -a fsubs
+      IFS=' ' read -r -a fsubs <<<"${FANOUT_SUBS}"
+      for t in "${TRANSPORTS[@]}"; do
+        for s in "${fsubs[@]}"; do
+          for p in "${PAYLOADS[@]}"; do
+            for r in "${frates[@]}"; do
+              run_fanout_combo "$t" "$s" "$p" "$r"
+            done
+          done
+        done
+      done
+    fi
   else
     # In plots-only, if no summary provided and our summary is empty, try latest one
     if [[ -z "${SUMMARY_OVERRIDE}" ]] && { [[ ! -f "${SUMMARY_CSV}" ]] || [[ $(wc -l <"${SUMMARY_CSV}") -le 1 ]]; }; then

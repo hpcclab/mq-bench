@@ -3,8 +3,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
-# Fanout scenario: 1 publisher → N subscribers on a single router (router1:7447)
+# Fanout scenario: 1 publisher → N subscribers.
+# Now supports multiple transports via ENGINE env var: zenoh|mqtt|redis
 # Usage: scripts/run_fanout.sh [RUN_ID] [SUBS=4] [RATE=10000] [DURATION=30]
+# Env:
+#   ENGINE=zenoh (default) | mqtt | redis
+#   For zenoh:   ENDPOINT_SUB=tcp/127.0.0.1:7448  ENDPOINT_PUB=tcp/127.0.0.1:7447  [optional] ZENOH_MODE=
+#   For mqtt:    MQTT_HOST=127.0.0.1  MQTT_PORT=1883
+#   For redis:   REDIS_URL=redis://127.0.0.1:6379
 
 RUN_ID=${1:-${RUN_ID:-run_$(date +%Y%m%d_%H%M%S)}}
 SUBS=${2:-${SUBS:-4}}
@@ -12,57 +18,34 @@ def RATE     "${RATE:-10000}"
 def DURATION "${DURATION:-30}"
 def PAYLOAD  "${PAYLOAD:-1024}"
 def SNAPSHOT "${SNAPSHOT:-5}"
+ENGINE="${ENGINE:-zenoh}"
 
 ART_DIR="artifacts/${RUN_ID}/fanout_singlesite"
 BIN="./target/release/mq-bench"
 ENDPOINT_PUB="${ENDPOINT_PUB:-tcp/127.0.0.1:7447}"
 ENDPOINT_SUB="${ENDPOINT_SUB:-tcp/127.0.0.1:7448}"
+MQTT_HOST="${MQTT_HOST:-127.0.0.1}"
+MQTT_PORT="${MQTT_PORT:-1883}"
+REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 KEY="${KEY:-bench/topic}"
 ZENOH_MODE="${ZENOH_MODE:-}"
 
-echo "[run_fanout] Run ID: ${RUN_ID} | SUBS=${SUBS} RATE=${RATE} DURATION=${DURATION}s"
+echo "[run_fanout] Run ID: ${RUN_ID} | ENGINE=${ENGINE} | SUBS=${SUBS} RATE=${RATE} DURATION=${DURATION}s"
 mkdir -p "${ART_DIR}"
 
-if [[ ! -x "${BIN}" ]]; then
-	echo "Building release binary..."
-	cargo build --release
-fi
+build_release_if_needed "${BIN}"
 
 SUB_CSV="${ART_DIR}/sub_agg.csv"
 PUB_CSV="${ART_DIR}/pub.csv"
 
-echo "Starting ${SUBS} subscribers on ${ENDPOINT_SUB} → ${KEY} (aggregated CSV)"
-CONNECT_SUB_ARGS=(--endpoint "${ENDPOINT_SUB}")
-if [[ -n "${ZENOH_MODE}" ]]; then
-	CONNECT_SUB_ARGS=(--connect "endpoint=${ENDPOINT_SUB}" --connect "mode=${ZENOH_MODE}")
-fi
-"${BIN}" --snapshot-interval "${SNAPSHOT}" sub \
-		"${CONNECT_SUB_ARGS[@]}" \
-	--expr "${KEY}" \
-	--subscribers "${SUBS}" \
-	--csv "${SUB_CSV}" \
-	>"${ART_DIR}/sub.log" 2>&1 &
-SUB_PID=$!
+echo "Starting ${SUBS} subscribers → ${KEY} (aggregated CSV)"
+start_sub SUB_PID "${KEY}" "${SUBS}" "${SUB_CSV}" "${ART_DIR}/sub.log"
 trap 'echo "Stopping subscribers (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
 
 sleep 1
 
-echo "Running publisher on ${ENDPOINT_PUB} → ${KEY}"
-RATE_FLAG=()
-if [[ -n "${RATE}" ]] && (( RATE > 0 )); then RATE_FLAG=(--rate "${RATE}"); fi
-CONNECT_PUB_ARGS=(--endpoint "${ENDPOINT_PUB}")
-if [[ -n "${ZENOH_MODE}" ]]; then
-	CONNECT_PUB_ARGS=(--connect "endpoint=${ENDPOINT_PUB}" --connect "mode=${ZENOH_MODE}")
-fi
-"${BIN}" --snapshot-interval "${SNAPSHOT}" pub \
-		"${CONNECT_PUB_ARGS[@]}" \
-	--topic-prefix "${KEY}" \
-	--payload "${PAYLOAD}" \
-	"${RATE_FLAG[@]}" \
-	--duration "${DURATION}" \
-	--csv "${PUB_CSV}" \
-	>"${ART_DIR}/pub.log" 2>&1 &
-PUB_PID=$!
+echo "Running publisher → ${KEY}"
+start_pub PUB_PID "${KEY}" "${PAYLOAD}" "${RATE}" "${DURATION}" "${PUB_CSV}" "${ART_DIR}/pub.log"
 
 print_status() {
 	local sub_file="$1" pub_file="$2"
@@ -81,26 +64,11 @@ print_status() {
 		"${rsub:--}" "${itsub:--}" "$(awk -v n="${p99sub:-0}" 'BEGIN{printf (n/1e6)}')"
 }
 
-echo "[watch] printing status every ${SNAPSHOT}s..."
-while kill -0 ${PUB_PID} 2>/dev/null; do
-	print_status "${SUB_CSV}" "${PUB_CSV}"
-	sleep "${SNAPSHOT}"
-done
+watch_until_pub_exits ${PUB_PID} "${SUB_CSV}" "${PUB_CSV}"
 
 wait ${PUB_PID} || true
 
 echo "\n=== Summary (${RUN_ID}) ==="
-final_pub=$(tail -n +2 "${PUB_CSV}" 2>/dev/null | tail -n1 || true)
-final_sub=$(tail -n +2 "${SUB_CSV}" 2>/dev/null | tail -n1 || true)
-if [[ -n "$final_pub" ]]; then
-	IFS=, read -r _ tsent _ terr tt _ _ _ _ _ _ _ <<<"$final_pub"
-	echo "Publisher: sent=${tsent} total_tps=${tt}"
-fi
-if [[ -n "$final_sub" ]]; then
-	IFS=, read -r _ _ rcv _ tps _ p50 p95 p99 _ _ _ <<<"$final_sub"
-	printf "Subscriber: recv=%s total_tps=%.2f p50=%.2fms p95=%.2fms p99=%.2fms\n" \
-		"$rcv" "$tps" "$(awk -v n="$p50" 'BEGIN{printf (n/1e6)}')" \
-		"$(awk -v n="$p95" 'BEGIN{printf (n/1e6)}')" "$(awk -v n="$p99" 'BEGIN{printf (n/1e6)}')"
-fi
+summarize_common "${SUB_CSV}" "${PUB_CSV}"
 
 echo "Fanout run complete. Artifacts at ${ART_DIR}"
