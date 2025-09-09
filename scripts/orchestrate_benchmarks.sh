@@ -6,7 +6,7 @@ set -euo pipefail
 # Usage:
 #   scripts/orchestrate_benchmarks.sh [--payloads "128 512 1024 4096"] \
 #     [--rates "1000 5000 10000"] [--duration 20] [--snapshot 5] \
-#     [--transports "zenoh mqtt redis"] [--mqtt-brokers "mosquitto:127.0.0.1:1883 emqx:127.0.0.1:1884 hivemq:127.0.0.1:1885"] \
+#     [--transports "zenoh mqtt redis nats"] [--mqtt-brokers "mosquitto:127.0.0.1:1883 emqx:127.0.0.1:1884 hivemq:127.0.0.1:1885"] \
 #     [--fanout] [--fanout-subs "2 4 8"] [--fanout-rates "1000 5000 10000"] \
 #     [--start-services] [--run-id-prefix PREFIX] [--summary PATH] [--plots-only] [--dry-run] [--no-baseline]
 #
@@ -40,7 +40,7 @@ PAYLOADS=(1024 4096)
 RATES=(5000 10000 50000 100000 200000 400000)
 DURATION=20
 SNAPSHOT=5
-TRANSPORTS=(zenoh mqtt redis)
+TRANSPORTS=(zenoh mqtt redis nats)
 RUN_ID_PREFIX="bench"
 START_SERVICES=0
 PLOTS_ONLY=0
@@ -212,6 +212,14 @@ run_fanout_combo() {
       run "${cmd}"
       parse_and_append_summary "fanout-redis-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
       ;;
+    nats)
+      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
+      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
+      cmd="ENGINE=nats ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      log "Running: fanout transport=nats, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
+      run "${cmd}"
+      parse_and_append_summary "fanout-nats-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
+      ;;
     *)
       log "Unknown fanout transport: ${transport}"; return 1 ;;
   esac
@@ -244,6 +252,11 @@ run_one_combo() {
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
       cmd="${env_common} bash \"${SCRIPT_DIR}/run_redis_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/redis_baseline"
+      ;;
+    nats)
+      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
+      cmd="${env_common} bash \"${SCRIPT_DIR}/run_nats_baseline.sh\" \"${rid}\""
+      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     *)
       log "Unknown transport: ${transport}"; return 1 ;;
