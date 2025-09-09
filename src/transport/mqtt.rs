@@ -13,6 +13,8 @@ pub struct MqttTransport {
     host: String,
     port: u16,
     keep_alive: Duration,
+    username: Option<String>,
+    password: Option<String>,
 }
 
 pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
@@ -35,11 +37,14 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
     let mut mqttoptions = MqttOptions::new(client_id, host.clone(), port);
     let keep_alive = Duration::from_secs(30);
     mqttoptions.set_keep_alive(keep_alive);
+    mqttoptions.set_max_packet_size(64*1024, 64*1024); // 64KB max packet size
     // We don't keep this MqttOptions; we store connection params to create per-role clients
     Ok(Box::new(MqttTransport {
         host,
         port,
         keep_alive,
+        username: opts.params.get("username").cloned(),
+        password: opts.params.get("password").cloned(),
     }))
 }
 
@@ -57,7 +62,12 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
-        let (client, mut eventloop) = AsyncClient::new(options, 100);
+        if let Some(user) = &self.username {
+            if let Some(pass) = &self.password {
+                options.set_credentials(user, pass);
+            }
+        }
+        let (client, mut eventloop) = AsyncClient::new(options, 65536);
         let topic = map_expr(expr);
         client
             .subscribe(topic, QoS::AtMostOnce)
@@ -90,7 +100,12 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
-        let (client, mut eventloop) = AsyncClient::new(options, 100);
+        if let Some(user) = &self.username {
+            if let Some(pass) = &self.password {
+                options.set_credentials(user, pass);
+            }
+        }
+        let (client, mut eventloop) = AsyncClient::new(options, 65536);
         let poller = tokio::spawn(async move {
             loop {
                 let _ = eventloop.poll().await;
@@ -114,6 +129,11 @@ impl Transport for MqttTransport {
             self.port,
         );
         sub_opts.set_keep_alive(self.keep_alive);
+        if let Some(user) = &self.username {
+            if let Some(pass) = &self.password {
+                sub_opts.set_credentials(user, pass);
+            }
+        }
         let (sub_client, mut sub_el) = AsyncClient::new(sub_opts, 20);
         sub_client
             .subscribe(&reply_topic, QoS::AtMostOnce)
@@ -127,7 +147,12 @@ impl Transport for MqttTransport {
             self.port,
         );
         pub_opts.set_keep_alive(self.keep_alive);
-        let (pub_client, mut pub_el) = AsyncClient::new(pub_opts, 20);
+        if let Some(user) = &self.username {
+            if let Some(pass) = &self.password {
+                pub_opts.set_credentials(user, pass);
+            }
+        }
+        let (pub_client, mut pub_el) = AsyncClient::new(pub_opts, 1024);
         // Drive publisher eventloop in background
         let _pub_poller = tokio::spawn(async move { while pub_el.poll().await.is_ok() {} });
 
@@ -170,7 +195,12 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
-        let (client, mut eventloop) = AsyncClient::new(options, 100);
+        if let Some(user) = &self.username {
+            if let Some(pass) = &self.password {
+                options.set_credentials(user, pass);
+            }
+        }
+        let (client, mut eventloop) = AsyncClient::new(options, 65536);
         client
             .subscribe(&subject, QoS::AtMostOnce)
             .await

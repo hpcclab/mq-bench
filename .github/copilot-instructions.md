@@ -52,3 +52,14 @@ Pitfalls
 - Wrong host port → wrong router. Use 7447 (router1), 7448 (router2), 7449 (router3).
 - Start subscriber before publisher to avoid initial drops.
 - High rates in debug builds can saturate CPU; prefer `--release` for performance work.
+
+How to add a new transport (quick checklist)
+- Create an adapter in `src/transport/<name>.rs` implementing `Transport` (pub/sub first; req/qry optional).
+- Wire it:
+  - Add enum variant in `src/transport/mod.rs` and dispatch in the builder under a new cargo feature `transport-<name>`.
+  - Map CLI string to engine in `src/transport/config.rs::parse_engine`.
+  - Add dependencies and `transport-<name>` feature in `Cargo.toml`.
+- Scripts & UX:
+  - Update `scripts/lib.sh::make_connect_args` to emit `--engine <name>` and `--connect KEY=VALUE` pairs; optionally add orchestrator cases for labels.
+  - Bind a container in `docker-compose.yml` if needed; prefer 127.0.0.1 host ports.
+- Docs: Add connect hints and a short example in README under “Transports (current)”.

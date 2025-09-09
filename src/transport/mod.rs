@@ -11,6 +11,8 @@ pub mod redis;
 pub mod nats;
 #[cfg(feature = "transport-zenoh")]
 pub mod zenoh;
+#[cfg(feature = "transport-amqp-0-9")]
+pub mod amqp;
 
 use std::collections::BTreeMap;
 use std::pin::Pin;
@@ -28,6 +30,7 @@ pub enum Engine {
     Redis,
     Mqtt,
     Nats,
+    Amqp,
     #[cfg(any(test, feature = "transport-mock"))]
     Mock,
 }
@@ -225,6 +228,16 @@ impl TransportBuilder {
                 #[cfg(not(feature = "transport-nats"))]
                 {
                     Err(TransportError::Connect("nats feature disabled".into()))
+                }
+            }
+            Engine::Amqp => {
+                #[cfg(feature = "transport-amqp-0-9")]
+                {
+                    return crate::transport::amqp::connect(opts).await;
+                }
+                #[cfg(not(feature = "transport-amqp-0-9"))]
+                {
+                    Err(TransportError::Connect("amqp feature disabled".into()))
                 }
             }
             #[cfg(any(test, feature = "transport-mock"))]

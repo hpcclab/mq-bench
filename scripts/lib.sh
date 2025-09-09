@@ -28,7 +28,7 @@ make_connect_args() {
 			# Accept both ENDPOINT_* and legacy *_ENDPOINT variable names
 			local ep
 			if [[ "${role}" == "sub" ]]; then
-				ep="${ENDPOINT_SUB:-${SUB_ENDPOINT:-tcp/127.0.0.1:7448}}"
+				ep="${ENDPOINT_SUB:-${SUB_ENDPOINT:-tcp/127.0.0.1:7447}}"
 			else
 				ep="${ENDPOINT_PUB:-${PUB_ENDPOINT:-tcp/127.0.0.1:7447}}"
 			fi
@@ -38,10 +38,101 @@ make_connect_args() {
 				_out=(--engine zenoh --endpoint "${ep}")
 			fi
 			;;
-		mqtt)
-			local host="${MQTT_HOST:-127.0.0.1}"
-			local port="${MQTT_PORT:-1883}"
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}")
+		zenoh-peer)
+			# Accept both ENDPOINT_* and legacy *_ENDPOINT variable names
+			local ep
+			if [[ "${role}" == "sub" ]]; then
+				ep="${ENDPOINT_SUB:-${SUB_ENDPOINT:-tcp/127.0.0.1:7447}}"
+			else
+				ep="${ENDPOINT_PUB:-${PUB_ENDPOINT:-tcp/127.0.0.1:7447}}"
+			fi
+			_out=(--engine zenoh --connect "endpoint=${ep}" --connect "mode=peer")
+			;;
+		amqp)
+			# Deprecated: use ENGINE=rabbitmq. Keep as alias.
+			local host="${RABBITMQ_HOST:-127.0.0.1}"
+			local port="${RABBITMQ_PORT:-5672}"
+			local user="${RABBITMQ_USER:-guest}"
+			local pass="${RABBITMQ_PASS:-guest}"
+			local vhost="${RABBITMQ_VHOST:-/}"
+			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			_out=(--engine rabbitmq --connect "url=${url}")
+			;;
+		rabbitmq)
+			# RabbitMQ over AMQP (native adapter); default
+			local host="${RABBITMQ_HOST:-127.0.0.1}"
+			local port="${RABBITMQ_PORT:-5672}"
+			local user="${RABBITMQ_USER:-guest}"
+			local pass="${RABBITMQ_PASS:-guest}"
+			local vhost="${RABBITMQ_VHOST:-/}"
+			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			_out=(--engine rabbitmq --connect "url=${url}")
+			;;
+		rabbitmq-amqp)
+			# Explicit RabbitMQ over AMQP
+			local host="${RABBITMQ_HOST:-127.0.0.1}"
+			local port="${RABBITMQ_PORT:-5672}"
+			local user="${RABBITMQ_USER:-guest}"
+			local pass="${RABBITMQ_PASS:-guest}"
+			local vhost="${RABBITMQ_VHOST:-/}"
+			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			_out=(--engine rabbitmq --connect "url=${url}")
+			;;
+		rabbitmq-mqtt)
+			# RabbitMQ via MQTT plugin
+			local host="${RABBITMQ_HOST:-127.0.0.1}"
+			local port="${RABBITMQ_MQTT_PORT:-1886}"
+			local user_opt=() pass_opt=()
+			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
+			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			;;
+		mqtt-mosquitto)
+			local host="${MOSQUITTO_HOST:-127.0.0.1}"
+			local port="${MOSQUITTO_PORT:-1883}"
+			local user_opt=() pass_opt=()
+			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
+			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			;;
+		mqtt-emqx)
+			local host="${EMQX_HOST:-127.0.0.1}"
+			local port="${EMQX_PORT:-1884}"
+			local user_opt=() pass_opt=()
+			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
+			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			;;
+		mqtt-hivemq)
+			local host="${HIVEMQ_HOST:-127.0.0.1}"
+			local port="${HIVEMQ_PORT:-1885}"
+			local user_opt=() pass_opt=()
+			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
+			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			;;
+		mqtt-rabbitmq)
+			local host="${RABBITMQ_HOST:-127.0.0.1}"
+			local port="${RABBITMQ_MQTT_PORT:-1886}"
+			local user_opt=() pass_opt=()
+			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
+			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			;;
+		mqtt-artemis)
+			local host="${ARTEMIS_HOST:-127.0.0.1}"
+			local port="${ARTEMIS_MQTT_PORT:-1887}"
+			# Defaults from docker-compose.yml: ARTEMIS_USERNAME=admin, ARTEMIS_PASSWORD=admin
+			# Allow overrides via MQTT_USERNAME/MQTT_PASSWORD or ARTEMIS_MQTT_USERNAME/ARTEMIS_MQTT_PASSWORD
+			local username="${MQTT_USERNAME:-${ARTEMIS_MQTT_USERNAME:-${ARTEMIS_USERNAME:-admin}}}"
+			local password="${MQTT_PASSWORD:-${ARTEMIS_MQTT_PASSWORD:-${ARTEMIS_PASSWORD:-admin}}}"
+			local user_opt=() pass_opt=()
+			if [[ -n "${username}" ]]; then user_opt=(--connect "username=${username}"); fi
+			if [[ -n "${password}" ]]; then pass_opt=(--connect "password=${password}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
 			;;
 		nats)
 			local host="${NATS_HOST:-127.0.0.1}"
