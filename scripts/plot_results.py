@@ -10,8 +10,10 @@ The CSV is expected to have columns:
 transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir
 
 Outputs:
-  - throughput_vs_rate_payload<bytes>.png
-  - p99_vs_rate_payload<bytes>.png
+    - throughput_vs_rate_payload<bytes>.png
+    - p99_vs_rate_payload<bytes>.png
+    - fanout_throughput_payload<bytes>_rate<r>.png (if fanout rows exist)
+    - gallery.md (Markdown file embedding all figures)
 """
 import argparse
 import csv
@@ -86,6 +88,11 @@ def main() -> int:
     for r in rate_records:
         by_pt[(r["payload"], r["transport"])].append(r)
 
+    # Track images to build a markdown gallery at the end
+    throughput_imgs = {}
+    p99_imgs = {}
+    fanout_imgs = {}  # (payload, rate) -> filename
+
     # Throughput vs offered rate
     for payload in payloads:
         fig, ax = plt.subplots(figsize=(7, 4))
@@ -106,8 +113,10 @@ def main() -> int:
         ax.grid(True, alpha=0.3)
         ax.legend()
         fig.tight_layout()
-        fig.savefig(os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}.png"), dpi=150)
-        plt.close(fig)
+    fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}.png")
+    fig.savefig(fn, dpi=150)
+    throughput_imgs[payload] = os.path.basename(fn)
+    plt.close(fig)
 
     # P99 vs offered rate
     for payload in payloads:
@@ -131,8 +140,10 @@ def main() -> int:
         ax.grid(True, alpha=0.3)
         ax.legend()
         fig.tight_layout()
-        fig.savefig(os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}.png"), dpi=150)
-        plt.close(fig)
+    fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}.png")
+    fig.savefig(fn, dpi=150)
+    p99_imgs[payload] = os.path.basename(fn)
+    plt.close(fig)
 
     # Fanout plots: x = subscriber count, y = delivered throughput, per (payload, rate)
     fanout_rows = []
@@ -178,10 +189,67 @@ def main() -> int:
             ax.grid(True, alpha=0.3)
             ax.legend()
             fig.tight_layout()
-            fig.savefig(os.path.join(args.out_dir, f"fanout_throughput_payload{payload}_rate{rate}.png"), dpi=150)
+            fn = os.path.join(args.out_dir, f"fanout_throughput_payload{payload}_rate{rate}.png")
+            fig.savefig(fn, dpi=150)
+            fanout_imgs[(payload, rate)] = os.path.basename(fn)
             plt.close(fig)
 
-    print("[plot] Wrote plots to", args.out_dir)
+    # Build a simple markdown gallery
+    try:
+        md_path = os.path.join(args.out_dir, "README.md")
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write("# Benchmark plots\n\n")
+            f.write(f"- Summary: `{os.path.abspath(args.summary)}`\n\n")
+
+            # Table of contents
+            f.write("## Table of contents\n\n")
+            if throughput_imgs:
+                f.write("- [Throughput vs Offered Rate](#throughput-vs-offered-rate)\n")
+            if p99_imgs:
+                f.write("- [P99 latency vs Offered Rate](#p99-latency-vs-offered-rate)\n")
+            if fanout_imgs:
+                f.write("- [Fanout: Delivered throughput](#fanout-delivered-throughput)\n")
+            f.write("\n")
+
+            if throughput_imgs:
+                f.write("## Throughput vs Offered Rate\n\n")
+                for payload in payloads:
+                    img = throughput_imgs.get(payload)
+                    if not img:
+                        continue
+                    f.write(f"### payload={payload}B\n\n")
+                    f.write(f"![throughput payload {payload}]({img})\n\n")
+
+            if p99_imgs:
+                f.write("## P99 latency vs Offered Rate\n\n")
+                for payload in payloads:
+                    img = p99_imgs.get(payload)
+                    if not img:
+                        continue
+                    f.write(f"### payload={payload}B\n\n")
+                    f.write(f"![p99 payload {payload}]({img})\n\n")
+
+            if fanout_imgs:
+                f.write("## Fanout: Delivered throughput\n\n")
+                # Group by payload, then rate for consistent order
+                pr_keys = sorted(fanout_imgs.keys())
+                by_p = defaultdict(list)
+                for (p, r) in pr_keys:
+                    by_p[p].append(r)
+                for p in sorted(by_p.keys()):
+                    f.write(f"### payload={p}B\n\n")
+                    for r in sorted(set(by_p[p])):
+                        img = fanout_imgs.get((p, r))
+                        if not img:
+                            continue
+                        f.write(f"#### rate={r}/s\n\n")
+                        f.write(f"![fanout p{p} r{r}]({img})\n\n")
+
+        print("[plot] Wrote plots to", args.out_dir)
+        print("[plot] Wrote gallery:", md_path)
+    except Exception as e:
+        print(f"[plot] failed to write README.md: {e}", file=sys.stderr)
+        print("[plot] Wrote plots to", args.out_dir)
     return 0
 
 
