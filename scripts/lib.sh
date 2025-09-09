@@ -48,6 +48,14 @@ make_connect_args() {
 			fi
 			_out=(--engine zenoh --connect "endpoint=${ep}" --connect "mode=peer")
 			;;
+		mqtt)
+			# Generic MQTT engine. Requires MQTT_HOST and MQTT_PORT. Optional MQTT_USERNAME/MQTT_PASSWORD.
+			local host="${MQTT_HOST:-127.0.0.1}"; local port="${MQTT_PORT:-1883}"
+			local user_opt=() pass_opt=()
+			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
+			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			;;
 		amqp)
 			# Deprecated: use ENGINE=rabbitmq. Keep as alias.
 			local host="${RABBITMQ_HOST:-127.0.0.1}"

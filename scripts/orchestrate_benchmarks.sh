@@ -40,7 +40,7 @@ PAYLOADS=(1024 4096 16384)
 RATES=(5000 10000 50000 100000 200000 400000)
 DURATION=20
 SNAPSHOT=5
-TRANSPORTS=(zenoh mqtt redis nats rabbitmq)
+TRANSPORTS=(zenoh redis nats rabbitmq mqtt)
 RUN_ID_PREFIX="bench"
 START_SERVICES=0
 PLOTS_ONLY=0
@@ -193,7 +193,16 @@ run_fanout_combo() {
       run "${cmd}"
       parse_and_append_summary "fanout-zenoh-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
       ;;
+    redis)
+      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
+      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
+      cmd="ENGINE=redis ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      log "Running: fanout transport=redis, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
+      run "${cmd}"
+      parse_and_append_summary "fanout-redis-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
+      ;;
     mqtt)
+      # Iterate over configured brokers
       for tok in "${MQTT_BROKERS_ARR[@]}"; do
         IFS=: read -r bname bhost bport <<<"${tok}"
         rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_${bname}_s${subs}_p${payload}_r${rate}"
@@ -203,70 +212,7 @@ run_fanout_combo() {
         run "${cmd}"
         parse_and_append_summary "fanout-mqtt-${bname}-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
       done
-      ;;
-    redis)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=redis ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=redis, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-redis-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    rabbitmq-amqp)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=rabbitmq ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=rabbitmq-amqp, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-rabbitmq-amqp-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    rabbitmq-mqtt)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1886 ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=rabbitmq-mqtt, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-rabbitmq-mqtt-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    mqtt-mosquitto)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1883 ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=mqtt-mosquitto, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-mqtt-mosquitto-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    mqtt-emqx)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1884 ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=mqtt-emqx, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-mqtt-emqx-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    mqtt-hivemq)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1885 ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=mqtt-hivemq, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-mqtt-hivemq-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    mqtt-rabbitmq)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1886 ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=mqtt-rabbitmq, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-mqtt-rabbitmq-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    mqtt-artemis)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1887 ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=mqtt-artemis, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-mqtt-artemis-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
+      return 0
       ;;
     rabbitmq)
       rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
@@ -275,22 +221,6 @@ run_fanout_combo() {
       log "Running: fanout transport=rabbitmq(amqp), subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
       run "${cmd}"
       parse_and_append_summary "fanout-rabbitmq-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    artemis)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=artemis ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=artemis(mqtt), subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-artemis-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
-      ;;
-    amqp)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
-      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-      cmd="ENGINE=amqp ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
-      log "Running: fanout transport=amqp (RabbitMQ), subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
-      run "${cmd}"
-      parse_and_append_summary "fanout-amqp-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
       ;;
     nats)
       rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
@@ -312,7 +242,7 @@ run_one_combo() {
   case "${transport}" in
     zenoh)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_zenoh_baseline.sh\" \"${rid}\""
+      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     mqtt)
@@ -320,7 +250,7 @@ run_one_combo() {
       for tok in "${MQTT_BROKERS_ARR[@]}"; do
         IFS=: read -r bname bhost bport <<<"${tok}"
         rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_${bname}_p${payload}_r${rate}"
-        cmd="MQTT_HOST=${bhost} MQTT_PORT=${bport} ${env_common} bash \"${SCRIPT_DIR}/run_mqtt_baseline.sh\" \"${rid}\""
+        cmd="ENGINE=mqtt MQTT_HOST=${bhost} MQTT_PORT=${bport} ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
         art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
         log "Running: transport=mqtt(${bname}), payload=${payload}, rate=${rate} (run_id=${rid})"
         run "${cmd}"
@@ -330,62 +260,17 @@ run_one_combo() {
       ;;
     redis)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_redis_baseline.sh\" \"${rid}\""
+      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/redis_baseline"
-      ;;
-    rabbitmq-amqp)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_rabbitmq_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    rabbitmq-mqtt)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1886 ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    mqtt-mosquitto)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1883 ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    mqtt-emqx)
-  rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1884 ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    mqtt-hivemq)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1885 ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    mqtt-rabbitmq)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1886 ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    mqtt-artemis)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="ENGINE=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1887 ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     rabbitmq)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_rabbitmq_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    artemis)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_artemis_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
-      ;;
-    amqp)
-      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-  cmd="ENGINE=amqp ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
+      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     nats)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_nats_baseline.sh\" \"${rid}\""
+      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     *)
