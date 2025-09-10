@@ -7,12 +7,14 @@ Inputs:
   --out-dir: directory to write plots (required)
 
 The CSV is expected to have columns:
-transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir
+transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes
 
 Outputs:
     - throughput_vs_rate_payload<bytes>.png
     - p99_vs_rate_payload<bytes>.png
-    - fanout_throughput_payload<bytes>_rate<r>.png (if fanout rows exist)
+    - throughput-vs-fanout_payload<bytes>_rate<r>.png (if fanout rows exist)
+    - max-cpu-vs-fanout_payload<bytes>_rate<r>.png (if fanout rows exist)
+    - max-memory-vs-fanout_payload<bytes>_rate<r>.png (if fanout rows exist)
     - gallery.md (Markdown file embedding all figures)
 """
 import argparse
@@ -44,6 +46,9 @@ def load_records(csv_path: str):
                         "rate": int(r["rate"]),
                         "sub_tps": float(r["sub_tps"]) if r["sub_tps"] else float("nan"),
                         "p99_ms": float(r["p99_ms"]) if r["p99_ms"] else float("nan"),
+                        "max_cpu": float(r.get("max_cpu_perc", "") or float("nan")),
+                        "max_mem_perc": float(r.get("max_mem_perc", "") or float("nan")),
+                        "max_mem_bytes": float(r.get("max_mem_used_bytes", "") or float("nan")),
                     }
                 )
             except Exception:
@@ -54,6 +59,38 @@ def load_records(csv_path: str):
 
 def unique_sorted(seq):
     return sorted(set(seq))
+
+
+def add_legend_top(ax, fig, max_cols: int = 4, reserve_top: float = 0.82) -> None:
+    """Place a de-duplicated legend at the top of the figure and reserve
+    vertical space to avoid overlap with the title.
+
+    reserve_top: fraction of figure height allocated to axes (leave 1-reserve_top for legend).
+    """
+    handles, labels = ax.get_legend_handles_labels()
+    # De-duplicate while preserving order
+    seen = set()
+    handles2, labels2 = [], []
+    for h, lbl in zip(handles, labels):
+        if lbl in seen:
+            continue
+        seen.add(lbl)
+        handles2.append(h)
+        labels2.append(lbl)
+    if not handles2:
+        # Still tighten layout even if no legend
+        try:
+            fig.tight_layout()
+        except Exception:
+            pass
+        return
+    ncol = min(len(labels2), max_cols)
+    # Reserve space for top legend, then place it
+    try:
+        fig.tight_layout(rect=(0, 0, 1, reserve_top))
+    except Exception:
+        pass
+    fig.legend(handles2, labels2, loc="upper center", bbox_to_anchor=(0.5, 0.99), ncol=ncol, frameon=False)
 
 
 def main() -> int:
@@ -91,7 +128,11 @@ def main() -> int:
     # Track images to build a markdown gallery at the end
     throughput_imgs = {}
     p99_imgs = {}
+    cpu_imgs = {}
+    mem_imgs = {}
     fanout_imgs = {}  # (payload, rate) -> filename
+    fanout_cpu_imgs = {}  # (payload, rate) -> filename
+    fanout_mem_imgs = {}  # (payload, rate) -> filename
 
     # Throughput vs offered rate
     for payload in payloads:
@@ -114,8 +155,7 @@ def main() -> int:
         ax.set_xlabel("Offered rate (msg/s)")
         ax.set_ylabel("Delivered throughput (msg/s)")
         ax.grid(True, alpha=0.3)
-        ax.legend()
-        fig.tight_layout()
+        add_legend_top(ax, fig)
         fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}.png")
         fig.savefig(fn, dpi=150)
         throughput_imgs[payload] = os.path.basename(fn)
@@ -141,11 +181,62 @@ def main() -> int:
         ax.set_xlabel("Offered rate (msg/s)")
         ax.set_ylabel("P99 latency (ms)")
         ax.grid(True, alpha=0.3)
-        ax.legend()
-        fig.tight_layout()
+        add_legend_top(ax, fig)
         fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}.png")
         fig.savefig(fn, dpi=150)
         p99_imgs[payload] = os.path.basename(fn)
+        plt.close(fig)
+
+    # Max CPU% vs offered rate
+    for payload in payloads:
+        fig, ax = plt.subplots(figsize=(7, 4))
+        for t in transports:
+            xs, ys = [], []
+            for rate in rates:
+                vals = [r for r in by_pt[(payload, t)] if r["rate"] == rate]
+                if not vals:
+                    continue
+                mc = vals[0].get("max_cpu")
+                if mc is None or not math.isfinite(mc):
+                    continue
+                xs.append(rate)
+                ys.append(mc)
+            if xs and ys:
+                ax.plot(xs, ys, marker="o", label=t)
+        ax.set_title(f"Max CPU% vs Offered Rate (payload={payload}B)")
+        ax.set_xlabel("Offered rate (msg/s)")
+        ax.set_ylabel("Max CPU (%)")
+        ax.grid(True, alpha=0.3)
+        add_legend_top(ax, fig)
+        fn = os.path.join(args.out_dir, f"max_cpu_vs_rate_payload{payload}.png")
+        fig.savefig(fn, dpi=150)
+        cpu_imgs[payload] = os.path.basename(fn)
+        plt.close(fig)
+
+    # Max Memory% vs offered rate
+    for payload in payloads:
+        fig, ax = plt.subplots(figsize=(7, 4))
+        for t in transports:
+            xs, ys = [], []
+            for rate in rates:
+                vals = [r for r in by_pt[(payload, t)] if r["rate"] == rate]
+                if not vals:
+                    continue
+                mm = vals[0].get("max_mem_perc")
+                if mm is None or not math.isfinite(mm):
+                    continue
+                xs.append(rate)
+                ys.append(mm)
+            if xs and ys:
+                ax.plot(xs, ys, marker="o", label=t)
+        ax.set_title(f"Max Memory% vs Offered Rate (payload={payload}B)")
+        ax.set_xlabel("Offered rate (msg/s)")
+        ax.set_ylabel("Max Memory (%)")
+        ax.grid(True, alpha=0.3)
+        add_legend_top(ax, fig)
+        fn = os.path.join(args.out_dir, f"max_mem_vs_rate_payload{payload}.png")
+        fig.savefig(fn, dpi=150)
+        mem_imgs[payload] = os.path.basename(fn)
         plt.close(fig)
 
     # Fanout plots: x = subscriber count, y = delivered throughput, per (payload, rate)
@@ -161,13 +252,18 @@ def main() -> int:
                 subs = int(m.group(1))
             except Exception:
                 continue
+            # Normalize label e.g. fanout-mqtt-hivemq-s8 -> mqtt-hivemq
+            base_label = t[: t.rfind("-s")]
+            if base_label.startswith("fanout-"):
+                base_label = base_label[len("fanout-"):]
             fanout_rows.append({
                 "payload": r["payload"],
                 "rate": r["rate"],
                 "subs": subs,
                 "sub_tps": r["sub_tps"],
-                # Normalize label e.g. fanout-mqtt-hivemq-s8 -> fanout-mqtt-hivemq
-                "label": t[: t.rfind("-s")],
+                "max_cpu": r.get("max_cpu"),
+                "max_mem_perc": r.get("max_mem_perc"),
+                "label": base_label,
             })
 
     if fanout_rows:
@@ -190,11 +286,56 @@ def main() -> int:
             ax.set_xlabel("Fanout (subscribers)")
             ax.set_ylabel("Delivered throughput (msg/s)")
             ax.grid(True, alpha=0.3)
-            ax.legend()
-            fig.tight_layout()
-            fn = os.path.join(args.out_dir, f"fanout_throughput_payload{payload}_rate{rate}.png")
+            add_legend_top(ax, fig)
+            fn = os.path.join(args.out_dir, f"throughput-vs-fanout_payload{payload}_rate{rate}.png")
             fig.savefig(fn, dpi=150)
             fanout_imgs[(payload, rate)] = os.path.basename(fn)
+            plt.close(fig)
+
+            # CPU vs fanout
+            fig, ax = plt.subplots(figsize=(7, 4))
+            for label, lst in by_label.items():
+                lst = sorted(lst, key=lambda x: x["subs"])
+                xs, ys = [], []
+                for x in lst:
+                    v = x.get("max_cpu")
+                    if v is None or not math.isfinite(v):
+                        continue
+                    xs.append(x["subs"]) 
+                    ys.append(v)
+                if xs and ys:
+                    ax.plot(xs, ys, marker="o", label=label)
+            ax.set_title(f"Max CPU% vs Fanout (payload={payload}B, rate={rate}/s)")
+            ax.set_xlabel("Fanout (subscribers)")
+            ax.set_ylabel("Max CPU (%)")
+            ax.grid(True, alpha=0.3)
+            add_legend_top(ax, fig)
+            fn_cpu = os.path.join(args.out_dir, f"max-cpu-vs-fanout_payload{payload}_rate{rate}.png")
+            fig.savefig(fn_cpu, dpi=150)
+            fanout_cpu_imgs[(payload, rate)] = os.path.basename(fn_cpu)
+            plt.close(fig)
+
+            # Memory% vs fanout
+            fig, ax = plt.subplots(figsize=(7, 4))
+            for label, lst in by_label.items():
+                lst = sorted(lst, key=lambda x: x["subs"])
+                xs, ys = [], []
+                for x in lst:
+                    v = x.get("max_mem_perc")
+                    if v is None or not math.isfinite(v):
+                        continue
+                    xs.append(x["subs"]) 
+                    ys.append(v)
+                if xs and ys:
+                    ax.plot(xs, ys, marker="o", label=label)
+            ax.set_title(f"Max Memory% vs Fanout (payload={payload}B, rate={rate}/s)")
+            ax.set_xlabel("Fanout (subscribers)")
+            ax.set_ylabel("Max Memory (%)")
+            ax.grid(True, alpha=0.3)
+            add_legend_top(ax, fig)
+            fn_mem = os.path.join(args.out_dir, f"max-memory-vs-fanout_payload{payload}_rate{rate}.png")
+            fig.savefig(fn_mem, dpi=150)
+            fanout_mem_imgs[(payload, rate)] = os.path.basename(fn_mem)
             plt.close(fig)
 
     # Build a simple markdown gallery
@@ -210,8 +351,16 @@ def main() -> int:
                 f.write("- [Throughput vs Offered Rate](#throughput-vs-offered-rate)\n")
             if p99_imgs:
                 f.write("- [P99 latency vs Offered Rate](#p99-latency-vs-offered-rate)\n")
+            if cpu_imgs:
+                f.write("- [Max CPU% vs Offered Rate](#max-cpu-vs-offered-rate)\n")
+            if mem_imgs:
+                f.write("- [Max Memory% vs Offered Rate](#max-memory-vs-offered-rate)\n")
             if fanout_imgs:
                 f.write("- [Fanout: Delivered throughput](#fanout-delivered-throughput)\n")
+            if fanout_cpu_imgs:
+                f.write("- [Fanout: Max CPU%](#fanout-max-cpu)\n")
+            if fanout_mem_imgs:
+                f.write("- [Fanout: Max Memory%](#fanout-max-memory)\n")
             f.write("\n")
 
             if throughput_imgs:
@@ -232,6 +381,24 @@ def main() -> int:
                     f.write(f"### payload={payload}B\n\n")
                     f.write(f"![p99 payload {payload}]({img})\n\n")
 
+            if cpu_imgs:
+                f.write("## Max CPU% vs Offered Rate\n\n")
+                for payload in payloads:
+                    img = cpu_imgs.get(payload)
+                    if not img:
+                        continue
+                    f.write(f"### payload={payload}B\n\n")
+                    f.write(f"![cpu payload {payload}]({img})\n\n")
+
+            if mem_imgs:
+                f.write("## Max Memory% vs Offered Rate\n\n")
+                for payload in payloads:
+                    img = mem_imgs.get(payload)
+                    if not img:
+                        continue
+                    f.write(f"### payload={payload}B\n\n")
+                    f.write(f"![mem payload {payload}]({img})\n\n")
+
             if fanout_imgs:
                 f.write("## Fanout: Delivered throughput\n\n")
                 # Group by payload, then rate for consistent order
@@ -247,6 +414,36 @@ def main() -> int:
                             continue
                         f.write(f"#### rate={r}/s\n\n")
                         f.write(f"![fanout p{p} r{r}]({img})\n\n")
+
+            if fanout_cpu_imgs:
+                f.write("## Fanout: Max CPU%\n\n")
+                pr_keys = sorted(fanout_cpu_imgs.keys())
+                by_p = defaultdict(list)
+                for (p, r) in pr_keys:
+                    by_p[p].append(r)
+                for p in sorted(by_p.keys()):
+                    f.write(f"### payload={p}B\n\n")
+                    for r in sorted(set(by_p[p])):
+                        img = fanout_cpu_imgs.get((p, r))
+                        if not img:
+                            continue
+                        f.write(f"#### rate={r}/s\n\n")
+                        f.write(f"![fanout cpu p{p} r{r}]({img})\n\n")
+
+            if fanout_mem_imgs:
+                f.write("## Fanout: Max Memory%\n\n")
+                pr_keys = sorted(fanout_mem_imgs.keys())
+                by_p = defaultdict(list)
+                for (p, r) in pr_keys:
+                    by_p[p].append(r)
+                for p in sorted(by_p.keys()):
+                    f.write(f"### payload={p}B\n\n")
+                    for r in sorted(set(by_p[p])):
+                        img = fanout_mem_imgs.get((p, r))
+                        if not img:
+                            continue
+                        f.write(f"#### rate={r}/s\n\n")
+                        f.write(f"![fanout mem p{p} r{r}]({img})\n\n")
 
         print("[plot] Wrote plots to", args.out_dir)
         print("[plot] Wrote gallery:", md_path)

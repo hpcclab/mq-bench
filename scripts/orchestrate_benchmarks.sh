@@ -119,7 +119,7 @@ fi
 # Write header if file is new/empty and we're going to append runs
 if [[ ${PLOTS_ONLY} -eq 0 ]]; then
   if [[ ! -s "${SUMMARY_CSV}" ]]; then
-    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
   fi
 fi
 
@@ -177,7 +177,66 @@ parse_and_append_summary() {
   p50_ms=$(ns_to_ms "${p50}")
   p95_ms=$(ns_to_ms "${p95}")
   p99_ms=$(ns_to_ms "${p99}")
-  echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${errors},${art_dir}" >> "${SUMMARY_CSV}"
+  # Aggregate docker stats if available (compute precise mem% from used/total)
+  local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used
+  max_cpu=""; max_mem_perc=""; max_mem_used=""
+  if [[ -f "${stats_csv}" ]]; then
+    local agg
+    agg=$(awk -F, '
+      function bytes(v,   n,u,mult,parts){
+        gsub(/^[ \t]+|[ \t]+$/, "", v);
+        if (match(v, /^([0-9.]+)([A-Za-z]+)$/, parts)) {
+          n=parts[1]; u=parts[2];
+          if (u=="B")   mult=1;
+          else if (u=="kB"||u=="KB") mult=1000;
+          else if (u=="MB") mult=1000*1000;
+          else if (u=="GB") mult=1000*1000*1000;
+          else if (u=="TB") mult=1000*1000*1000*1000;
+          else if (u=="KiB") mult=1024;
+          else if (u=="MiB") mult=1024*1024;
+          else if (u=="GiB") mult=1024*1024*1024;
+          else if (u=="TiB") mult=1024*1024*1024*1024;
+          else mult=1;
+          return n*mult;
+        }
+        return 0;
+      }
+      NR==1 {
+        # Detect presence of extended columns produced by jq sampler
+        has_memprec = (NF>=12);  # mem_used_b(10), mem_limit_b(11), mem_perc_calc(12)
+        has_cpuprec = (NF>=17);  # cpu_perc_num at 17
+        next;
+      }
+      {
+        # CPU: prefer numeric cpu_perc_num if present; else parse $4
+        if (has_cpuprec) { c = $17 + 0; } else { c=$4; gsub(/%/,"",c); c+=0; }
+        if (c>mcpu) mcpu=c;
+
+        # Memory
+        if (has_memprec) {
+          used_b = $10 + 0; tot_b = $11 + 0;
+          if (used_b>mused) mused=used_b;
+          if (tot_b>0) {
+            perc = $12 + 0; if (perc==0) perc = (used_b/tot_b)*100.0;
+            if (perc>mperc) mperc=perc;
+          }
+        } else {
+          split($5, mparts, " / ");
+          used_b=bytes(mparts[1]); tot_b=bytes(mparts[2]);
+          if (used_b>mused) mused=used_b;
+          if (tot_b>0) { perc=(used_b/tot_b)*100.0; if (perc>mperc) mperc=perc; }
+        }
+      }
+      END{
+        if (mcpu=="") mcpu=0;
+        if (mperc=="") mperc=0;
+        if (mused=="") mused=0;
+        printf("%.6f,%.6f,%.0f", mcpu, mperc, mused);
+      }
+    ' "${stats_csv}" || true)
+    IFS=, read -r max_cpu max_mem_perc max_mem_used <<<"${agg}"
+  fi
+  echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${errors},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
 }
 
 run_fanout_combo() {
@@ -215,7 +274,7 @@ run_fanout_combo() {
         IFS=: read -r bname bhost bport <<<"${tok}"
         rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_${bname}_s${subs}_p${payload}_r${rate}"
         art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
-        cmd="ENGINE=mqtt MQTT_HOST=${bhost} MQTT_PORT=${bport} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+  cmd="ENGINE=mqtt BROKER_CONTAINER=${bname} MQTT_HOST=${bhost} MQTT_PORT=${bport} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
         log "Running: fanout transport=mqtt(${bname}), subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
         run "${cmd}"
         parse_and_append_summary "fanout-mqtt-${bname}-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
@@ -263,7 +322,7 @@ run_one_combo() {
       for tok in "${MQTT_BROKERS_ARR[@]}"; do
         IFS=: read -r bname bhost bport <<<"${tok}"
         rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_${bname}_p${payload}_r${rate}"
-        cmd="ENGINE=mqtt MQTT_HOST=${bhost} MQTT_PORT=${bport} ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
+  cmd="ENGINE=mqtt BROKER_CONTAINER=${bname} MQTT_HOST=${bhost} MQTT_PORT=${bport} ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
         art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
         log "Running: transport=mqtt(${bname}), payload=${payload}, rate=${rate} (run_id=${rid})"
         run "${cmd}"
@@ -274,7 +333,7 @@ run_one_combo() {
     redis)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
       cmd="ENGINE=redis ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
-      art_dir="${REPO_ROOT}/artifacts/${rid}/redis_baseline"
+      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     rabbitmq)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"

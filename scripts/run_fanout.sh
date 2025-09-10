@@ -38,10 +38,21 @@ build_release_if_needed "${BIN}"
 
 SUB_CSV="${ART_DIR}/sub_agg.csv"
 PUB_CSV="${ART_DIR}/pub.csv"
+STATS_CSV="${ART_DIR}/docker_stats.csv"
+
+# Determine containers to monitor
+declare -a MON_CONTAINERS=()
+resolve_monitor_containers MON_CONTAINERS
+if (( ${#MON_CONTAINERS[@]} > 0 )); then
+	echo "[monitor] Capturing docker stats for: ${MON_CONTAINERS[*]} → ${STATS_CSV}"
+	start_broker_stats_monitor STATS_PID "${STATS_CSV}" "${MON_CONTAINERS[@]}"
+	trap 'echo "Stopping subscribers (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true; stop_broker_stats_monitor ${STATS_PID}' EXIT
+else
+	trap 'echo "Stopping subscribers (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
+fi
 
 echo "Starting ${SUBS} subscribers → ${KEY} (aggregated CSV)"
 start_sub SUB_PID "${KEY}" "${SUBS}" "${SUB_CSV}" "${ART_DIR}/sub.log"
-trap 'echo "Stopping subscribers (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
 
 sleep 1
 

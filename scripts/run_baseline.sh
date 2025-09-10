@@ -24,10 +24,21 @@ build_release_if_needed "${BIN}"
 
 SUB_CSV="${ART_DIR}/sub.csv"
 PUB_CSV="${ART_DIR}/pub.csv"
+STATS_CSV="${ART_DIR}/docker_stats.csv"
+
+# Determine containers to monitor (can be overridden via MONITOR_CONTAINERS or BROKER_CONTAINER)
+declare -a MON_CONTAINERS=()
+resolve_monitor_containers MON_CONTAINERS
+if (( ${#MON_CONTAINERS[@]} > 0 )); then
+	echo "[monitor] Capturing docker stats for: ${MON_CONTAINERS[*]} → ${STATS_CSV}"
+	start_broker_stats_monitor STATS_PID "${STATS_CSV}" "${MON_CONTAINERS[@]}"
+	trap 'echo "Stopping subscriber (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true; stop_broker_stats_monitor ${STATS_PID}' EXIT
+else
+	trap 'echo "Stopping subscriber (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
+fi
 
 echo "Starting subscriber → ${KEY}"
 start_sub SUB_PID "${KEY}" 1 "${SUB_CSV}" "${ART_DIR}/sub.log"
-trap 'echo "Stopping subscriber (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
 
 sleep 1
 
@@ -37,7 +48,7 @@ start_pub PUB_PID "${KEY}" "${PAYLOAD}" "${RATE}" "${DURATION}" "${PUB_CSV}" "${
 watch_until_pub_exits ${PUB_PID} "${SUB_CSV}" "${PUB_CSV}"
 wait ${PUB_PID} || true
 
-echo "\n=== Summary (${RUN_ID}) ==="
+echo "=== Summary (${RUN_ID}) ==="
 summarize_common "${SUB_CSV}" "${PUB_CSV}"
 
 echo "Baseline run complete. Artifacts at ${ART_DIR}"

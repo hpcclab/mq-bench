@@ -16,6 +16,160 @@ build_release_if_needed() {
 	fi
 }
 
+# Resolve which docker containers to monitor for broker utilization.
+# Priority: MONITOR_CONTAINERS env (space/comma/colon separated) > engine-based defaults.
+# Usage: resolve_monitor_containers OUT_ARR
+resolve_monitor_containers() {
+	local -n _out="${1:?out array var name}"
+	_out=()
+	if [[ -n "${MONITOR_CONTAINERS:-}" ]]; then
+		# Accept separators: space, comma, or colon
+		local IFS_SAVED="$IFS"
+		IFS=' ,:' read -r -a _out <<<"${MONITOR_CONTAINERS}"
+		IFS="$IFS_SAVED"
+		return 0
+	fi
+	case "${ENGINE:-zenoh}" in
+		zenoh|zenoh-peer)
+			_out=(router1)
+			;;
+		mqtt|mqtt-*)
+			# For generic mqtt, we cannot infer container without a hint; allow BROKER_CONTAINER
+			if [[ -n "${BROKER_CONTAINER:-}" ]]; then _out=("${BROKER_CONTAINER}"); fi
+			;;
+		rabbitmq|rabbitmq-amqp|rabbitmq-mqtt|amqp)
+			_out=(rabbitmq)
+			;;
+		nats)
+			_out=(nats)
+			;;
+		redis)
+			_out=(redis)
+			;;
+		*)
+			# Unknown engine → no monitoring by default
+			;;
+	 esac
+}
+
+# Start a background docker stats sampler for given containers.
+# Args: OUT_PID_VAR  outfile  [containers...]
+# Writes CSV with header:
+#   ts,container,name,cpu_perc,mem_usage,mem_perc,net_io,block_io,pids,mem_used_b,mem_limit_b,mem_perc_calc
+start_broker_stats_monitor() {
+	local -n _outpid="${1:?out pid var}"; shift
+	local outfile="${1:?outfile}"; shift
+	local interval="${SNAPSHOT:-5}"
+	local containers=("$@")
+
+	# Preconditions
+	if ! command -v docker >/dev/null 2>&1; then
+		echo "[monitor] 'docker' not found; skipping utilization capture" >&2
+		_outpid=0
+		return 0
+	fi
+	if ! command -v jq >/dev/null 2>&1; then
+		echo "[monitor] 'jq' not found; install jq to enable Docker stats parsing; skipping" >&2
+		_outpid=0
+		return 0
+	fi
+	if (( ${#containers[@]} == 0 )); then
+		echo "[monitor] No containers to monitor; set MONITOR_CONTAINERS to enable" >&2
+		_outpid=0
+		return 0
+	fi
+
+	# Ensure directory exists
+	mkdir -p "$(dirname -- "${outfile}")"
+
+	# Pre-resolve container IDs and names to avoid repeated inspect calls inside the loop
+	local ids=() names=()
+	for c in "${containers[@]}"; do
+		local id name
+		id=$(docker inspect -f '{{.Id}}' "$c" 2>/dev/null || true)
+		name=$(docker inspect -f '{{.Name}}' "$c" 2>/dev/null | sed 's#^/##' || true)
+		if [[ -z "$id" ]]; then
+			echo "[monitor] Skipping unknown container '$c'" >&2
+			continue
+		fi
+		ids+=("${id}")
+		if [[ -z "$name" ]]; then name="$c"; fi
+		names+=("${name}")
+	done
+	if (( ${#ids[@]} == 0 )); then
+		echo "[monitor] No valid containers found to monitor" >&2
+		_outpid=0
+		return 0
+	fi
+
+	# Start sampler using Docker HTTP API (one-shot per interval) so it can exit cleanly
+	{
+			echo "ts,container,name,cpu_perc,mem_usage,mem_perc,net_io,block_io,pids,mem_used_b,mem_limit_b,mem_perc_calc,net_rx_b,net_tx_b,blk_read_b,blk_write_b,cpu_perc_num"
+		while true; do
+			local ts
+			ts=$(date +%s)
+			for idx in "${!ids[@]}"; do
+				local id="${ids[$idx]}" name="${names[$idx]}" short
+				short="${id:0:12}"
+				# Fetch one-shot stats JSON (non-streaming)
+				local json
+				json=$(curl -sS --unix-socket /var/run/docker.sock "http://localhost/containers/${id}/stats?stream=false" 2>/dev/null || true)
+				[[ -z "$json" ]] && continue
+				# Parse and compute metrics using jq
+				local line
+				line=$(jq -r --arg ts "$ts" --arg cid "$short" --arg name "$name" '
+				  def round2: (. * 100 | floor / 100);
+				  def round4: (. * 10000 | floor / 10000);
+				  def human(n):
+				    if (n|type) != "number" then "0B"
+				    elif n>=1000000000000 then ((n/1000000000000)|round2|tostring)+"TB"
+				    elif n>=1000000000 then ((n/1000000000)|round2|tostring)+"GB"
+				    elif n>=1000000 then ((n/1000000)|round2|tostring)+"MB"
+				    elif n>=1000 then ((n/1000)|round2|tostring)+"kB"
+				    else ((n)|round|tostring)+"B" end;
+				  # CPU
+				  (.cpu_stats.cpu_usage.total_usage // 0) as $ct |
+				  (.precpu_stats.cpu_usage.total_usage // 0) as $pt |
+				  (.cpu_stats.system_cpu_usage // 0) as $cs |
+				  (.precpu_stats.system_cpu_usage // 0) as $ps |
+				  (.cpu_stats.online_cpus // ((.cpu_stats.cpu_usage.percpu_usage | length) // 1)) as $online |
+				  ($ct - $pt) as $cpu_delta |
+				  ($cs - $ps) as $sys_delta |
+				  (if ($sys_delta>0 and $cpu_delta>0) then (($cpu_delta / $sys_delta) * $online * 100.0) else 0 end) as $cpu |
+				  # Memory
+				  (.memory_stats.limit // 0) as $ml |
+				  (.memory_stats.usage // 0) as $mu |
+				  (.memory_stats.stats.cache // 0) as $mc |
+				  ($mu - $mc) as $used |
+				  (if $ml>0 then ($used / $ml * 100.0) else 0 end) as $mperc |
+				  # Net agg (sum over values)
+				  ((.networks // {} | to_entries | map(.value.rx_bytes // 0) | add) // 0) as $rx |
+				  ((.networks // {} | to_entries | map(.value.tx_bytes // 0) | add) // 0) as $tx |
+				  # BlkIO agg (sum read/write values)
+				  ((.blkio_stats.io_service_bytes_recursive // [] | map(select((.op|ascii_downcase)=="read") | (.value // 0)) | add) // 0) as $rbytes |
+				  ((.blkio_stats.io_service_bytes_recursive // [] | map(select((.op|ascii_downcase)=="write") | (.value // 0)) | add) // 0) as $wbytes |
+				  # PIDs
+				  (.pids_stats.current // 0) as $pids |
+				  # Emit CSV-like line (no quotes)
+				  ($ts+","+$cid+","+$name+","+($cpu|round2|tostring)+"%"+","+(human($used))+" / "+(human($ml))+","+($mperc|round2|tostring)+"%"+","+(human($rx))+" / "+(human($tx))+","+(human($rbytes))+" / "+(human($wbytes))+","+($pids|tostring)+","+($used|tostring)+","+($ml|tostring)+","+($mperc|round4|tostring)+","+($rx|tostring)+","+($tx|tostring)+","+($rbytes|tostring)+","+($wbytes|tostring)+","+($cpu|round4|tostring))
+				' <<< "$json")
+				# Append line
+				echo "$line"
+			done
+			sleep "${interval}"
+			done
+	} >>"${outfile}" &
+	_outpid=$!
+}
+
+# Stop the background docker stats sampler if running
+stop_broker_stats_monitor() {
+	local pid="${1:-0}"
+	if [[ -n "${pid}" ]] && (( pid > 0 )); then
+		kill "${pid}" >/dev/null 2>&1 || true
+	fi
+}
+
 # Helper: make connect args based on ENGINE and role (sub|pub)
 # Usage: make_connect_args sub OUT_ARR   or   make_connect_args pub OUT_ARR
 make_connect_args() {
