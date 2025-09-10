@@ -103,9 +103,12 @@ def main() -> int:
                 vals = [r for r in by_pt[(payload, t)] if r["rate"] == rate]
                 if not vals:
                     continue
+                sub_tps = vals[0]["sub_tps"]
+                if not math.isfinite(sub_tps):
+                    continue
                 xs.append(rate)
-                ys.append(vals[0]["sub_tps"])
-            if xs:
+                ys.append(sub_tps)
+            if xs and ys:
                 ax.plot(xs, ys, marker="o", label=t)
         ax.set_title(f"Throughput vs Offered Rate (payload={payload}B)")
         ax.set_xlabel("Offered rate (msg/s)")
@@ -113,10 +116,10 @@ def main() -> int:
         ax.grid(True, alpha=0.3)
         ax.legend()
         fig.tight_layout()
-    fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}.png")
-    fig.savefig(fn, dpi=150)
-    throughput_imgs[payload] = os.path.basename(fn)
-    plt.close(fig)
+        fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}.png")
+        fig.savefig(fn, dpi=150)
+        throughput_imgs[payload] = os.path.basename(fn)
+        plt.close(fig)
 
     # P99 vs offered rate
     for payload in payloads:
@@ -127,12 +130,12 @@ def main() -> int:
                 vals = [r for r in by_pt[(payload, t)] if r["rate"] == rate]
                 if not vals:
                     continue
-                xs.append(rate)
                 p99 = vals[0]["p99_ms"]
                 if not math.isfinite(p99):
                     continue
+                xs.append(rate)
                 ys.append(p99)
-            if xs:
+            if xs and ys:
                 ax.plot(xs, ys, marker="o", label=t)
         ax.set_title(f"P99 latency vs Offered Rate (payload={payload}B)")
         ax.set_xlabel("Offered rate (msg/s)")
@@ -140,10 +143,10 @@ def main() -> int:
         ax.grid(True, alpha=0.3)
         ax.legend()
         fig.tight_layout()
-    fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}.png")
-    fig.savefig(fn, dpi=150)
-    p99_imgs[payload] = os.path.basename(fn)
-    plt.close(fig)
+        fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}.png")
+        fig.savefig(fn, dpi=150)
+        p99_imgs[payload] = os.path.basename(fn)
+        plt.close(fig)
 
     # Fanout plots: x = subscriber count, y = delivered throughput, per (payload, rate)
     fanout_rows = []
