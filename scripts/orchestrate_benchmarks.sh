@@ -40,7 +40,7 @@ PAYLOADS=(1024 4096 16384)
 RATES=(5000 10000 50000 100000 200000 400000)
 DURATION=20
 SNAPSHOT=5
-TRANSPORTS=(zenoh redis nats rabbitmq mqtt)
+TRANSPORTS=(zenoh zenoh-peer redis nats rabbitmq mqtt)
 RUN_ID_PREFIX="bench"
 START_SERVICES=0
 PLOTS_ONLY=0
@@ -193,6 +193,14 @@ run_fanout_combo() {
       run "${cmd}"
       parse_and_append_summary "fanout-zenoh-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
       ;;
+    zenoh-peer)
+      rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
+      art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
+      cmd="ENGINE=zenoh-peer ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      log "Running: fanout transport=zenoh-peer, subs=${subs}, payload=${payload}, rate=${rate} (run_id=${rid})"
+      run "${cmd}"
+      parse_and_append_summary "fanout-zenoh-peer-s${subs}" "${payload}" "${rate}" "${rid}" "${art_dir}"
+      ;;
     redis)
       rid="${RUN_ID_PREFIX}_$(timestamp)_fanout_${transport}_s${subs}_p${payload}_r${rate}"
       art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_singlesite"
@@ -242,7 +250,12 @@ run_one_combo() {
   case "${transport}" in
     zenoh)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
+      cmd="ENGINE=zenoh ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
+      art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
+      ;;
+    zenoh-peer)
+      rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
+      cmd="ENGINE=zenoh-peer ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     mqtt)
@@ -260,17 +273,17 @@ run_one_combo() {
       ;;
     redis)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
+      cmd="ENGINE=redis ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/redis_baseline"
       ;;
     rabbitmq)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
+      cmd="ENGINE=rabbitmq ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     nats)
       rid="${RUN_ID_PREFIX}_$(timestamp)_${transport}_p${payload}_r${rate}"
-      cmd="${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
+      cmd="ENGINE=nats ${env_common} bash \"${SCRIPT_DIR}/run_baseline.sh\" \"${rid}\""
       art_dir="${REPO_ROOT}/artifacts/${rid}/local_baseline"
       ;;
     *)

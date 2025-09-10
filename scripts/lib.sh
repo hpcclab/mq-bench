@@ -51,10 +51,13 @@ make_connect_args() {
 		mqtt)
 			# Generic MQTT engine. Requires MQTT_HOST and MQTT_PORT. Optional MQTT_USERNAME/MQTT_PASSWORD.
 			local host="${MQTT_HOST:-127.0.0.1}"; local port="${MQTT_PORT:-1883}"
-			local user_opt=() pass_opt=()
+			local user_opt=() pass_opt=() max_opts=()
 			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
 			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
+			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
+			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
 		amqp)
 			# Deprecated: use ENGINE=rabbitmq. Keep as alias.
@@ -101,34 +104,46 @@ make_connect_args() {
 		mqtt-mosquitto)
 			local host="${MOSQUITTO_HOST:-127.0.0.1}"
 			local port="${MOSQUITTO_PORT:-1883}"
-			local user_opt=() pass_opt=()
+			local user_opt=() pass_opt=() max_opts=()
 			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
 			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
+			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
+			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
 		mqtt-emqx)
 			local host="${EMQX_HOST:-127.0.0.1}"
 			local port="${EMQX_PORT:-1884}"
-			local user_opt=() pass_opt=()
+			local user_opt=() pass_opt=() max_opts=()
 			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
 			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
+			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
+			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
 		mqtt-hivemq)
 			local host="${HIVEMQ_HOST:-127.0.0.1}"
 			local port="${HIVEMQ_PORT:-1885}"
-			local user_opt=() pass_opt=()
+			local user_opt=() pass_opt=() max_opts=()
 			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
 			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
+			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
+			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
 		mqtt-rabbitmq)
 			local host="${RABBITMQ_HOST:-127.0.0.1}"
 			local port="${RABBITMQ_MQTT_PORT:-1886}"
-			local user_opt=() pass_opt=()
+			local user_opt=() pass_opt=() max_opts=()
 			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
 			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
+			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
+			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
 		mqtt-artemis)
 			local host="${ARTEMIS_HOST:-127.0.0.1}"
@@ -137,10 +152,13 @@ make_connect_args() {
 			# Allow overrides via MQTT_USERNAME/MQTT_PASSWORD or ARTEMIS_MQTT_USERNAME/ARTEMIS_MQTT_PASSWORD
 			local username="${MQTT_USERNAME:-${ARTEMIS_MQTT_USERNAME:-${ARTEMIS_USERNAME:-admin}}}"
 			local password="${MQTT_PASSWORD:-${ARTEMIS_MQTT_PASSWORD:-${ARTEMIS_PASSWORD:-admin}}}"
-			local user_opt=() pass_opt=()
+			local user_opt=() pass_opt=() max_opts=()
 			if [[ -n "${username}" ]]; then user_opt=(--connect "username=${username}"); fi
 			if [[ -n "${password}" ]]; then pass_opt=(--connect "password=${password}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}")
+			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
+			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
+			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
 		nats)
 			local host="${NATS_HOST:-127.0.0.1}"

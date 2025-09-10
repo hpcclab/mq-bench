@@ -15,6 +15,8 @@ pub struct MqttTransport {
     keep_alive: Duration,
     username: Option<String>,
     password: Option<String>,
+    max_in: usize,
+    max_out: usize,
 }
 
 pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
@@ -28,16 +30,22 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         .get("port")
         .and_then(|s| s.parse().ok())
         .unwrap_or(1883);
-    let client_id = opts
-        .params
-        .get("client_id")
-        .cloned()
-        .unwrap_or_else(|| format!("mqb-{}", uuid::Uuid::new_v4()));
-
-    let mut mqttoptions = MqttOptions::new(client_id, host.clone(), port);
     let keep_alive = Duration::from_secs(30);
-    mqttoptions.set_keep_alive(keep_alive);
-    mqttoptions.set_max_packet_size(64*1024, 64*1024); // 64KB max packet size
+    // Parse max packet sizes; allow a single "max_packet" for both directions, or per-direction overrides
+    let default_max: usize = 2 * 1024 * 1024; // 2 MiB default to comfortably allow 16 KiB+ payloads
+    let max_both: Option<usize> = opts.params.get("max_packet").and_then(|s| s.parse().ok());
+    let max_in: usize = opts
+        .params
+        .get("max_in")
+        .and_then(|s| s.parse().ok())
+        .or(max_both)
+        .unwrap_or(default_max);
+    let max_out: usize = opts
+        .params
+        .get("max_out")
+        .and_then(|s| s.parse().ok())
+        .or(max_both)
+        .unwrap_or(default_max);
     // We don't keep this MqttOptions; we store connection params to create per-role clients
     Ok(Box::new(MqttTransport {
         host,
@@ -45,6 +53,8 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         keep_alive,
         username: opts.params.get("username").cloned(),
         password: opts.params.get("password").cloned(),
+        max_in,
+        max_out,
     }))
 }
 
@@ -62,6 +72,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
+    options.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 options.set_credentials(user, pass);
@@ -100,6 +111,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
+    options.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 options.set_credentials(user, pass);
@@ -129,6 +141,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         sub_opts.set_keep_alive(self.keep_alive);
+    sub_opts.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 sub_opts.set_credentials(user, pass);
@@ -147,6 +160,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         pub_opts.set_keep_alive(self.keep_alive);
+    pub_opts.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 pub_opts.set_credentials(user, pass);
@@ -195,6 +209,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
+    options.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 options.set_credentials(user, pass);
