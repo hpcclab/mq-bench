@@ -72,7 +72,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
-    options.set_max_packet_size(self.max_in, self.max_out);
+        options.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 options.set_credentials(user, pass);
@@ -111,7 +111,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
-    options.set_max_packet_size(self.max_in, self.max_out);
+        options.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 options.set_credentials(user, pass);
@@ -141,7 +141,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         sub_opts.set_keep_alive(self.keep_alive);
-    sub_opts.set_max_packet_size(self.max_in, self.max_out);
+        sub_opts.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 sub_opts.set_credentials(user, pass);
@@ -160,7 +160,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         pub_opts.set_keep_alive(self.keep_alive);
-    pub_opts.set_max_packet_size(self.max_in, self.max_out);
+        pub_opts.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 pub_opts.set_credentials(user, pass);
@@ -209,7 +209,7 @@ impl Transport for MqttTransport {
             self.port,
         );
         options.set_keep_alive(self.keep_alive);
-    options.set_max_packet_size(self.max_in, self.max_out);
+        options.set_max_packet_size(self.max_in, self.max_out);
         if let Some(user) = &self.username {
             if let Some(pass) = &self.password {
                 options.set_credentials(user, pass);

@@ -1,18 +1,18 @@
 //! Transport abstraction: trait, types, and builder factory.
 
+#[cfg(feature = "transport-amqp-0-9")]
+pub mod amqp;
 pub mod config;
 #[cfg(any(test, feature = "transport-mock"))]
 pub mod mock;
 #[cfg(feature = "transport-mqtt")]
 pub mod mqtt;
-#[cfg(feature = "transport-redis")]
-pub mod redis;
 #[cfg(feature = "transport-nats")]
 pub mod nats;
+#[cfg(feature = "transport-redis")]
+pub mod redis;
 #[cfg(feature = "transport-zenoh")]
 pub mod zenoh;
-#[cfg(feature = "transport-amqp-0-9")]
-pub mod amqp;
 
 use std::collections::BTreeMap;
 use std::pin::Pin;

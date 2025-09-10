@@ -8,8 +8,8 @@ use futures::StreamExt;
 use lapin::{
     BasicProperties, Channel, Connection, ConnectionProperties,
     options::{
-    BasicAckOptions, BasicConsumeOptions, BasicPublishOptions,
-        QueueBindOptions, QueueDeclareOptions,
+        BasicAckOptions, BasicConsumeOptions, BasicPublishOptions, QueueBindOptions,
+        QueueDeclareOptions,
     },
     types::FieldTable,
 };
@@ -132,7 +132,7 @@ impl Transport for AmqpTransport {
             .create_channel()
             .await
             .map_err(|e| TransportError::Connect(e.to_string()))?;
-    // Do not declare built-in exchange "amq.topic": it's predeclared (durable) by RabbitMQ.
+        // Do not declare built-in exchange "amq.topic": it's predeclared (durable) by RabbitMQ.
         Ok(Box::new(AmqpPublisher {
             channel,
             routing: map_routing(topic),

@@ -7,8 +7,8 @@ pub fn parse_engine(s: &str) -> Option<Engine> {
         "redis" => Some(Engine::Redis),
         "mqtt" => Some(Engine::Mqtt),
         "nats" => Some(Engine::Nats),
-    "amqp" => Some(Engine::Amqp),
-    "rabbitmq" => Some(Engine::Amqp),
+        "amqp" => Some(Engine::Amqp),
+        "rabbitmq" => Some(Engine::Amqp),
         _ => None,
     }
 }

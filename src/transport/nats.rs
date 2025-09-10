@@ -41,7 +41,7 @@ impl Transport for NatsTransport {
         expr: &str,
         handler: Box<dyn Fn(TransportMessage) + Send + Sync + 'static>,
     ) -> Result<Box<dyn Subscription>, TransportError> {
-    let subject = map_expr(expr);
+        let subject = map_expr(expr);
         let client = async_nats::connect(&self.url)
             .await
             .map_err(|e| TransportError::Connect(e.to_string()))?;
@@ -92,10 +92,10 @@ impl Transport for NatsTransport {
         subject: &str,
         handler: Box<dyn Fn(IncomingQuery) + Send + Sync + 'static>,
     ) -> Result<Box<dyn QueryRegistration>, TransportError> {
-    let client = async_nats::connect(&self.url)
+        let client = async_nats::connect(&self.url)
             .await
             .map_err(|e| TransportError::Connect(e.to_string()))?;
-    let subject = map_topic(subject);
+        let subject = map_topic(subject);
         let handler = std::sync::Arc::new(handler);
         let mut sub = client
             .subscribe(subject.clone())
