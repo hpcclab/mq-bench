@@ -147,7 +147,7 @@ impl Transport for MqttTransport {
                 sub_opts.set_credentials(user, pass);
             }
         }
-        let (sub_client, mut sub_el) = AsyncClient::new(sub_opts, 20);
+        let (sub_client, mut sub_el) = AsyncClient::new(sub_opts, 65536);
         sub_client
             .subscribe(&reply_topic, QoS::AtMostOnce)
             .await
@@ -166,7 +166,7 @@ impl Transport for MqttTransport {
                 pub_opts.set_credentials(user, pass);
             }
         }
-        let (pub_client, mut pub_el) = AsyncClient::new(pub_opts, 1024);
+        let (pub_client, mut pub_el) = AsyncClient::new(pub_opts, 65536);
         // Drive publisher eventloop in background
         let _pub_poller = tokio::spawn(async move { while pub_el.poll().await.is_ok() {} });
 
