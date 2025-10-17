@@ -82,9 +82,9 @@ enum Commands {
         #[arg(long, default_value = "false")]
         share_transport: bool,
 
-        /// Reliability (best/reliable)
-        #[arg(long, default_value = "best")]
-        reliability: String,
+        /// QoS level (0,1,2). Mapped per engine; for zenoh: 0=best effort, 1/2=reliable
+        #[arg(long, default_value_t = 0u8)]
+        qos: u8,
 
         /// Optional CSV output file path (stdout if omitted)
         #[arg(long)]
@@ -218,9 +218,9 @@ enum Commands {
         #[arg(long, default_value = "1")]
         subscribers: u32,
 
-        /// Reliability (best/reliable)
-        #[arg(long, default_value = "best")]
-        reliability: String,
+        /// QoS level (0,1,2). Mapped per engine; for zenoh: 0=best effort, 1/2=reliable
+        #[arg(long, default_value_t = 0u8)]
+        qos: u8,
 
         /// Optional CSV output file path (stdout if omitted)
         #[arg(long)]
@@ -290,9 +290,9 @@ enum Commands {
         #[arg(long, default_value = "0")]
         proc_delay: u64,
 
-        /// Reliability (best/reliable)
-        #[arg(long, default_value = "best")]
-        reliability: String,
+        /// QoS level (0,1,2). Mapped per engine; for zenoh: 0=best effort, 1/2=reliable
+        #[arg(long, default_value_t = 0u8)]
+        qos: u8,
 
         /// Optional CSV output file path (stdout if omitted)
         #[arg(long)]
@@ -330,7 +330,7 @@ async fn main() -> Result<()> {
             payload,
             rate,
             duration,
-            reliability: _reliability,
+            qos,
             csv,
             share_transport: _,
         } => {
@@ -342,6 +342,10 @@ async fn main() -> Result<()> {
                     conn.params.insert("endpoint".into(), ep.clone());
                 }
             }
+            // Inject QoS into connect params if not already provided
+            conn.params
+                .entry("qos".into())
+                .or_insert_with(|| qos.to_string());
             let mut handles = Vec::new();
             // Externalize snapshotting always (single or multiple)
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
@@ -585,7 +589,7 @@ async fn main() -> Result<()> {
             endpoint,
             expr,
             subscribers,
-            reliability: _,
+            qos,
             csv,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
@@ -595,6 +599,10 @@ async fn main() -> Result<()> {
                     conn.params.insert("endpoint".into(), ep.clone());
                 }
             }
+            // Inject QoS into connect params if not already provided
+            conn.params
+                .entry("qos".into())
+                .or_insert_with(|| qos.to_string());
             let mut handles = Vec::new();
             // Externalize snapshotting always
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
@@ -731,7 +739,7 @@ async fn main() -> Result<()> {
             serve_prefix,
             reply_size,
             proc_delay,
-            reliability: _rel,
+            qos,
             csv,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
@@ -741,6 +749,10 @@ async fn main() -> Result<()> {
                     conn.params.insert("endpoint".into(), ep.clone());
                 }
             }
+            // Inject QoS into connect params if not already provided
+            conn.params
+                .entry("qos".into())
+                .or_insert_with(|| qos.to_string());
             // Externalize snapshotting
             let shared_stats: Option<Arc<Stats>> = Some(Arc::new(Stats::new()));
             let mut agg_output = if let Some(ref path) = csv {

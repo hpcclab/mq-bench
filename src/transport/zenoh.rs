@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use tokio::sync::Mutex;
+use zenoh::qos::Reliability;
 
 use super::{
     ConnectOptions, IncomingQuery, Payload, QueryResponder, QueryResponderInner, Transport,
@@ -14,6 +15,7 @@ use zenoh::bytes::ZBytes;
 
 pub struct ZenohTransport {
     session: zenoh::Session,
+    pub_reliability: Reliability,
 }
 
 pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
@@ -40,15 +42,23 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         cfg.insert_json5("connect/endpoints", &list)
             .map_err(|e| TransportError::Connect(e.to_string()))?;
     }
-    // cfg.insert_json5("scouting/multicast/enabled", "false")
-    //     .map_err(|e| TransportError::Connect(e.to_string()))?;
-    // cfg.insert_json5("scouting/gossip/enabled", "false")
-    //     .map_err(|e| TransportError::Connect(e.to_string()))?;
+    
 
     let session = zenoh::open(cfg)
         .await
         .map_err(|e| TransportError::Connect(e.to_string()))?;
-    Ok(Box::new(ZenohTransport { session }))
+    // Map ConnectOptions qos -> Reliability (0: BestEffort, 1/2: Reliable)
+    let qos_level: u8 = opts
+        .params
+        .get("qos")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let pub_reliability = if qos_level == 0 {
+        Reliability::BestEffort
+    } else {
+        Reliability::Reliable
+    };
+    Ok(Box::new(ZenohTransport { session, pub_reliability }))
 }
 
 #[async_trait::async_trait]
@@ -85,6 +95,7 @@ impl Transport for ZenohTransport {
         let pub_decl = self
             .session
             .declare_publisher(topic.to_string())
+            .reliability(self.pub_reliability)
             .await
             .map_err(|e| TransportError::Publish(e.to_string()))?;
         Ok(Box::new(ZenohPublisher { inner: pub_decl }))

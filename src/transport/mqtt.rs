@@ -17,6 +17,7 @@ pub struct MqttTransport {
     password: Option<String>,
     max_in: usize,
     max_out: usize,
+    qos: QoS,
 }
 
 pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
@@ -46,6 +47,17 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         .and_then(|s| s.parse().ok())
         .or(max_both)
         .unwrap_or(default_max);
+    // Determine QoS (0,1,2)
+    let qos_level: u8 = opts
+        .params
+        .get("qos")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let qos = match qos_level {
+        2 => QoS::ExactlyOnce,
+        1 => QoS::AtLeastOnce,
+        _ => QoS::AtMostOnce,
+    };
     // We don't keep this MqttOptions; we store connection params to create per-role clients
     Ok(Box::new(MqttTransport {
         host,
@@ -55,6 +67,7 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         password: opts.params.get("password").cloned(),
         max_in,
         max_out,
+        qos,
     }))
 }
 
@@ -81,7 +94,7 @@ impl Transport for MqttTransport {
         let (client, mut eventloop) = AsyncClient::new(options, 65536);
         let topic = map_expr(expr);
         client
-            .subscribe(topic, QoS::AtMostOnce)
+            .subscribe(topic, self.qos)
             .await
             .map_err(|e| TransportError::Subscribe(e.to_string()))?;
         let handler = std::sync::Arc::new(handler);
@@ -126,6 +139,7 @@ impl Transport for MqttTransport {
         Ok(Box::new(MqttPublisher {
             client,
             topic: topic.to_string(),
+            qos: self.qos,
             poller,
         }))
     }
@@ -149,7 +163,7 @@ impl Transport for MqttTransport {
         }
         let (sub_client, mut sub_el) = AsyncClient::new(sub_opts, 65536);
         sub_client
-            .subscribe(&reply_topic, QoS::AtMostOnce)
+            .subscribe(&reply_topic, self.qos)
             .await
             .map_err(|e| TransportError::Request(e.to_string()))?;
 
@@ -173,7 +187,7 @@ impl Transport for MqttTransport {
         // Build envelope: [u16 reply_len][reply_topic][payload]
         let env = encode_req_env(&reply_topic, _payload.as_ref());
         pub_client
-            .publish(_subject, QoS::AtMostOnce, false, env)
+            .publish(_subject, self.qos, false, env)
             .await
             .map_err(|e| TransportError::Request(e.to_string()))?;
 
@@ -217,7 +231,7 @@ impl Transport for MqttTransport {
         }
         let (client, mut eventloop) = AsyncClient::new(options, 65536);
         client
-            .subscribe(&subject, QoS::AtMostOnce)
+            .subscribe(&subject, self.qos)
             .await
             .map_err(|e| TransportError::Subscribe(e.to_string()))?;
         let handle: JoinHandle<()> = tokio::spawn(async move {
@@ -259,6 +273,7 @@ impl Transport for MqttTransport {
 struct MqttPublisher {
     client: AsyncClient,
     topic: String,
+    qos: QoS,
     poller: JoinHandle<()>,
 }
 
@@ -266,7 +281,7 @@ struct MqttPublisher {
 impl Publisher for MqttPublisher {
     async fn publish(&self, payload: Bytes) -> Result<(), TransportError> {
         self.client
-            .publish(&self.topic, QoS::AtMostOnce, false, payload.to_vec())
+            .publish(&self.topic, self.qos, false, payload.to_vec())
             .await
             .map_err(|e| TransportError::Publish(e.to_string()))?;
         Ok(())
@@ -310,7 +325,7 @@ struct MqttResponder {
 impl QueryResponderInner for MqttResponder {
     async fn send(&self, payload: Bytes) -> Result<(), TransportError> {
         self.client
-            .publish(&self.topic, QoS::AtMostOnce, false, payload.to_vec())
+            .publish(&self.topic, QoS::AtLeastOnce, false, payload.to_vec())
             .await
             .map_err(|e| TransportError::Publish(e.to_string()))?;
         Ok(())

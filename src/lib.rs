@@ -1,6 +1,5 @@
 //! mq-bench library crate exposing modules for reuse and testing.
 
-pub mod config;
 pub mod logging;
 pub mod metrics;
 pub mod output;
