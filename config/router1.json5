@@ -16,5 +16,13 @@
   // Hub: no outbound connects needed
   connect: {
     endpoints: ["tcp/router2:7447", "tcp/router3:7447"]
+  },
+
+  // Enable MQTT server plugin listening on TCP 1883
+  plugins: {
+    mqtt: {
+      // The plugin uses a single 'port' setting rather than zenoh 'listen.endpoints'
+      port: "0.0.0.0:1883"
+    }
   }
 }

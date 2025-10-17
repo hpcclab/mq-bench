@@ -64,33 +64,36 @@ services:
     command: ["redis-server", "--save", "", "--appendonly", "no"]
 
   router1:
-    image: eclipse/zenoh:1.5.1
+    image: eclipse/zenoh-bridge-mqtt:1.6.1
     container_name: router1
     command: ["-c", "/etc/zenoh/router1.json5"]
     ports:
       - "127.0.0.1:7447:7447" # TCP listener exposed to host
+      - "127.0.0.1:1888:1883" # MQTT plugin listener (router1)
     volumes:
       - ./config/router1.json5:/etc/zenoh/router1.json5:ro
     environment:
       RUST_LOG: info
 
   router2:
-    image: eclipse/zenoh:1.5.1
+    image: eclipse/zenoh-bridge-mqtt:1.6.1
     container_name: router2
     command: ["-c", "/etc/zenoh/router2.json5"]
     ports:
       - "127.0.0.1:7448:7447" # expose TCP listener to host for router2
+      # - "127.0.0.1:1889:1883" # MQTT plugin listener (router2)
     volumes:
       - ./config/router2.json5:/etc/zenoh/router2.json5:ro
     environment:
       RUST_LOG: info
 
   router3:
-    image: eclipse/zenoh:1.5.1
+    image: eclipse/zenoh-bridge-mqtt:1.6.1
     container_name: router3
     command: ["-c", "/etc/zenoh/router3.json5"]
     ports:
       - "127.0.0.1:7449:7447" # expose TCP listener to host for router3
+      # - "127.0.0.1:1890:1883" # MQTT plugin listener (router3)
     volumes:
       - ./config/router3.json5:/etc/zenoh/router3.json5:ro
     environment:

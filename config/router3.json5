@@ -9,5 +9,12 @@
   },
   connect: {
     endpoints: ["tcp/router1:7447"]
+  },
+
+  // Enable MQTT server plugin listening on TCP 1883
+  plugins: {
+    mqtt: {
+      port: "0.0.0.0:1883"
+    }
   }
 }
