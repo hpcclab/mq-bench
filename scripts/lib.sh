@@ -16,6 +16,16 @@ build_release_if_needed() {
 	fi
 }
 
+# Helper: pretty-print a command array as a single shell-escaped line
+print_cmd() {
+	# Usage: print_cmd cmd arg1 arg2 ...
+	# Prints: [cmd] <command ...>
+	local out
+	# shellcheck disable=SC2059
+	out=$(printf '%q ' "$@")
+	echo "[cmd] ${out}"
+}
+
 # Resolve which docker containers to monitor for broker utilization.
 # Priority: MONITOR_CONTAINERS env (space/comma/colon separated) > engine-based defaults.
 # Usage: resolve_monitor_containers OUT_ARR
@@ -354,12 +364,15 @@ start_sub() {
 	local args=()
 	make_connect_args sub args
 	echo "[sub] ${ENGINE:-zenoh} → ${expr} (subs=${subs})"
-	"${BIN}" --snapshot-interval "${SNAPSHOT}" sub \
-		"${args[@]}" \
-		--expr "${expr}" \
-		--subscribers "${subs}" \
-		--csv "${csv}" \
-		>"${log}" 2>&1 &
+	local -a CMD=(
+		"${BIN}" --snapshot-interval "${SNAPSHOT}" sub
+		"${args[@]}"
+		--expr "${expr}"
+		--subscribers "${subs}"
+		--csv "${csv}"
+	)
+	print_cmd "${CMD[@]}" && echo "       1>$(printf %q "${log}") 2>&1 &"
+	"${CMD[@]}" >"${log}" 2>&1 &
 	_outpid=$!
 }
 
@@ -380,14 +393,17 @@ start_pub() {
 	local rate_flag=()
 	if [[ -n "${rate}" ]] && (( rate > 0 )); then rate_flag=(--rate "${rate}"); fi
 	echo "[pub] ${ENGINE:-zenoh} → ${topic} (payload=${payload}, rate=${rate:-max}, dur=${duration}s)"
-	"${BIN}" --snapshot-interval "${SNAPSHOT}" pub \
-		"${args[@]}" \
-		--topic-prefix "${topic}" \
-		--payload "${payload}" \
-		"${rate_flag[@]}" \
-		--duration "${duration}" \
-		--csv "${csv}" \
-		>"${log}" 2>&1 &
+	local -a CMD=(
+		"${BIN}" --snapshot-interval "${SNAPSHOT}" pub
+		"${args[@]}"
+		--topic-prefix "${topic}"
+		--payload "${payload}"
+		"${rate_flag[@]}"
+		--duration "${duration}"
+		--csv "${csv}"
+	)
+	print_cmd "${CMD[@]}" && echo "       1>$(printf %q "${log}") 2>&1 &"
+	"${CMD[@]}" >"${log}" 2>&1 &
 	_outpid=$!
 }
 

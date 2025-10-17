@@ -41,13 +41,16 @@ CONNECT_QRY_ARGS=(--endpoint "${QRY_EP}")
 if [[ -n "${ZENOH_MODE}" ]]; then
 	CONNECT_QRY_ARGS=(--connect "endpoint=${QRY_EP}" --connect "mode=${ZENOH_MODE}")
 fi
-"${BIN}" --snapshot-interval "${SNAPSHOT}" qry \
-		"${CONNECT_QRY_ARGS[@]}" \
-	--serve-prefix "${PREFIX}/**" \
-	--reply-size "${REPLY_SIZE}" \
-	--proc-delay "${PROC_DELAY}" \
-	--csv "${QRY_CSV}" \
-	>"${ART_DIR}/qry.log" 2>&1 &
+CMD_QRY=(
+	"${BIN}" --snapshot-interval "${SNAPSHOT}" qry
+	"${CONNECT_QRY_ARGS[@]}"
+	--serve-prefix "${PREFIX}/**"
+	--reply-size "${REPLY_SIZE}"
+	--proc-delay "${PROC_DELAY}"
+	--csv "${QRY_CSV}"
+)
+print_cmd "${CMD_QRY[@]}" && echo "       1>$(printf %q "${ART_DIR}/qry.log") 2>&1 &"
+"${CMD_QRY[@]}" >"${ART_DIR}/qry.log" 2>&1 &
 QRY_PID=$!
 trap 'echo "Stopping queryable (${QRY_PID})"; kill ${QRY_PID} >/dev/null 2>&1 || true' EXIT
 
@@ -60,15 +63,18 @@ CONNECT_REQ_ARGS=(--endpoint "${REQ_EP}")
 if [[ -n "${ZENOH_MODE}" ]]; then
 	CONNECT_REQ_ARGS=(--connect "endpoint=${REQ_EP}" --connect "mode=${ZENOH_MODE}")
 fi
-"${BIN}" --snapshot-interval "${SNAPSHOT}" req \
-		"${CONNECT_REQ_ARGS[@]}" \
-	--key-expr "${KEY_EXPR}" \
-	"${QPS_FLAG[@]}" \
-	--concurrency "${CONC}" \
-	--timeout "${TIMEOUT_MS}" \
-	--duration "${DURATION}" \
-	--csv "${REQ_CSV}" \
-	>"${ART_DIR}/req.log" 2>&1 &
+CMD_REQ=(
+	"${BIN}" --snapshot-interval "${SNAPSHOT}" req
+	"${CONNECT_REQ_ARGS[@]}"
+	--key-expr "${KEY_EXPR}"
+	"${QPS_FLAG[@]}"
+	--concurrency "${CONC}"
+	--timeout "${TIMEOUT_MS}"
+	--duration "${DURATION}"
+	--csv "${REQ_CSV}"
+)
+print_cmd "${CMD_REQ[@]}" && echo "       1>$(printf %q "${ART_DIR}/req.log") 2>&1 &"
+"${CMD_REQ[@]}" >"${ART_DIR}/req.log" 2>&1 &
 REQ_PID=$!
 
 print_status() {

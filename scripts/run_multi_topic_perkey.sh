@@ -49,19 +49,22 @@ CONNECT_SUB_ARGS=()
 make_connect_args sub CONNECT_SUB_ARGS
 SHARE_FLAG=()
 if [[ "${SHARE_TRANSPORT}" == "true" ]]; then SHARE_FLAG=(--share-transport); fi
-"${BIN}" --snapshot-interval "${SNAPSHOT}" mt-sub \
-  "${CONNECT_SUB_ARGS[@]}" \
-  --topic-prefix "${TOPIC_PREFIX}" \
-  --tenants "${TENANTS}" \
-  --regions "${REGIONS}" \
-  --services "${SERVICES}" \
-  --shards "${SHARDS}" \
-  --subscribers "${SUBSCRIBERS}" \
-  --mapping "${MAPPING}" \
-  --duration "${DURATION}" \
-  "${SHARE_FLAG[@]}" \
-  --csv "${SUB_CSV}" \
-  >"${ART_DIR}/mt_sub.log" 2>&1 &
+CMD_MTSUB=(
+  "${BIN}" --snapshot-interval "${SNAPSHOT}" mt-sub
+  "${CONNECT_SUB_ARGS[@]}"
+  --topic-prefix "${TOPIC_PREFIX}"
+  --tenants "${TENANTS}"
+  --regions "${REGIONS}"
+  --services "${SERVICES}"
+  --shards "${SHARDS}"
+  --subscribers "${SUBSCRIBERS}"
+  --mapping "${MAPPING}"
+  --duration "${DURATION}"
+  "${SHARE_FLAG[@]}"
+  --csv "${SUB_CSV}"
+)
+print_cmd "${CMD_MTSUB[@]}" && echo "       1>$(printf %q "${ART_DIR}/mt_sub.log") 2>&1 &"
+"${CMD_MTSUB[@]}" >"${ART_DIR}/mt_sub.log" 2>&1 &
 SUB_PID=$!
 trap 'echo "Stopping subscribers (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
 
@@ -74,21 +77,24 @@ if [[ "${SHARE_TRANSPORT}" == "true" ]]; then SHARE_FLAG=(--share-transport); el
 # Build connect args for publisher via helper
 CONNECT_PUB_ARGS=()
 make_connect_args pub CONNECT_PUB_ARGS
-"${BIN}" --snapshot-interval "${SNAPSHOT}" mt-pub \
-  "${CONNECT_PUB_ARGS[@]}" \
-  --topic-prefix "${TOPIC_PREFIX}" \
-  --tenants "${TENANTS}" \
-  --regions "${REGIONS}" \
-  --services "${SERVICES}" \
-  --shards "${SHARDS}" \
-  --publishers "${PUBLISHERS}" \
-  --mapping "${MAPPING}" \
-  --payload "${PAYLOAD}" \
-  "${RATE_FLAG[@]}" \
-  --duration "${DURATION}" \
-  "${SHARE_FLAG[@]}" \
-  --csv "${PUB_CSV}" \
-  >"${ART_DIR}/mt_pub.log" 2>&1 &
+CMD_MTPUB=(
+  "${BIN}" --snapshot-interval "${SNAPSHOT}" mt-pub
+  "${CONNECT_PUB_ARGS[@]}"
+  --topic-prefix "${TOPIC_PREFIX}"
+  --tenants "${TENANTS}"
+  --regions "${REGIONS}"
+  --services "${SERVICES}"
+  --shards "${SHARDS}"
+  --publishers "${PUBLISHERS}"
+  --mapping "${MAPPING}"
+  --payload "${PAYLOAD}"
+  "${RATE_FLAG[@]}"
+  --duration "${DURATION}"
+  "${SHARE_FLAG[@]}"
+  --csv "${PUB_CSV}"
+)
+print_cmd "${CMD_MTPUB[@]}" && echo "       1>$(printf %q "${ART_DIR}/mt_pub.log") 2>&1 &"
+"${CMD_MTPUB[@]}" >"${ART_DIR}/mt_pub.log" 2>&1 &
 PUB_PID=$!
 
 echo "[watch] printing status every ${SNAPSHOT}s..."

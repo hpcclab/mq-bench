@@ -60,21 +60,24 @@ SHARE_FLAG=()
 if [[ "${SHARE_TRANSPORT}" == "true" ]]; then SHARE_FLAG=(--share-transport); fi
 CONNECT_PUB_ARGS=()
 make_connect_args pub CONNECT_PUB_ARGS
-"${BIN}" --snapshot-interval "${SNAPSHOT}" mt-pub \
-  "${CONNECT_PUB_ARGS[@]}" \
-  --topic-prefix "${TOPIC_PREFIX}" \
-  --tenants "${TENANTS}" \
-  --regions "${REGIONS}" \
-  --services "${SERVICES}" \
-  --shards "${SHARDS}" \
-  --publishers "${PUBLISHERS}" \
-  --mapping "${MAPPING}" \
-  --payload "${PAYLOAD}" \
-  "${RATE_FLAG[@]}" \
-  --duration "${DURATION}" \
-  "${SHARE_FLAG[@]}" \
-  --csv "${PUB_CSV}" \
-  >"${ART_DIR}/mt_pub.log" 2>&1 &
+CMD_MTPUB=(
+  "${BIN}" --snapshot-interval "${SNAPSHOT}" mt-pub
+  "${CONNECT_PUB_ARGS[@]}"
+  --topic-prefix "${TOPIC_PREFIX}"
+  --tenants "${TENANTS}"
+  --regions "${REGIONS}"
+  --services "${SERVICES}"
+  --shards "${SHARDS}"
+  --publishers "${PUBLISHERS}"
+  --mapping "${MAPPING}"
+  --payload "${PAYLOAD}"
+  "${RATE_FLAG[@]}"
+  --duration "${DURATION}"
+  "${SHARE_FLAG[@]}"
+  --csv "${PUB_CSV}"
+)
+print_cmd "${CMD_MTPUB[@]}" && echo "       1>$(printf %q "${ART_DIR}/mt_pub.log") 2>&1 &"
+"${CMD_MTPUB[@]}" >"${ART_DIR}/mt_pub.log" 2>&1 &
 PUB_PID=$!
 
 watch_until_pub_exits ${PUB_PID} "${SUB_CSV}" "${PUB_CSV}"

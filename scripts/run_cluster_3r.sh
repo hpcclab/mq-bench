@@ -34,7 +34,14 @@ CONNECT_SUB_ARGS=(--endpoint "${SUB_ENDPOINT}")
 if [[ -n "${ZENOH_MODE}" ]]; then
   CONNECT_SUB_ARGS=(--connect "endpoint=${SUB_ENDPOINT}" --connect "mode=${ZENOH_MODE}")
 fi
-"${BIN}" --snapshot-interval "${SNAPSHOT}" sub "${CONNECT_SUB_ARGS[@]}" --expr "${KEY}" --csv "${SUB_CSV}" >"${ART_DIR}/sub.log" 2>&1 &
+CMD_SUB=(
+  "${BIN}" --snapshot-interval "${SNAPSHOT}" sub
+  "${CONNECT_SUB_ARGS[@]}"
+  --expr "${KEY}"
+  --csv "${SUB_CSV}"
+)
+print_cmd "${CMD_SUB[@]}" && echo "       1>$(printf %q "${ART_DIR}/sub.log") 2>&1 &"
+"${CMD_SUB[@]}" >"${ART_DIR}/sub.log" 2>&1 &
 SUB_PID=$!
 trap 'echo "Stopping subscriber (${SUB_PID})"; kill ${SUB_PID} >/dev/null 2>&1 || true' EXIT
 
@@ -45,7 +52,17 @@ CONNECT_PUB_ARGS=(--endpoint "${PUB_ENDPOINT}")
 if [[ -n "${ZENOH_MODE}" ]]; then
   CONNECT_PUB_ARGS=(--connect "endpoint=${PUB_ENDPOINT}" --connect "mode=${ZENOH_MODE}")
 fi
-"${BIN}" --snapshot-interval "${SNAPSHOT}" pub "${CONNECT_PUB_ARGS[@]}" --topic-prefix "${KEY}" --payload "${PAYLOAD}" ${RATE:+--rate "${RATE}"} --duration "${DURATION}" --csv "${PUB_CSV}" >"${ART_DIR}/pub.log" 2>&1 &
+CMD_PUB=(
+  "${BIN}" --snapshot-interval "${SNAPSHOT}" pub
+  "${CONNECT_PUB_ARGS[@]}"
+  --topic-prefix "${KEY}"
+  --payload "${PAYLOAD}"
+  ${RATE:+--rate "${RATE}"}
+  --duration "${DURATION}"
+  --csv "${PUB_CSV}"
+)
+print_cmd "${CMD_PUB[@]}" && echo "       1>$(printf %q "${ART_DIR}/pub.log") 2>&1 &"
+"${CMD_PUB[@]}" >"${ART_DIR}/pub.log" 2>&1 &
 PUB_PID=$!
 
 # Status watcher
