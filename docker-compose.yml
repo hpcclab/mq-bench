@@ -1,0 +1,100 @@
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    
+  emqx:
+    image: emqx:5.8
+    container_name: emqx
+    ports:
+      - "127.0.0.1:1884:1883"   # MQTT TCP
+      - "127.0.0.1:18084:18083" # Dashboard (optional)
+    environment:
+      - EMQX_ALLOW_ANONYMOUS=true
+      - EMQX_AUTHORIZATION__NO_MATCH=allow
+      - EMQX_LOG__LEVEL=info
+
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: hivemq
+    ports:
+      - "127.0.0.1:1885:1883"   # MQTT TCP
+      - "127.0.0.1:8081:8080"   # Dashboard (optional)
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rabbitmq
+    # Enable MQTT plugin and start server
+    command: ["bash", "-lc", "rabbitmq-plugins enable --offline rabbitmq_mqtt; rabbitmq-server"]
+    ports:
+      - "127.0.0.1:5672:5672"   # AMQP
+      - "127.0.0.1:15672:15672" # Management UI
+      - "127.0.0.1:1886:1883"   # MQTT plugin (host port 1886 to avoid clashing with other brokers)
+
+  artemis:
+    image: apache/activemq-artemis:latest-alpine
+    container_name: artemis
+    environment:
+      - ARTEMIS_USERNAME=admin
+      - ARTEMIS_PASSWORD=admin
+    ports:
+      - "127.0.0.1:5673:5672"   # AMQP 1.0 (host 5673 to avoid RabbitMQ 5672)
+      - "127.0.0.1:1887:1883"   # MQTT (host 1887; Artemis MQTT)
+      - "127.0.0.1:61616:61616" # OpenWire
+      - "127.0.0.1:61614:61613" # STOMP (host 61614)
+      - "127.0.0.1:8161:8161"   # Web console
+
+  nats:
+    image: nats:2
+    container_name: nats
+    command: ["-p", "4222"]
+    ports:
+      - "127.0.0.1:4222:4222"   # NATS TCP
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  router1:
+    image: eclipse/zenoh-bridge-mqtt:1.6.1
+    container_name: router1
+    command: ["-c", "/etc/zenoh/router1.json5"]
+    ports:
+      - "127.0.0.1:7447:7447" # TCP listener exposed to host
+      - "127.0.0.1:1888:1883" # MQTT plugin listener (router1)
+    volumes:
+      - ./config/router1.json5:/etc/zenoh/router1.json5:ro
+    environment:
+      RUST_LOG: info
+
+  router2:
+    image: eclipse/zenoh-bridge-mqtt:1.6.1
+    container_name: router2
+    command: ["-c", "/etc/zenoh/router2.json5"]
+    ports:
+      - "127.0.0.1:7448:7447" # expose TCP listener to host for router2
+      # - "127.0.0.1:1889:1883" # MQTT plugin listener (router2)
+    volumes:
+      - ./config/router2.json5:/etc/zenoh/router2.json5:ro
+    environment:
+      RUST_LOG: info
+
+  router3:
+    image: eclipse/zenoh-bridge-mqtt:1.6.1
+    container_name: router3
+    command: ["-c", "/etc/zenoh/router3.json5"]
+    ports:
+      - "127.0.0.1:7449:7447" # expose TCP listener to host for router3
+      # - "127.0.0.1:1890:1883" # MQTT plugin listener (router3)
+    volumes:
+      - ./config/router3.json5:/etc/zenoh/router3.json5:ro
+    environment:
+      RUST_LOG: info

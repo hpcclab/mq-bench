@@ -1,0 +1,15 @@
+/target
+
+# Ignore logs directory contents
+logs/*
+!logs/.gitignore
+
+# Local run artifacts
+artifacts/
+results/
+
+# OS/editor junk
+**/.DS_Store
+**/*.swp
+
+__pycache__

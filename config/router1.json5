@@ -1,0 +1,28 @@
+{
+  // Router in star topology (hub)
+  mode: "router",
+
+  // Disable auto-discovery/autoconnect
+  scouting: {
+    multicast: { enabled: false },
+    gossip: { enabled: false }
+  },
+
+  // Listen on TCP 7447
+  listen: {
+    endpoints: ["tcp/0.0.0.0:7447"]
+  },
+
+  // Hub: no outbound connects needed
+  connect: {
+    endpoints: ["tcp/router2:7447", "tcp/router3:7447"]
+  },
+
+  // Enable MQTT server plugin listening on TCP 1883
+  plugins: {
+    mqtt: {
+      // The plugin uses a single 'port' setting rather than zenoh 'listen.endpoints'
+      port: "0.0.0.0:1883"
+    }
+  }
+}
