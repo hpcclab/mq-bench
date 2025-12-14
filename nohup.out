@@ -1,0 +1,10 @@
+[01:26:35] Throughput vs pairs benchmark → /home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635
+[01:26:35] Current ulimit -n is 200000. Attempting to raise to 1048576...
+[01:26:35] WARN: Failed to raise ulimit to 1048576. Trying 65536...
+[01:26:35] Success: ulimit -n is now 65536
+[01:26:35] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635/raw_data/summary.csv | PLOTS_DIR=/home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635/plots | RAW_DIR=/home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635/raw_data
+[01:26:35] Resolved payload (bytes): 1024
+[01:26:35] Pairs list: 4000 | rate-per-pub=10 | total-rate=
+[01:26:35] Starting services: router1
+[01:26:35] [remote] ubuntu@192.168.0.253: cd /home/ubuntu && docker compose down
+ Container router1  Stopping

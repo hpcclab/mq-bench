@@ -241,24 +241,32 @@ make_connect_args() {
 			;;
 		rabbitmq)
 			# RabbitMQ over AMQP (native adapter); default
-			local host="${RABBITMQ_HOST:-127.0.0.1}"
-			local port="${RABBITMQ_PORT:-5672}"
-			local user="${RABBITMQ_USER:-guest}"
-			local pass="${RABBITMQ_PASS:-guest}"
-			local vhost="${RABBITMQ_VHOST:-/}"
-			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
-			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			# Check for pre-built URL first, otherwise construct from components
+			local url="${RABBITMQ_URL:-}"
+			if [[ -z "${url}" ]]; then
+				local host="${RABBITMQ_HOST:-127.0.0.1}"
+				local port="${RABBITMQ_PORT:-5672}"
+				local user="${RABBITMQ_USER:-guest}"
+				local pass="${RABBITMQ_PASS:-guest}"
+				local vhost="${RABBITMQ_VHOST:-/}"
+				if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+				url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			fi
 			_out=(--engine rabbitmq --connect "url=${url}")
 			;;
 		rabbitmq-amqp)
 			# Explicit RabbitMQ over AMQP
-			local host="${RABBITMQ_HOST:-127.0.0.1}"
-			local port="${RABBITMQ_PORT:-5672}"
-			local user="${RABBITMQ_USER:-guest}"
-			local pass="${RABBITMQ_PASS:-guest}"
-			local vhost="${RABBITMQ_VHOST:-/}"
-			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
-			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			# Check for pre-built URL first, otherwise construct from components
+			local url="${RABBITMQ_URL:-}"
+			if [[ -z "${url}" ]]; then
+				local host="${RABBITMQ_HOST:-127.0.0.1}"
+				local port="${RABBITMQ_PORT:-5672}"
+				local user="${RABBITMQ_USER:-guest}"
+				local pass="${RABBITMQ_PASS:-guest}"
+				local vhost="${RABBITMQ_VHOST:-/}"
+				if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+				url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			fi
 			_out=(--engine rabbitmq --connect "url=${url}")
 			;;
 		rabbitmq-mqtt)
