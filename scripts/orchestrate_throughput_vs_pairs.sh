@@ -43,6 +43,8 @@ SNAPSHOT=1
 RAMP_UP_SECS=5
 WARMUP_SECS=0               # warmup duration (0 to disable)
 WARMUP_PAYLOAD=1024           # warmup payload size in bytes
+IGNORE_START_SECS=5           # seconds to ignore from beginning of data
+IGNORE_END_SECS=5             # seconds to ignore from end of data
 RUN_ID_PREFIX="scale"
 TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
 DEFAULT_TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
@@ -196,6 +198,10 @@ while [[ $# -gt 0 ]]; do
       shift; WARMUP_SECS=${1:-10} ;;
     --warmup-payload)
       shift; WARMUP_PAYLOAD=${1:-1024} ;;
+    --ignore-start-secs)
+      shift; IGNORE_START_SECS=${1:-5} ;;
+    --ignore-end-secs)
+      shift; IGNORE_END_SECS=${1:-5} ;;
     --sequential)
       SEQUENTIAL=1 ;;
     --ssh-target)
@@ -327,33 +333,58 @@ append_summary_from_artifacts() {
   fi
   if [[ ! -f "${pub_csv}" ]]; then if [[ -f "${art_dir}/mt_pub.csv" ]]; then pub_csv="${art_dir}/mt_pub.csv"; fi; fi
   
-  # Calculate steady-state metrics using only rows where active_connections == target pairs
+  # Calculate steady-state metrics by ignoring first IGNORE_START_SECS and last IGNORE_END_SECS
   # Columns: 1=timestamp, 2=sent_count, 3=received_count, 4=error_count, 5=total_throughput,
   #          6=interval_throughput, 7=p50, 8=p95, 9=p99, 10=min, 11=max, 12=mean, 13=connections, 14=active_connections
   local steady_state_metrics
-  steady_state_metrics=$(awk -F, -v target="${pairs}" '
+  steady_state_metrics=$(awk -F, -v ignore_start="${IGNORE_START_SECS}" -v ignore_end="${IGNORE_END_SECS}" '
     NR == 1 { next }  # skip header
-    $14 + 0 == target && $3 + 0 > 0 {
-        # Track first and last rows for delta calculation
-        if (first_ts == "") {
-            first_ts = $1 + 0
-            first_recv = $3 + 0
-            first_sent = $2 + 0
-            first_err = $4 + 0
-        }
-        last_ts = $1 + 0
-        last_recv = $3 + 0
-        last_sent = $2 + 0
-        last_err = $4 + 0
+    {
+        # First pass: collect all timestamps to determine time range
+        ts = $1 + 0
+        if (min_ts == "" || ts < min_ts) min_ts = ts
+        if (max_ts == "" || ts > max_ts) max_ts = ts
         
-        # Accumulate latency values for averaging
-        sum_p50 += $7 + 0
-        sum_p95 += $8 + 0
-        sum_p99 += $9 + 0
-        sum_mean += $12 + 0
-        count++
+        # Store row data for second pass
+        row_ts[NR] = ts
+        row_recv[NR] = $3 + 0
+        row_sent[NR] = $2 + 0
+        row_err[NR] = $4 + 0
+        row_p50[NR] = $7 + 0
+        row_p95[NR] = $8 + 0
+        row_p99[NR] = $9 + 0
+        row_mean[NR] = $12 + 0
+        total_rows = NR
     }
     END {
+        # Calculate the valid time window
+        window_start = min_ts + ignore_start
+        window_end = max_ts - ignore_end
+        
+        # Second pass: filter rows within the time window
+        for (i = 2; i <= total_rows; i++) {
+            ts = row_ts[i]
+            if (ts >= window_start && ts <= window_end && row_recv[i] > 0) {
+                if (first_ts == "") {
+                    first_ts = ts
+                    first_recv = row_recv[i]
+                    first_sent = row_sent[i]
+                    first_err = row_err[i]
+                }
+                last_ts = ts
+                last_recv = row_recv[i]
+                last_sent = row_sent[i]
+                last_err = row_err[i]
+                
+                # Accumulate latency values for averaging
+                sum_p50 += row_p50[i]
+                sum_p95 += row_p95[i]
+                sum_p99 += row_p99[i]
+                sum_mean += row_mean[i]
+                count++
+            }
+        }
+        
         if (count == 0) {
             # No steady-state rows found, output zeros
             print "0.00,0,0,0,0,0,0,0,0,0"
@@ -393,22 +424,35 @@ append_summary_from_artifacts() {
   IFS=, read -r tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts <<<"${steady_state_metrics}"
   
   if [[ "${steady_rows}" -eq 0 ]]; then
-    log "WARN: No steady-state rows (active_connections == ${pairs}) found for ${run_id}"
+    log "WARN: No steady-state rows found for ${run_id} (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s)"
     return 0
   fi
   
-  log "Steady-state: ${steady_rows} rows with active_connections=${pairs}, TPS=${tps}, time_range=${steady_start_ts}-${steady_end_ts}"
+  log "Steady-state: ${steady_rows} rows (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s), TPS=${tps}, time_range=${steady_start_ts}-${steady_end_ts}"
 
-  # Calculate publisher TPS using same active_connections filter
+  # Calculate publisher TPS using same time-based filtering
   local pub_tps=""
   if [[ -f "${pub_csv}" ]]; then
-    pub_tps=$(awk -F, -v target="${pairs}" '
+    pub_tps=$(awk -F, -v ignore_start="${IGNORE_START_SECS}" -v ignore_end="${IGNORE_END_SECS}" '
       NR == 1 { next }
-      $14 + 0 == target && $2 + 0 > 0 {
-          if (first_ts == "") { first_ts = $1 + 0; first_sent = $2 + 0 }
-          last_ts = $1 + 0; last_sent = $2 + 0
+      {
+          ts = $1 + 0
+          if (min_ts == "" || ts < min_ts) min_ts = ts
+          if (max_ts == "" || ts > max_ts) max_ts = ts
+          row_ts[NR] = ts
+          row_sent[NR] = $2 + 0
+          total_rows = NR
       }
       END {
+          window_start = min_ts + ignore_start
+          window_end = max_ts - ignore_end
+          for (i = 2; i <= total_rows; i++) {
+              ts = row_ts[i]
+              if (ts >= window_start && ts <= window_end && row_sent[i] > 0) {
+                  if (first_ts == "") { first_ts = ts; first_sent = row_sent[i] }
+                  last_ts = ts; last_sent = row_sent[i]
+              }
+          }
           duration = last_ts - first_ts
           if (duration > 0) { printf "%.2f", (last_sent - first_sent) / duration }
           else { print "" }

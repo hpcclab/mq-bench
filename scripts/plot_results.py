@@ -98,6 +98,10 @@ COLOR_MAP = {
 
 _MARKERS_CYCLE = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "+", "x"]
 _STYLES_CYCLE = ["--", "-.", ":", (0, (5, 1)), (0, (1, 1)), (0, (3, 1, 1, 1))]
+
+# Default figure size for all plots (width, height in inches)
+DEFAULT_FIGSIZE = (10, 6)
+DEFAULT_MARKER_SIZE = 8
 _COLORS_CYCLE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
 
 
