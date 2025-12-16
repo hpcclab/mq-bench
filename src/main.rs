@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use futures::future::join_all;
+use mq_bench::crash::CrashConfig;
 use mq_bench::metrics::stats::Stats;
 use mq_bench::output::OutputWriter;
 use mq_bench::roles::multi_topic::{
@@ -191,6 +192,22 @@ enum Commands {
         /// Initial delay between retries in milliseconds
         #[arg(long, default_value = "1000")]
         retry_delay: u64,
+
+        /// Mean Time To Failure in seconds (0 = disabled). Crashes are exponentially distributed.
+        #[arg(long, default_value = "0")]
+        mttf: f64,
+
+        /// Mean Time To Repair in seconds (wait before reconnect attempt)
+        #[arg(long, default_value = "5")]
+        mttr: f64,
+
+        /// Number of crashes to simulate (0 = infinite until duration ends)
+        #[arg(long, default_value = "0")]
+        crash_count: u32,
+
+        /// RNG seed for reproducible crash patterns
+        #[arg(long)]
+        crash_seed: Option<u64>,
     },
     /// Multi-topic subscriber: spawn many per-key subscriptions
     #[command(name = "mt-sub")]
@@ -256,6 +273,22 @@ enum Commands {
         /// Initial delay between retries in milliseconds
         #[arg(long, default_value = "1000")]
         retry_delay: u64,
+
+        /// Mean Time To Failure in seconds (0 = disabled). Crashes are exponentially distributed.
+        #[arg(long, default_value = "0")]
+        mttf: f64,
+
+        /// Mean Time To Repair in seconds (wait before reconnect attempt)
+        #[arg(long, default_value = "5")]
+        mttr: f64,
+
+        /// Number of crashes to simulate (0 = infinite until duration ends)
+        #[arg(long, default_value = "0")]
+        crash_count: u32,
+
+        /// RNG seed for reproducible crash patterns
+        #[arg(long)]
+        crash_seed: Option<u64>,
     },
     /// Subscriber role
     Sub {
@@ -620,6 +653,10 @@ async fn main() -> Result<()> {
             enable_retry,
             retry_count,
             retry_delay,
+            mttf,
+            mttr,
+            crash_count,
+            crash_seed,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
@@ -633,6 +670,13 @@ async fn main() -> Result<()> {
             conn.retry_count = retry_count;
             conn.retry_delay_ms = retry_delay;
             conn.retry_max_delay_ms = 30000;
+            // Build crash config
+            let crash_cfg = CrashConfig {
+                mttf_secs: mttf,
+                mttr_secs: mttr,
+                crash_count,
+                seed: crash_seed,
+            };
             let mapping = match mapping.as_str() {
                 "mdim" => KeyMappingMode::MDim,
                 _ => KeyMappingMode::Hash,
@@ -685,6 +729,7 @@ async fn main() -> Result<()> {
                 ramp_up_secs,
                 shared_stats: shared_stats.clone(),
                 disable_internal_snapshot: true,
+                crash_config: crash_cfg,
             };
             run_multi_topic(cfg).await?;
             if let Some(stats) = shared_stats {
@@ -716,6 +761,10 @@ async fn main() -> Result<()> {
             enable_retry,
             retry_count,
             retry_delay,
+            mttf,
+            mttr,
+            crash_count,
+            crash_seed,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
@@ -729,6 +778,13 @@ async fn main() -> Result<()> {
             conn.retry_count = retry_count;
             conn.retry_delay_ms = retry_delay;
             conn.retry_max_delay_ms = 30000;
+            // Build crash config
+            let crash_cfg = CrashConfig {
+                mttf_secs: mttf,
+                mttr_secs: mttr,
+                crash_count,
+                seed: crash_seed,
+            };
             let mapping = match mapping.as_str() {
                 "mdim" => KeyMappingMode::MDim,
                 _ => KeyMappingMode::Hash,
@@ -776,6 +832,7 @@ async fn main() -> Result<()> {
                 ramp_up_secs,
                 shared_stats: shared_stats.clone(),
                 disable_internal_snapshot: true,
+                crash_config: crash_cfg,
             };
             run_multi_topic_sub(cfg).await?;
             if let Some(stats) = shared_stats {

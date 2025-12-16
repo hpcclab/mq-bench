@@ -8,6 +8,8 @@ use std::sync::{
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
+use crate::crash::{CrashConfig, CrashInjector};
+use crate::metrics::sequence::SequenceTracker;
 use crate::metrics::stats::Stats;
 use crate::payload::generate_payload;
 use crate::rate::RateController;
@@ -41,6 +43,8 @@ pub struct MultiTopicConfig {
     // Aggregation support
     pub shared_stats: Option<Arc<Stats>>, // when set, aggregate externally
     pub disable_internal_snapshot: bool,
+    // Crash injection support
+    pub crash_config: CrashConfig,
 }
 
 fn fnv1a64(mut x: u64) -> u64 {
@@ -217,9 +221,11 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                 
                 handles.push(tokio::spawn(async move {
                     let mut rc = RateController::new(rate_per_shard);
-                    let mut seq = 0u64;
+                    // Per-topic sequence numbers (not global across topics).
+                    // This keeps gap/duplicate accounting meaningful per topic.
                     let mut pub_idx = 0;
                     let num_pubs = shard_pubs.len();
+                    let mut seqs: Vec<u64> = vec![0u64; num_pubs];
                     let mut is_active = false;
                     
                     loop {
@@ -228,6 +234,7 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                         }
                         rc.wait_for_next().await;
                         
+                        let seq = seqs[pub_idx];
                         let payload = generate_payload(seq, payload_size);
                         let bytes = Bytes::from(payload);
                         
@@ -252,8 +259,8 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                                 }
                             }
                         }
-                        
-                        seq = seq.wrapping_add(1);
+
+                        seqs[pub_idx] = seqs[pub_idx].wrapping_add(1);
                         pub_idx = (pub_idx + 1) % num_pubs;
                     }
                     
@@ -334,20 +341,58 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
             "[multi_topic] done"
         );
         return Ok(());
+    }
+    
+    // Per-key transport mode with crash injection support
+    // Early exit for shared transport mode if crash injection enabled
+    if config.share_transport {
+        if config.crash_config.is_enabled() {
+            warn!(
+                "[multi_topic] Crash injection not supported with share_transport=true. \
+                 Use share_transport=false for crash testing."
+            );
+        }
+        // (The code above handles shared transport mode without crashes)
+    }
+
+    // Calculate per-connection delay from total ramp-up time
+    let ramp_delay_us = if config.ramp_up_secs > 0.0 && pubs > 1 {
+        ((config.ramp_up_secs * 1_000_000.0) / (pubs - 1) as f64) as u64
     } else {
-        // Calculate per-connection delay from total ramp-up time
-        let ramp_delay_us = if config.ramp_up_secs > 0.0 && pubs > 1 {
-            ((config.ramp_up_secs * 1_000_000.0) / (pubs - 1) as f64) as u64
-        } else {
-            0
-        };
-        info!(
-            ramp_up_secs = config.ramp_up_secs,
-            delay_per_conn_us = ramp_delay_us,
-            "[multi_topic] using per-key transports"
-        );
+        0
+    };
+    info!(
+        ramp_up_secs = config.ramp_up_secs,
+        delay_per_conn_us = ramp_delay_us,
+        crash_enabled = config.crash_config.is_enabled(),
+        "[multi_topic] using per-key transports"
+    );
+
+    // Crash injection setup
+    let mut crash_injector = CrashInjector::new(config.crash_config.clone());
+    let start_time = std::time::Instant::now();
+
+    // Per-topic sequence numbers persist across crash cycles to make
+    // offline-queue delivery (QoS1/2 + clean_session=false) measurable.
+    let mut seq_vec: Vec<std::sync::atomic::AtomicU64> = Vec::with_capacity(pubs as usize);
+    for _ in 0..pubs {
+        seq_vec.push(std::sync::atomic::AtomicU64::new(0));
+    }
+    let seqs = Arc::new(seq_vec);
+
+    'reconnect: loop {
+        // Check duration limit
+        if start_time.elapsed().as_secs() >= config.duration_secs {
+            break;
+        }
+
+        // Reset handles for this reconnection cycle
+        let mut handles = Vec::with_capacity(pubs as usize);
+        let stop = Arc::new(AtomicBool::new(false));
+
+        // Create all publishers
         for i in 0..pubs {
-            // Apply ramp-up delay between connections (skip first)
+            // Apply ramp-up delay between connections (skip first, reset on reconnect)
             if i > 0 && ramp_delay_us > 0 {
                 tokio::time::sleep(Duration::from_micros(ramp_delay_us)).await;
             }
@@ -388,9 +433,10 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
             let rate = config.rate_per_pub;
             let payload_size = config.payload_size;
             let stop_flag = stop.clone();
+            let seqs_p = seqs.clone();
+            let idx: usize = i as usize;
             handles.push(tokio::spawn(async move {
                 let mut rc = rate.map(RateController::new);
-                let mut seq = 0u64;
                 let mut is_active = false;
                 loop {
                     if stop_flag.load(Ordering::Relaxed) {
@@ -399,6 +445,7 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                     if let Some(r) = &mut rc {
                         r.wait_for_next().await;
                     }
+                    let seq = seqs_p[idx].fetch_add(1, Ordering::Relaxed);
                     let payload = generate_payload(seq, payload_size);
                     let bytes = Bytes::from(payload);
                     match pub_handle.publish(bytes).await {
@@ -408,7 +455,6 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                                 is_active = true;
                             }
                             stats_p.record_sent().await;
-                            seq = seq.wrapping_add(1);
                         }
                         Err(e) => {
                             warn!(key = %key, error = %e, "[multi_topic] send error");
@@ -425,18 +471,63 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                 let _ = transport.shutdown().await;
             }));
         }
+
+        // Run loop: wait for crash or duration
+        'run: loop {
+            // Check crash condition
+            if crash_injector.is_enabled() && crash_injector.should_crash() {
+                if crash_injector.consume_crash() {
+                    info!("[multi_topic] Crash injection triggered");
+                    stats.record_crash_injected();
+                    break 'run; // Exit to reconnect
+                }
+            }
+
+            // Check duration
+            if start_time.elapsed().as_secs() >= config.duration_secs {
+                break 'reconnect;
+            }
+
+            // Check Ctrl+C
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(100)) => {},
+                _ = tokio::signal::ctrl_c() => {
+                    stop.store(true, Ordering::Relaxed);
+                    break 'reconnect;
+                }
+            }
+        }
+
+        // Crash cleanup: signal all tasks to stop
+        info!("[multi_topic] Stopping {} publisher tasks", handles.len());
+        stop.store(true, Ordering::Relaxed);
+        
+        // Wait for all tasks to exit (with timeout)
+        let _ = tokio::time::timeout(
+            Duration::from_secs(2),
+            join_all(handles)
+        ).await;
+
+        // Exit if duration exceeded
+        if start_time.elapsed().as_secs() >= config.duration_secs {
+            break 'reconnect;
+        }
+
+        // Repair delay
+        let repair_time = crash_injector.sample_repair_time();
+        info!(
+            repair_secs = repair_time.as_secs_f64(),
+            "[multi_topic] Simulating repair delay"
+        );
+        tokio::time::sleep(repair_time).await;
+
+        // Schedule next crash
+        crash_injector.schedule_next_crash_after(repair_time);
+        stats.record_reconnect();
+        info!("[multi_topic] Attempting reconnection after crash");
     }
 
-    // Wait for either duration or Ctrl+C
-    tokio::select! {
-        _ = tokio::time::sleep(Duration::from_secs(config.duration_secs)) => {},
-        _ = tokio::signal::ctrl_c() => {},
-    }
-    stop.store(true, Ordering::Relaxed);
-
-    // Wait for all publisher tasks to exit gracefully
-    let _ = join_all(handles).await;
-
+    // Final cleanup
     if let Some(h) = snapshot_handle {
         h.abort();
     }
@@ -447,6 +538,8 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
         sent = final_stats.sent_count,
         errors = final_stats.error_count,
         total_tps = format!("{:.2}", final_stats.total_throughput()),
+        crashes = final_stats.crashes_injected,
+        reconnects = final_stats.reconnects,
         "[multi_topic] done"
     );
 
@@ -472,6 +565,8 @@ pub struct MultiTopicSubConfig {
     // Aggregation support
     pub shared_stats: Option<Arc<Stats>>, // when set, aggregate externally
     pub disable_internal_snapshot: bool,
+    // Crash injection support
+    pub crash_config: CrashConfig,
 }
 
 use crate::payload::parse_header;
@@ -530,21 +625,42 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
         None
     };
 
-    // Batched stats worker via channel
-    // Increase channel capacity to avoid backpressure on high-throughput scenarios
-    let (tx, rx) = flume::bounded::<(u64, [u8; 24])>(1_000_000);
+    // Batched stats worker via channel.
+    // NOTE: If the channel becomes full, the handler will drop samples; we account
+    // that as an error to avoid silently inflating "loss".
+    let (tx, rx) = flume::bounded::<(u32, u64, [u8; 24])>(1_000_000);
     let stats_worker = stats.clone();
     
     // Spawn multiple stats workers to parallelize histogram recording if needed
     // But histogram is protected by RwLock, so single writer is better.
     // However, we can optimize the batch size and loop.
+    // Per-topic (subscription index) sequence tracking.
+    let subs_usize = subs as usize;
     tokio::spawn(async move {
         let mut buf = Vec::with_capacity(4096);
         let mut lats = Vec::with_capacity(4096);
+        let mut seq_trackers: Vec<SequenceTracker> = (0..subs_usize)
+            .map(|_| SequenceTracker::new())
+            .collect();
+        let mut batch_counter: u64 = 0;
         loop {
             let first = match rx.recv_async().await {
                 Ok(v) => v,
-                Err(_) => break,
+                Err(_) => {
+                    // Channel closed: publish final aggregates.
+                    let mut dup_sum = 0u64;
+                    let mut gap_sum = 0u64;
+                    let mut head_sum = 0u64;
+                    for tr in &seq_trackers {
+                        dup_sum = dup_sum.saturating_add(tr.duplicate_count());
+                        gap_sum = gap_sum.saturating_add(tr.gap_count());
+                        head_sum = head_sum.saturating_add(tr.head_loss());
+                    }
+                    stats_worker.set_duplicates(dup_sum);
+                    stats_worker.set_gaps(gap_sum);
+                    stats_worker.set_head_loss(head_sum);
+                    break;
+                }
             };
             buf.clear();
             buf.push(first);
@@ -556,12 +672,32 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
                 }
             }
             lats.clear();
-            for (recv_ns, hdr) in buf.drain(..) {
+            for (topic_idx, recv_ns, hdr) in buf.drain(..) {
                 if let Ok(h) = parse_header(&hdr) {
+                    if (topic_idx as usize) < seq_trackers.len() {
+                        seq_trackers[topic_idx as usize].record(h.seq);
+                    }
                     lats.push(recv_ns.saturating_sub(h.timestamp_ns));
                 }
             }
             stats_worker.record_received_batch(&lats).await;
+
+            // Publish aggregate duplicate/gap/head-loss across topics frequently.
+            // (Short runs may only process a handful of batches.)
+            batch_counter = batch_counter.wrapping_add(1);
+            if batch_counter % 4 == 0 {
+                let mut dup_sum = 0u64;
+                let mut gap_sum = 0u64;
+                let mut head_sum = 0u64;
+                for tr in &seq_trackers {
+                    dup_sum = dup_sum.saturating_add(tr.duplicate_count());
+                    gap_sum = gap_sum.saturating_add(tr.gap_count());
+                    head_sum = head_sum.saturating_add(tr.head_loss());
+                }
+                stats_worker.set_duplicates(dup_sum);
+                stats_worker.set_gaps(gap_sum);
+                stats_worker.set_head_loss(head_sum);
+            }
         }
     });
 
@@ -597,6 +733,7 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
             let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
             let handler_tx = tx.clone();
             let stats_cb = stats.clone();
+            let topic_idx: u32 = i as u32;
             let first_received = Arc::new(AtomicBool::new(false));
             let first_received_cb = first_received.clone();
             let sub = transport
@@ -608,7 +745,9 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
                         if bytes.len() >= 24 {
                             hdr.copy_from_slice(&bytes[..24]);
                             let recv = now_unix_ns_estimate();
-                            let _ = handler_tx.try_send((recv, hdr));
+                            if handler_tx.try_send((topic_idx, recv, hdr)).is_err() {
+                                stats_cb.error_count.fetch_add(1, Ordering::Relaxed);
+                            }
                             // Track first receive for active connection
                             if !first_received_cb.swap(true, Ordering::Relaxed) {
                                 stats_cb.increment_active_connections();
@@ -653,6 +792,19 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
     }
 
     // Per-subscription transports
+    // Early exit for shared transport mode if crash injection enabled
+    if config.share_transport {
+        if config.crash_config.is_enabled() {
+            warn!(
+                "[multi_topic_sub] Crash injection not supported with share_transport=true. \
+                 Use share_transport=false for crash testing."
+            );
+        }
+        // ... existing shared transport logic continues unchanged ...
+        // (The code above handles shared transport mode without crashes)
+    }
+
+    // Per-topic transport mode with crash injection support
     // Calculate per-connection delay from total ramp-up time
     let ramp_delay_us = if config.ramp_up_secs > 0.0 && subs > 1 {
         ((config.ramp_up_secs * 1_000_000.0) / (subs - 1) as f64) as u64
@@ -662,90 +814,162 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
     info!(
         ramp_up_secs = config.ramp_up_secs,
         delay_per_conn_us = ramp_delay_us,
+        crash_enabled = config.crash_config.is_enabled(),
         "[multi_topic_sub] using per-key transports"
     );
-    // Hold both the subscription and its own transport to keep the client alive
-    let mut clients: Vec<(Box<dyn crate::transport::Subscription>, Box<dyn Transport>, Arc<AtomicBool>)> =
-        Vec::with_capacity(subs as usize);
-    for i in 0..subs {
-        // Apply ramp-up delay between connections (skip first)
-        if i > 0 && ramp_delay_us > 0 {
-            tokio::time::sleep(Duration::from_micros(ramp_delay_us)).await;
+
+    // Crash injection setup
+    let mut crash_injector = CrashInjector::new(config.crash_config.clone());
+    let start_time = std::time::Instant::now();
+
+    'reconnect: loop {
+        // Check duration limit
+        if start_time.elapsed().as_secs() >= config.duration_secs {
+            break;
         }
-        let (t, r, s, k) = map_index(
-            i,
-            config.tenants,
-            config.regions,
-            config.services,
-            config.shards,
-            config.mapping,
-        );
-        let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
-        let handler_tx = tx.clone();
-        let stats_cb = stats.clone();
-        let first_received = Arc::new(AtomicBool::new(false));
-        let first_received_cb = first_received.clone();
-        stats.record_connection_attempt();
-        let transport: Box<dyn Transport> = match TransportBuilder::connect_with_retry(
-            config.engine.clone(),
-            config.connect.clone(),
-        )
-        .await
-        {
-            Ok(t) => t,
-            Err(e) => {
-                warn!(key = %key, error = %e, "Transport connect error");
-                stats.record_connection_failure();
-                continue; // Skip this subscriber but continue with others
+
+        // Hold both the subscription and its own transport to keep the client alive
+        let mut clients: Vec<(Box<dyn crate::transport::Subscription>, Box<dyn Transport>, Arc<AtomicBool>)> =
+            Vec::with_capacity(subs as usize);
+        
+        // Create all subscriptions
+        for i in 0..subs {
+            // Apply ramp-up delay between connections (skip first, reset on reconnect)
+            if i > 0 && ramp_delay_us > 0 {
+                tokio::time::sleep(Duration::from_micros(ramp_delay_us)).await;
             }
-        };
-        let sub = match transport
-            .subscribe(
-                &key,
-                Box::new(move |msg: crate::transport::TransportMessage| {
-                    let mut hdr = [0u8; 24];
-                    let bytes = msg.payload.as_cow();
-                    if bytes.len() >= 24 {
-                        hdr.copy_from_slice(&bytes[..24]);
-                        let recv = now_unix_ns_estimate();
-                        let _ = handler_tx.try_send((recv, hdr));
-                        // Track first receive for active connection
-                        if !first_received_cb.swap(true, Ordering::Relaxed) {
-                            stats_cb.increment_active_connections();
-                        }
-                    }
-                }),
+            let (t, r, s, k) = map_index(
+                i,
+                config.tenants,
+                config.regions,
+                config.services,
+                config.shards,
+                config.mapping,
+            );
+            let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
+            let handler_tx = tx.clone();
+            let stats_cb = stats.clone();
+            let topic_idx: u32 = i as u32;
+            let first_received = Arc::new(AtomicBool::new(false));
+            let first_received_cb = first_received.clone();
+            stats.record_connection_attempt();
+            let transport: Box<dyn Transport> = match TransportBuilder::connect_with_retry(
+                config.engine.clone(),
+                config.connect.clone(),
             )
             .await
-        {
-            Ok(s) => s,
-            Err(e) => {
-                error!(key = %key, error = %e, "Subscribe error");
-                stats.record_connection_failure();
-                continue;
-            }
-        };
-        // Track connection created
-        stats.increment_connections();
-        clients.push((sub, transport, first_received));
-    }
-
-    // Wait for either duration or Ctrl+C
-    tokio::select! {
-        _ = tokio::time::sleep(Duration::from_secs(config.duration_secs)) => {},
-        _ = tokio::signal::ctrl_c() => {},
-    }
-
-    // Clean up subscriptions and transports
-    for (sub, trans, first_received) in &clients {
-        let _ = sub.shutdown().await;
-        let _ = trans.shutdown().await;
-        // Track connection shutdown
-        if first_received.load(Ordering::Relaxed) {
-            stats.decrement_active_connections();
+            {
+                Ok(t) => t,
+                Err(e) => {
+                    warn!(key = %key, error = %e, "Transport connect error");
+                    stats.record_connection_failure();
+                    continue; // Skip this subscriber but continue with others
+                }
+            };
+            let sub = match transport
+                .subscribe(
+                    &key,
+                    Box::new(move |msg: crate::transport::TransportMessage| {
+                        let mut hdr = [0u8; 24];
+                        let bytes = msg.payload.as_cow();
+                        if bytes.len() >= 24 {
+                            hdr.copy_from_slice(&bytes[..24]);
+                            let recv = now_unix_ns_estimate();
+                            if handler_tx.try_send((topic_idx, recv, hdr)).is_err() {
+                                stats_cb.error_count.fetch_add(1, Ordering::Relaxed);
+                            }
+                            // Track first receive for active connection
+                            if !first_received_cb.swap(true, Ordering::Relaxed) {
+                                stats_cb.increment_active_connections();
+                            }
+                        }
+                    }),
+                )
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    error!(key = %key, error = %e, "Subscribe error");
+                    stats.record_connection_failure();
+                    continue;
+                }
+            };
+            // Track connection created
+            stats.increment_connections();
+            clients.push((sub, transport, first_received));
         }
-        stats.decrement_connections();
+
+        // Run loop: wait for crash or duration
+        'run: loop {
+            // Check crash condition
+            if crash_injector.is_enabled() && crash_injector.should_crash() {
+                if crash_injector.consume_crash() {
+                    info!("[multi_topic_sub] Crash injection triggered");
+                    stats.record_crash_injected();
+                    break 'run; // Exit to reconnect
+                }
+            }
+
+            // Check duration
+            if start_time.elapsed().as_secs() >= config.duration_secs {
+                break 'reconnect;
+            }
+
+            // Check Ctrl+C
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(100)) => {},
+                _ = tokio::signal::ctrl_c() => {
+                    break 'reconnect;
+                }
+            }
+        }
+
+        // Crash cleanup: force disconnect all
+        // NOTE: force_disconnect() simulates HARD CRASH (network loss, process kill).
+        // This means:
+        // - No graceful DISCONNECT packet sent to broker
+        // - QoS 1/2 inflight acknowledgments are lost
+        // - rumqttc loses all QoS state (PUBACK, PUBREC, PUBREL, PUBCOMP)
+        //
+        // On reconnect with persistent session (clean_session=false):
+        // - Broker expects to resume QoS handshakes
+        // - But client has no memory of them → "unsolicited ack" errors
+        // - Can cause message loss or connection failures
+        //
+        // This is EXPECTED BEHAVIOR for hard crash simulation.
+        // To avoid this: increase MTTR > session expiry, or use graceful shutdown.
+        info!("[multi_topic_sub] Cleaning up {} subscriptions", clients.len());
+        for (sub, transport, first_received) in &clients {
+            let _ = sub.force_disconnect().await;
+            let _ = transport.force_disconnect().await;
+            // Track connection shutdown
+            if first_received.load(Ordering::Relaxed) {
+                stats.decrement_active_connections();
+            }
+            stats.decrement_connections();
+        }
+        clients.clear();
+
+        // Exit if duration exceeded
+        if start_time.elapsed().as_secs() >= config.duration_secs {
+            break 'reconnect;
+        }
+
+        // Repair delay
+        let repair_time = crash_injector.sample_repair_time();
+        info!(
+            repair_secs = repair_time.as_secs_f64(),
+            "[multi_topic_sub] Simulating repair delay"
+        );
+        tokio::time::sleep(repair_time).await;
+
+        // Schedule next crash
+        crash_injector.schedule_next_crash_after(repair_time);
+        stats.record_reconnect();
+        info!("[multi_topic_sub] Attempting reconnection after crash");
     }
+
+    // Final cleanup
     if let Some(h) = snapshot_handle {
         h.abort();
     }
@@ -757,6 +981,8 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
         errors = s.error_count,
         total_tps = format!("{:.2}", s.total_throughput()),
         p99_ms = format!("{:.2}", s.latency_ns_p99 as f64 / 1_000_000.0),
+        crashes = s.crashes_injected,
+        reconnects = s.reconnects,
         "[multi_topic_sub] done"
     );
 

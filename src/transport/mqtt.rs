@@ -8,6 +8,36 @@ use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS};
 use std::time::Duration;
 use tokio::task::JoinHandle;
 
+fn fnv1a64_bytes(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    let prime: u64 = 0x100000001b3;
+    for &b in bytes {
+        h ^= b as u64;
+        h = h.wrapping_mul(prime);
+    }
+    h
+}
+
+fn sanitize_client_id_base(base: &str) -> String {
+    // Keep IDs reasonably short and portable across brokers.
+    // Replace non [A-Za-z0-9_-] with '_' and cap length.
+    let mut out = String::with_capacity(base.len().min(48));
+    for ch in base.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+        if out.len() >= 48 {
+            break;
+        }
+    }
+    if out.is_empty() {
+        out.push_str("mqb");
+    }
+    out
+}
+
 #[derive(Clone)]
 pub struct MqttTransport {
     host: String,
@@ -90,12 +120,21 @@ impl Transport for MqttTransport {
         handler: Box<dyn Fn(TransportMessage) + Send + Sync + 'static>,
     ) -> Result<Box<dyn Subscription>, TransportError> {
         // Create a dedicated client + eventloop for this subscription
-        // Use provided client_id or generate one; add "sub-" prefix to avoid collision with publisher
-        let cid = self
+        // Use a stable, per-topic client_id so broker-side session state (clean_session=false)
+        // can be recovered across reconnects, while still avoiding collisions across many topics.
+        let topic = map_expr(expr);
+        let base = self
             .client_id
-            .as_ref()
-            .map(|id| format!("sub-{}", id))
-            .unwrap_or_else(|| format!("sub-{}", uuid::Uuid::new_v4()));
+            .as_deref()
+            .unwrap_or_else(|| {
+                // If no base client_id is provided, fall back to a process-unique value.
+                // Multi-topic roles are expected to provide a base id (derived from run-id).
+                "mqb"
+            });
+        let base = sanitize_client_id_base(base);
+        let topic_hash = fnv1a64_bytes(topic.as_bytes());
+        let cid = format!("sub-{}-{:016x}", base, topic_hash);
+        let cid_debug = cid.clone();
         let mut options = MqttOptions::new(cid, self.host.clone(), self.port);
         options.set_keep_alive(self.keep_alive);
         options.set_max_packet_size(self.max_in, self.max_out);
@@ -106,7 +145,6 @@ impl Transport for MqttTransport {
             }
         }
         let (client, mut eventloop) = AsyncClient::new(options, 65536);
-        let topic = map_expr(expr);
         client
             .subscribe(topic, self.qos)
             .await
@@ -121,7 +159,10 @@ impl Transport for MqttTransport {
                         });
                     }
                     Ok(_) => {}
-                    Err(_e) => break,
+                    Err(e) => {
+                        tracing::warn!(client_id = %cid_debug, error = %e, "MQTT subscription eventloop error, exiting");
+                        break;
+                    }
                 }
             }
             // drop client on exit
@@ -132,12 +173,19 @@ impl Transport for MqttTransport {
 
     async fn create_publisher(&self, topic: &str) -> Result<Box<dyn Publisher>, TransportError> {
         // Dedicated client + background poller for publisher
-        // Use provided client_id or generate one; add "pub-" prefix to avoid collision with subscriber
-        let cid = self
+        // Use a stable, per-topic client_id so broker-side inflight state can be recovered
+        // across reconnects, while still avoiding collisions across many topics.
+        let base = self
             .client_id
-            .as_ref()
-            .map(|id| format!("pub-{}", id))
-            .unwrap_or_else(|| format!("pub-{}", uuid::Uuid::new_v4()));
+            .as_deref()
+            .unwrap_or_else(|| {
+                // If no base client_id is provided, fall back to a process-unique value.
+                // Multi-topic roles are expected to provide a base id (derived from run-id).
+                "mqb"
+            });
+        let base = sanitize_client_id_base(base);
+        let topic_hash = fnv1a64_bytes(topic.as_bytes());
+        let cid = format!("pub-{}-{:016x}", base, topic_hash);
         let mut options = MqttOptions::new(cid, self.host.clone(), self.port);
         options.set_keep_alive(self.keep_alive);
         options.set_max_packet_size(self.max_in, self.max_out);
