@@ -66,7 +66,7 @@ DEFAULT_MQTT_BROKERS="${MQTT_BROKERS}"
 declare -a MQTT_BROKERS_ARR=()
 
 # AMQP brokers (name:host:port). Default to local compose ports.
-AMQP_BROKERS="rabbitmq:127.0.0.1:5672 artemis:127.0.0.1:5673"
+AMQP_BROKERS="rabbitmq:127.0.0.1:5672"
 DEFAULT_AMQP_BROKERS="${AMQP_BROKERS}"
 declare -a AMQP_BROKERS_ARR=()
 
