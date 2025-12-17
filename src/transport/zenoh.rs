@@ -161,6 +161,15 @@ impl Transport for ZenohTransport {
     async fn health_check(&self) -> Result<(), TransportError> {
         Ok(())
     }
+
+    async fn force_disconnect(&self) -> Result<(), TransportError> {
+        // Zenoh: Close the session to force disconnect.
+        // This will terminate all publishers and subscribers.
+        self.session
+            .close()
+            .await
+            .map_err(|e| TransportError::Other(e.to_string()))
+    }
 }
 
 struct ZenohResponder {

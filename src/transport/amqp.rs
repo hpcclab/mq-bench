@@ -164,6 +164,12 @@ impl Transport for AmqpTransport {
     async fn health_check(&self) -> Result<(), TransportError> {
         Ok(())
     }
+    async fn force_disconnect(&self) -> Result<(), TransportError> {
+        // AMQP: Transport stores URL; actual connections are created per operation.
+        // This is a no-op since we can't force-close connections we don't hold.
+        // The crash simulation will work by dropping/recreating the transport.
+        Ok(())
+    }
 }
 
 struct AmqpSubscription {

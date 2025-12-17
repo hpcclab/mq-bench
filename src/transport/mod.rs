@@ -170,11 +170,20 @@ pub trait Transport: Send + Sync {
     ) -> Result<Box<dyn QueryRegistration>, TransportError>;
     async fn shutdown(&self) -> Result<(), TransportError>;
     async fn health_check(&self) -> Result<(), TransportError>;
+    /// Force-close the underlying connection to simulate a crash.
+    /// After calling this, all operations should return TransportError::Disconnected.
+    async fn force_disconnect(&self) -> Result<(), TransportError>;
 }
 
 #[async_trait::async_trait]
 pub trait Subscription: Send + Sync {
     async fn shutdown(&self) -> Result<(), TransportError>;
+    /// Force-close the underlying connection without graceful disconnect.
+    /// Used to simulate crashes - no DISCONNECT packet should be sent.
+    async fn force_disconnect(&self) -> Result<(), TransportError> {
+        // Default: same as shutdown (adapters can override for true abrupt close)
+        self.shutdown().await
+    }
 }
 
 #[async_trait::async_trait]
@@ -182,6 +191,12 @@ pub trait Publisher: Send + Sync {
     async fn publish(&self, payload: Bytes) -> Result<(), TransportError>;
     async fn shutdown(&self) -> Result<(), TransportError> {
         Ok(())
+    }
+    /// Force-close the underlying connection without graceful disconnect.
+    /// Used to simulate crashes - no DISCONNECT packet should be sent.
+    async fn force_disconnect(&self) -> Result<(), TransportError> {
+        // Default: same as shutdown (adapters can override for true abrupt close)
+        self.shutdown().await
     }
 }
 

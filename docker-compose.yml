@@ -7,6 +7,7 @@ services:
       - "1883:1883"
     volumes:
       - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
     ulimits:
       nofile:
         soft: 300000
@@ -149,3 +150,6 @@ services:
   #     nofile:
   #       soft: 65535
   #       hard: 65535
+
+volumes:
+  mosquitto_data:
