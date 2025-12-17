@@ -1,6 +1,6 @@
 # Benchmark plots
 
-- Summary: `/home/cc/mq-bench/results/throughput_vs_pairs_20251216_023430/raw_data/summary.csv`
+- Summary: `/home/cc/mq-bench/good/vm48/throughput_vs_pairs_20251216_023430/raw_data/summary.csv`
 
 ## Table of contents
 

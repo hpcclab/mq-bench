@@ -32,17 +32,19 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Defaults
 PAIRS=10                # N pub/sub pairs
-TOTAL_RATE=1000         # msgs/s (system-wide)
+TOTAL_RATE=100         # msgs/s (system-wide)
 DURATION=30             # seconds
-SNAPSHOT=5
+SNAPSHOT=1
 RUN_ID_PREFIX="latency"
 # Include zenoh-mqtt as a distinct label (internally uses zenoh engine)
 TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
 # Default payloads (bytes): 1KB, 2KB, 4KB, 8KB, 16KB, 32KB, 64KB, 128KB, 256KB, 512KB, 1MB
 PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576)
+PAYLOADS=(1024 16384 1048576)  # 1KB, 16KB, 1MB for quicker runs
 # Keep immutable copies for fallback if user passes empty strings to flags
 DEFAULT_TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
-DEFAULT_PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152)
+# DEFAULT_PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152)
+DEFAULT_PAYLOADS=(1024 16384 1048576)  # 1KB, 16KB, 1MB for quicker runs
 START_SERVICES=0
 DRY_RUN=${DRY_RUN:-0}
 HOST="${HOST:-}" 
@@ -53,6 +55,7 @@ WARMUP_SECS=0             # duration for warmup run
 WARMUP_PAYLOAD=1024       # payload size for warmup
 SKIP_SUMMARY=0            # internal flag to skip writing to summary.csv
 RAMP_UP_SECS=5            # ramp-up time for pub/sub connections
+APPEND_LATEST=0           # append to most recent results directory
 IGNORE_START_SECS=5       # seconds to ignore from beginning of data
 IGNORE_END_SECS=5         # seconds to ignore from end of data
 
@@ -123,6 +126,22 @@ PLOTS_DIR=""
 SUMMARY_CSV=""
 
 init_dirs() {
+  # Handle --append-latest: find and use most recent results directory
+  if [[ ${APPEND_LATEST} -eq 1 ]] && [[ -z "${SUMMARY_OVERRIDE}" ]] && [[ -z "${BENCH_DIR}" ]]; then
+    local latest_dir
+    latest_dir=$(ls -1d "${REPO_ROOT}/results/latency_vs_payload_"* 2>/dev/null | sort -r | head -1 || true)
+    if [[ -n "${latest_dir}" ]] && [[ -d "${latest_dir}" ]]; then
+      BENCH_DIR="${latest_dir}"
+      RAW_DIR="${BENCH_DIR}/raw_data"
+      PLOTS_DIR="${BENCH_DIR}/plots"
+      # Extract timestamp from directory name
+      TS="${latest_dir##*latency_vs_payload_}"
+      log "Appending to existing run: ${BENCH_DIR}"
+    else
+      log "WARN: --append-latest specified but no existing latency_vs_payload_* directory found. Creating new."
+    fi
+  fi
+
   # Use existing TS if set, else generate
   if [[ -z "${TS}" ]]; then TS="$(timestamp)"; fi
   # Default bench dir if none provided via overrides
@@ -252,6 +271,8 @@ while [[ $# -gt 0 ]]; do
       shift; SSH_TARGET=${1:-} ;;
     --remote-dir)
       shift; REMOTE_DIR=${1:-} ;;
+    --append-latest)
+      APPEND_LATEST=1 ;;
     -h|--help)
       usage; exit 0 ;;
     *)

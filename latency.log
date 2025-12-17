@@ -1,50 +1,119 @@
 nohup: ignoring input
-[23:24:59] Inferred HOST=192.168.0.245 from SSH_TARGET
-[23:24:59] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/latency_vs_payload_20251216_232459/raw_data/summary.csv | PLOTS_DIR=/home/cc/mq-bench/results/latency_vs_payload_20251216_232459/plots | RAW_DIR=/home/cc/mq-bench/results/latency_vs_payload_20251216_232459/raw_data
-[23:24:59] Resolved payloads (bytes): 1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576
-[23:24:59] Latency vs payload benchmark → /home/cc/mq-bench/results/latency_vs_payload_20251216_232459
-[23:24:59] Starting services: router1
-[23:24:59] Cleaning up orphan mq-bench processes...
-[23:25:00] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
- Container mosquitto Stopping 
- Container mosquitto Stopped 
- Container mosquitto Removing 
- Container mosquitto Removed 
- Network ubuntu_default Removing 
- Network ubuntu_default Removed 
-[23:25:02] Waiting 10s for connections to settle...
-[23:25:12] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose up -d router1
+[05:28:27] Appending to existing run: /home/cc/mq-bench/results/latency_vs_payload_20251217_045551
+[05:28:27] Inferred HOST=192.168.0.245 from SSH_TARGET
+[05:28:27] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/latency_vs_payload_20251217_045551/raw_data/summary.csv | PLOTS_DIR=/home/cc/mq-bench/results/latency_vs_payload_20251217_045551/plots | RAW_DIR=/home/cc/mq-bench/results/latency_vs_payload_20251217_045551/raw_data
+[05:28:27] Resolved payloads (bytes): 1024 16384 1048576
+[05:28:27] Latency vs payload benchmark → /home/cc/mq-bench/results/latency_vs_payload_20251217_045551
+[05:28:27] Starting services: router1
+[05:28:27] Cleaning up orphan mq-bench processes...
+[05:28:28] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
+[05:28:29] Waiting 10s for connections to settle...
+[05:28:39] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose up -d router1
+ Image eclipse/zenoh-bridge-mqtt:1.7.0 Pulling 
+ e4428501060a  
+ 5f5c4ac5e315  
+ a812e9c38037  
+ 4b3e7f4a1f58  
+ fa1cb37a2e98  
+ a7f620bf257f  
+ 014e56e61396  
+ eaab9596631c  
+ 014e56e61396 [==================================================>]  3.859MB/3.859MB 
+ 4b3e7f4a1f58  
+ fa1cb37a2e98  
+ eaab9596631c  
+ 5f5c4ac5e315 [===========>                                       ]  2.097MB/9.196MB 
+ a7f620bf257f  
+ a812e9c38037  
+ 014e56e61396  
+ e4428501060a  
+ bf8ace7f3025  
+ 5f5c4ac5e315 [=============================================>     ]  8.389MB/9.196MB 
+ 014e56e61396 1 s 
+ 5f5c4ac5e315  
+ 014e56e61396 1 s 
+ 014e56e61396  
+ e4428501060a  
+ 5f5c4ac5e315 1 s 
+ 5f5c4ac5e315 1 s 
+ fa1cb37a2e98  
+ eaab9596631c  
+ a7f620bf257f 1 s 
+ a812e9c38037  
+ 5f5c4ac5e315  
+ 4b3e7f4a1f58  
+ a7f620bf257f  
+ Image eclipse/zenoh-bridge-mqtt:1.7.0 Pulled 
  Network ubuntu_default Creating 
  Network ubuntu_default Created 
  Container router1 Creating 
  Container router1 Created 
  Container router1 Starting 
  Container router1 Started 
-[23:25:18] Waiting for 192.168.0.245:7447...
-[23:25:18] Port 192.168.0.245:7447 is open.
-[23:25:18] Run: transport=zenoh payload=1024B pairs=10 total_rate=1000/s
-[23:25:18] Starting remote stats collector on 192.168.0.245...
-[run_multi_topic_perkey] latency_20251216_232518_zenoh_p1024_n10_r100 (ENGINE=zenoh)
+[05:28:47] Waiting for 192.168.0.245:7447...
+[05:28:47] Port 192.168.0.245:7447 is open.
+[05:28:47] Run: transport=zenoh payload=1024B pairs=10 total_rate=100/s
+[05:28:47] Starting remote stats collector on 192.168.0.245...
+[run_multi_topic_perkey] latency_20251217_052847_zenoh_p1024_n10_r10 (ENGINE=zenoh)
 Dims: T=10 R=1 S=1 K=1 | subs=10 pubs=10 mapping=mdim
-Load: payload=1024 rate_per_pub=100 dur=60s snapshot=5s share_transport=false
+Load: payload=1024 rate_per_pub=10 dur=120s snapshot=1s share_transport=false
 Paths: sub=tcp/192.168.0.245:7447 pub=tcp/192.168.0.245:7447 prefix=bench/pair mode=client
 Starting per-key subscribers
-[cmd] ./target/release/mq-bench --snapshot-interval 5 mt-sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix bench/pair --tenants 10 --regions 1 --services 1 --shards 1 --subscribers 10 --mapping mdim --duration 60 --ramp-up-secs 5 --csv artifacts/latency_20251216_232518_zenoh_p1024_n10_r100/fanout_multi_topic_perkey/sub_agg.csv 
-       1>artifacts/latency_20251216_232518_zenoh_p1024_n10_r100/fanout_multi_topic_perkey/mt_sub.log 2>&1 &
+[cmd] ./target/release/mq-bench --snapshot-interval 1 mt-sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix bench/pair --tenants 10 --regions 1 --services 1 --shards 1 --subscribers 10 --mapping mdim --duration 120 --ramp-up-secs 5 --csv artifacts/latency_20251217_052847_zenoh_p1024_n10_r10/fanout_multi_topic_perkey/sub_agg.csv 
+       1>artifacts/latency_20251217_052847_zenoh_p1024_n10_r10/fanout_multi_topic_perkey/mt_sub.log 2>&1 &
 Waiting 5s for subscribers to stabilize...
 Starting multi-topic publishers
-[cmd] ./target/release/mq-bench --snapshot-interval 5 mt-pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix bench/pair --tenants 10 --regions 1 --services 1 --shards 1 --publishers 10 --mapping mdim --payload 1024 --rate 100 --ramp-up-secs 5 --duration 60 --csv artifacts/latency_20251216_232518_zenoh_p1024_n10_r100/fanout_multi_topic_perkey/mt_pub.csv 
-       1>artifacts/latency_20251216_232518_zenoh_p1024_n10_r100/fanout_multi_topic_perkey/mt_pub.log 2>&1 &
-[watch] printing status every 5s...
-[watch] printing status every 5s...
-[status] PUB sent=- itps=- tps=- conn=-/- | SUB recv=0 itps=0.00 p99=0.00ms conn=0,1,0/0
-[status] PUB sent=2499 itps=499.89 tps=500.06 conn=9,9,0/9 | SUB recv=2496 itps=499.15 p99=0.53ms conn=9,10,0/10
-[status] PUB sent=7497 itps=999.57 tps=749.89 conn=10,10,0/10 | SUB recv=7495 itps=999.72 p99=0.51ms conn=10,10,0/10
-[status] PUB sent=12497 itps=999.94 tps=833.25 conn=10,10,0/10 | SUB recv=12495 itps=999.99 p99=0.52ms conn=10,10,0/10
-[status] PUB sent=17497 itps=999.94 tps=874.93 conn=10,10,0/10 | SUB recv=17494 itps=999.95 p99=0.52ms conn=10,10,0/10
-[status] PUB sent=22497 itps=1000.09 tps=899.96 conn=10,10,0/10 | SUB recv=22495 itps=1000.18 p99=0.52ms conn=10,10,0/10
-[status] PUB sent=27497 itps=1000.04 tps=916.64 conn=10,10,0/10 | SUB recv=27494 itps=999.74 p99=0.52ms conn=10,10,0/10
-[status] PUB sent=32496 itps=999.83 tps=928.53 conn=10,10,0/10 | SUB recv=32495 itps=1000.13 p99=0.52ms conn=10,10,0/10
-[status] PUB sent=37497 itps=1000.09 tps=937.47 conn=10,10,0/10 | SUB recv=37494 itps=999.98 p99=0.52ms conn=10,10,0/10
-[status] PUB sent=42497 itps=999.99 tps=944.42 conn=10,10,0/10 | SUB recv=42495 itps=1000.05 p99=0.52ms conn=10,10,0/10
-[status] PUB sent=47497 itps=999.93 tps=949.97 conn=10,10,0/10 | SUB recv=47494 itps=999.88 p99=0.52ms conn=10,10,0/10
+[cmd] ./target/release/mq-bench --snapshot-interval 1 mt-pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix bench/pair --tenants 10 --regions 1 --services 1 --shards 1 --publishers 10 --mapping mdim --payload 1024 --rate 10 --ramp-up-secs 5 --duration 120 --csv artifacts/latency_20251217_052847_zenoh_p1024_n10_r10/fanout_multi_topic_perkey/mt_pub.csv 
+       1>artifacts/latency_20251217_052847_zenoh_p1024_n10_r10/fanout_multi_topic_perkey/mt_pub.log 2>&1 &
+[watch] printing status every 1s...
+[watch] printing status every 1s...
+[status] PUB sent=- itps=- tps=- conn=-/- | SUB recv=0 itps=0.00 p99=0.00ms conn=0,8,0/8
+[status] PUB sent=17 itps=17.01 tps=17.03 conn=2,2,0/2 | SUB recv=17 itps=17.00 p99=0.61ms conn=2,10,0/10
+[status] PUB sent=52 itps=35.01 tps=26.03 conn=4,4,0/4 | SUB recv=52 itps=35.01 p99=0.63ms conn=4,10,0/10
+[status] PUB sent=105 itps=52.99 tps=35.02 conn=6,6,0/6 | SUB recv=104 itps=51.99 p99=0.61ms conn=6,10,0/10
+[status] PUB sent=175 itps=69.97 tps=43.77 conn=8,8,0/8 | SUB recv=174 itps=69.96 p99=0.61ms conn=8,10,0/10
+[status] PUB sent=262 itps=87.01 tps=52.42 conn=9,9,0/9 | SUB recv=261 itps=87.01 p99=0.61ms conn=9,10,0/10
+[status] PUB sent=363 itps=100.99 tps=60.52 conn=10,10,0/10 | SUB recv=362 itps=100.99 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=463 itps=99.98 tps=66.16 conn=10,10,0/10 | SUB recv=462 itps=99.98 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=563 itps=100.08 tps=70.39 conn=10,10,0/10 | SUB recv=562 itps=99.99 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=663 itps=100.00 tps=73.69 conn=10,10,0/10 | SUB recv=662 itps=100.09 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=763 itps=99.98 tps=76.32 conn=10,10,0/10 | SUB recv=762 itps=99.95 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=863 itps=99.99 tps=78.47 conn=10,10,0/10 | SUB recv=862 itps=100.03 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=963 itps=99.99 tps=80.26 conn=10,10,0/10 | SUB recv=962 itps=99.99 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1063 itps=99.97 tps=81.78 conn=10,10,0/10 | SUB recv=1062 itps=99.98 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1163 itps=100.00 tps=83.08 conn=10,10,0/10 | SUB recv=1162 itps=99.99 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1263 itps=99.99 tps=84.21 conn=10,10,0/10 | SUB recv=1262 itps=99.99 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1363 itps=100.09 tps=85.20 conn=10,10,0/10 | SUB recv=1362 itps=99.99 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1463 itps=99.99 tps=86.07 conn=10,10,0/10 | SUB recv=1462 itps=100.08 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1563 itps=99.98 tps=86.84 conn=10,10,0/10 | SUB recv=1562 itps=100.00 p99=0.59ms conn=10,10,0/10
+[status] PUB sent=1663 itps=100.01 tps=87.54 conn=10,10,0/10 | SUB recv=1662 itps=99.99 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1763 itps=100.00 tps=88.16 conn=10,10,0/10 | SUB recv=1762 itps=100.01 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=1863 itps=99.98 tps=88.72 conn=10,10,0/10 | SUB recv=1862 itps=99.99 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=1963 itps=100.00 tps=89.23 conn=10,10,0/10 | SUB recv=1962 itps=99.99 p99=0.60ms conn=10,10,0/10
+[status] PUB sent=2063 itps=99.99 tps=89.70 conn=10,10,0/10 | SUB recv=2062 itps=99.99 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=2163 itps=99.98 tps=90.13 conn=10,10,0/10 | SUB recv=2162 itps=99.99 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=2263 itps=100.00 tps=90.53 conn=10,10,0/10 | SUB recv=2262 itps=100.00 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=2363 itps=100.01 tps=90.89 conn=10,10,0/10 | SUB recv=2362 itps=100.01 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=2463 itps=100.01 tps=91.23 conn=10,10,0/10 | SUB recv=2462 itps=100.00 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=2563 itps=100.02 tps=91.54 conn=10,10,0/10 | SUB recv=2562 itps=100.03 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=2663 itps=99.98 tps=91.83 conn=10,10,0/10 | SUB recv=2662 itps=99.99 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=2763 itps=100.01 tps=92.11 conn=10,10,0/10 | SUB recv=2762 itps=100.00 p99=0.61ms conn=10,10,0/10
+[status] PUB sent=2863 itps=100.00 tps=92.36 conn=10,10,0/10 | SUB recv=2862 itps=99.99 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=2963 itps=100.02 tps=92.60 conn=10,10,0/10 | SUB recv=2962 itps=100.03 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3063 itps=99.92 tps=92.82 conn=10,10,0/10 | SUB recv=3062 itps=99.91 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3163 itps=100.08 tps=93.04 conn=10,10,0/10 | SUB recv=3162 itps=100.09 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3263 itps=99.99 tps=93.23 conn=10,10,0/10 | SUB recv=3262 itps=99.98 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3363 itps=99.99 tps=93.42 conn=10,10,0/10 | SUB recv=3362 itps=100.00 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3463 itps=99.97 tps=93.60 conn=10,10,0/10 | SUB recv=3462 itps=99.98 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3563 itps=100.00 tps=93.77 conn=10,10,0/10 | SUB recv=3562 itps=99.99 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3663 itps=99.98 tps=93.93 conn=10,10,0/10 | SUB recv=3662 itps=99.98 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3763 itps=100.07 tps=94.08 conn=10,10,0/10 | SUB recv=3762 itps=100.07 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3863 itps=100.00 tps=94.22 conn=10,10,0/10 | SUB recv=3862 itps=99.99 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=3963 itps=99.97 tps=94.36 conn=10,10,0/10 | SUB recv=3962 itps=99.98 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=4063 itps=99.99 tps=94.49 conn=10,10,0/10 | SUB recv=4062 itps=99.98 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=4163 itps=99.99 tps=94.62 conn=10,10,0/10 | SUB recv=4162 itps=100.00 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=4263 itps=100.05 tps=94.74 conn=10,10,0/10 | SUB recv=4262 itps=99.96 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=4363 itps=99.97 tps=94.85 conn=10,10,0/10 | SUB recv=4362 itps=99.98 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=4463 itps=99.96 tps=94.96 conn=10,10,0/10 | SUB recv=4462 itps=100.07 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=4563 itps=100.06 tps=95.07 conn=10,10,0/10 | SUB recv=4562 itps=100.04 p99=0.63ms conn=10,10,0/10
+[status] PUB sent=4663 itps=99.98 tps=95.17 conn=10,10,0/10 | SUB recv=4662 itps=99.97 p99=0.63ms conn=10,10,0/10
