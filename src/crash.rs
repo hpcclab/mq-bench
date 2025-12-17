@@ -128,6 +128,21 @@ impl CrashInjector {
         self.sample_exponential(self.config.mttr_secs)
     }
 
+    /// Apply a deterministic phase offset to the crash timeline.
+    ///
+    /// This is useful for multi-topic tests where each topic/connection should have an
+    /// independent crash schedule that is also intentionally de-synchronized.
+    pub fn apply_phase_offset(&mut self, offset: Duration) {
+        if !self.config.is_enabled() {
+            return;
+        }
+        if offset.is_zero() {
+            return;
+        }
+        self.timeline_offset += offset;
+        self.next_crash_at = self.base_time + self.timeline_offset;
+    }
+
     /// Schedule the next crash time based on MTTF.
     pub fn schedule_next_crash(&mut self) {
         self.schedule_next_crash_after(Duration::ZERO);
@@ -216,6 +231,22 @@ mod tests {
         assert!(injector.consume_crash()); // 2 -> 1
         assert!(injector.consume_crash()); // 1 -> 0
         assert!(!injector.consume_crash()); // 0 -> underflow, returns false
+    }
+
+    #[test]
+    fn test_phase_offset_increases_time_until_crash() {
+        let config = CrashConfig {
+            mttf_secs: 10.0,
+            mttr_secs: 1.0,
+            crash_count: 1,
+            seed: Some(42),
+        };
+
+        let mut injector = CrashInjector::new(config);
+        let before = injector.time_until_crash();
+        injector.apply_phase_offset(Duration::from_secs(1));
+        let after = injector.time_until_crash();
+        assert!(after > before);
     }
 
     #[test]

@@ -45,6 +45,12 @@ pub struct MultiTopicConfig {
     pub disable_internal_snapshot: bool,
     // Crash injection support
     pub crash_config: CrashConfig,
+    /// If true, crash/reconnect each topic independently (per-transport) instead of
+    /// crashing the whole multi-topic role at once.
+    pub crash_per_topic: bool,
+    /// Optional deterministic phase staggering (seconds) applied per topic index.
+    /// Effective only when `crash_per_topic=true`.
+    pub crash_stagger_secs: f64,
 }
 
 fn fnv1a64(mut x: u64) -> u64 {
@@ -58,6 +64,10 @@ fn fnv1a64(mut x: u64) -> u64 {
         x >>= 8;
     }
     h
+}
+
+fn derive_topic_seed(base_seed: u64, topic_idx: u64) -> u64 {
+    base_seed ^ fnv1a64(topic_idx.wrapping_add(0x9e3779b97f4a7c15))
 }
 
 fn map_index(i: u64, t: u32, r: u32, s: u32, k: u32, mode: KeyMappingMode) -> (u32, u32, u32, u32) {
@@ -368,8 +378,18 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
         "[multi_topic] using per-key transports"
     );
 
-    // Crash injection setup
-    let mut crash_injector = CrashInjector::new(config.crash_config.clone());
+    // Derive a stable base seed for per-topic crash injectors.
+    let crash_seed_base: Option<u64> = if config.crash_config.is_enabled() {
+        Some(config.crash_config.seed.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(12345)
+        }))
+    } else {
+        None
+    };
+
     let start_time = std::time::Instant::now();
 
     // Per-topic sequence numbers persist across crash cycles to make
@@ -379,6 +399,176 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
         seq_vec.push(std::sync::atomic::AtomicU64::new(0));
     }
     let seqs = Arc::new(seq_vec);
+
+    // Per-topic crash/reconnect (independent schedules).
+    if config.crash_config.is_enabled() && config.crash_per_topic {
+        info!(
+            stagger_secs = config.crash_stagger_secs,
+            "[multi_topic] crash scope: per-topic"
+        );
+
+        let stop = Arc::new(AtomicBool::new(false));
+        let mut handles = Vec::with_capacity(pubs as usize);
+        for i in 0..pubs {
+            if i > 0 && ramp_delay_us > 0 {
+                tokio::time::sleep(Duration::from_micros(ramp_delay_us)).await;
+            }
+            let (t, r, s, k) = map_index(
+                i,
+                config.tenants,
+                config.regions,
+                config.services,
+                config.shards,
+                config.mapping,
+            );
+            let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
+            let engine = config.engine.clone();
+            let connect = config.connect.clone();
+            let stats_p = stats.clone();
+            let rate = config.rate_per_pub;
+            let payload_size = config.payload_size;
+            let stop_flag = stop.clone();
+            let start = start_time;
+            let duration_secs = config.duration_secs;
+            let idx: usize = i as usize;
+            let seqs_p = seqs.clone();
+            let mut crash_cfg = config.crash_config.clone();
+            if let Some(base) = crash_seed_base {
+                crash_cfg.seed = Some(derive_topic_seed(base, i));
+            }
+            let stagger_secs = config.crash_stagger_secs;
+
+            handles.push(tokio::spawn(async move {
+                let mut rc = rate.map(RateController::new);
+                let mut is_active = false;
+                let mut crash_injector = CrashInjector::new(crash_cfg);
+                if stagger_secs > 0.0 {
+                    crash_injector.apply_phase_offset(Duration::from_secs_f64(stagger_secs * (i as f64)));
+                }
+
+                // Connect loop
+                let mut transport: Option<Box<dyn Transport>> = None;
+                let mut pub_handle: Option<Box<dyn crate::transport::Publisher>> = None;
+
+                while !stop_flag.load(Ordering::Relaxed) && start.elapsed().as_secs() < duration_secs {
+                    // Ensure connected
+                    if transport.is_none() || pub_handle.is_none() {
+                        stats_p.record_connection_attempt();
+                        match TransportBuilder::connect_with_retry(engine.clone(), connect.clone()).await {
+                            Ok(t) => {
+                                match t.create_publisher(&key).await {
+                                    Ok(p) => {
+                                        stats_p.increment_connections();
+                                        transport = Some(t);
+                                        pub_handle = Some(p);
+                                        is_active = false;
+                                    }
+                                    Err(e) => {
+                                        warn!(key = %key, error = %e, "Create publisher error");
+                                        stats_p.record_connection_failure();
+                                        let _ = t.shutdown().await;
+                                        tokio::time::sleep(Duration::from_millis(250)).await;
+                                        continue;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!(key = %key, error = %e, "Transport connect error");
+                                stats_p.record_connection_failure();
+                                tokio::time::sleep(Duration::from_millis(250)).await;
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Crash check
+                    if crash_injector.is_enabled() && crash_injector.should_crash() {
+                        if crash_injector.consume_crash() {
+                            info!(key = %key, "[multi_topic] Topic crash injected");
+                            stats_p.record_crash_injected();
+
+                            if let Some(ph) = pub_handle.take() {
+                                let _ = ph.force_disconnect().await;
+                                if is_active {
+                                    stats_p.decrement_active_connections();
+                                }
+                                stats_p.decrement_connections();
+                            }
+                            if let Some(t) = transport.take() {
+                                let _ = t.force_disconnect().await;
+                            }
+
+                            let repair_time = crash_injector.sample_repair_time();
+                            tokio::time::sleep(repair_time).await;
+                            crash_injector.schedule_next_crash_after(repair_time);
+                            stats_p.record_reconnect();
+                            continue;
+                        }
+                    }
+
+                    // Publish
+                    if let Some(r) = &mut rc {
+                        r.wait_for_next().await;
+                    }
+                    let seq = seqs_p[idx].fetch_add(1, Ordering::Relaxed);
+                    let payload = generate_payload(seq, payload_size);
+                    let bytes = Bytes::from(payload);
+
+                    if let Some(ph) = pub_handle.as_ref() {
+                        match ph.publish(bytes).await {
+                            Ok(_) => {
+                                if !is_active {
+                                    stats_p.increment_active_connections();
+                                    is_active = true;
+                                }
+                                stats_p.record_sent().await;
+                            }
+                            Err(e) => {
+                                warn!(key = %key, error = %e, "[multi_topic] send error");
+                                stats_p.record_error().await;
+                            }
+                        }
+                    }
+                }
+
+                // Cleanup
+                if let Some(ph) = pub_handle.take() {
+                    let _ = ph.shutdown().await;
+                    if is_active {
+                        stats_p.decrement_active_connections();
+                    }
+                    stats_p.decrement_connections();
+                }
+                if let Some(t) = transport.take() {
+                    let _ = t.shutdown().await;
+                }
+            }));
+        }
+
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(config.duration_secs)) => {},
+            _ = tokio::signal::ctrl_c() => {},
+        }
+        stop.store(true, Ordering::Relaxed);
+        let _ = join_all(handles).await;
+
+        if let Some(h) = snapshot_handle {
+            h.abort();
+        }
+        let final_stats = stats.snapshot().await;
+        info!(
+            sent = final_stats.sent_count,
+            errors = final_stats.error_count,
+            total_tps = format!("{:.2}", final_stats.total_throughput()),
+            crashes = final_stats.crashes_injected,
+            reconnects = final_stats.reconnects,
+            "[multi_topic] done"
+        );
+        return Ok(());
+    }
+
+    // Crash injection setup (process-wide crash/reconnect)
+    let mut crash_injector = CrashInjector::new(config.crash_config.clone());
 
     'reconnect: loop {
         // Check duration limit
@@ -567,6 +757,12 @@ pub struct MultiTopicSubConfig {
     pub disable_internal_snapshot: bool,
     // Crash injection support
     pub crash_config: CrashConfig,
+    /// If true, crash/reconnect each topic independently (per-transport) instead of
+    /// crashing the whole multi-topic role at once.
+    pub crash_per_topic: bool,
+    /// Optional deterministic phase staggering (seconds) applied per topic index.
+    /// Effective only when `crash_per_topic=true`.
+    pub crash_stagger_secs: f64,
 }
 
 use crate::payload::parse_header;
@@ -818,9 +1014,190 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
         "[multi_topic_sub] using per-key transports"
     );
 
-    // Crash injection setup
-    let mut crash_injector = CrashInjector::new(config.crash_config.clone());
+    // Derive a stable base seed for per-topic crash injectors.
+    let crash_seed_base: Option<u64> = if config.crash_config.is_enabled() {
+        Some(config.crash_config.seed.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(12345)
+        }))
+    } else {
+        None
+    };
+
     let start_time = std::time::Instant::now();
+
+    // Per-topic crash/reconnect (independent schedules).
+    if config.crash_config.is_enabled() && config.crash_per_topic {
+        info!(
+            stagger_secs = config.crash_stagger_secs,
+            "[multi_topic_sub] crash scope: per-topic"
+        );
+
+        // Spawn one task per subscription; each task owns its transport + subscription.
+        let stop = Arc::new(AtomicBool::new(false));
+        let mut handles = Vec::with_capacity(subs as usize);
+
+        for i in 0..subs {
+            if i > 0 && ramp_delay_us > 0 {
+                tokio::time::sleep(Duration::from_micros(ramp_delay_us)).await;
+            }
+            let (t, r, s, k) = map_index(
+                i,
+                config.tenants,
+                config.regions,
+                config.services,
+                config.shards,
+                config.mapping,
+            );
+            let key = format!("{}/t{}/r{}/svc{}/k{}", config.topic_prefix, t, r, s, k);
+
+            let engine = config.engine.clone();
+            let connect = config.connect.clone();
+            let handler_tx = tx.clone();
+            let stats_cb = stats.clone();
+            let stop_flag = stop.clone();
+            let start = start_time;
+            let duration_secs = config.duration_secs;
+            let topic_idx: u32 = i as u32;
+            let first_received = Arc::new(AtomicBool::new(false));
+            let first_received_cb = first_received.clone();
+
+            let mut crash_cfg = config.crash_config.clone();
+            if let Some(base) = crash_seed_base {
+                crash_cfg.seed = Some(derive_topic_seed(base, i));
+            }
+            let stagger_secs = config.crash_stagger_secs;
+
+            handles.push(tokio::spawn(async move {
+                let mut crash_injector = CrashInjector::new(crash_cfg);
+                if stagger_secs > 0.0 {
+                    crash_injector.apply_phase_offset(Duration::from_secs_f64(stagger_secs * (i as f64)));
+                }
+
+                let mut transport: Option<Box<dyn Transport>> = None;
+                let mut sub: Option<Box<dyn crate::transport::Subscription>> = None;
+
+                while !stop_flag.load(Ordering::Relaxed) && start.elapsed().as_secs() < duration_secs {
+                    // Ensure connected + subscribed
+                    if transport.is_none() || sub.is_none() {
+                        stats_cb.record_connection_attempt();
+                        match TransportBuilder::connect_with_retry(engine.clone(), connect.clone()).await {
+                            Ok(t) => {
+                                let handler_tx2 = handler_tx.clone();
+                                let stats_cb2 = stats_cb.clone();
+                                let first_received_cb2 = first_received_cb.clone();
+                                match t
+                                    .subscribe(
+                                        &key,
+                                        Box::new(move |msg: crate::transport::TransportMessage| {
+                                            let mut hdr = [0u8; 24];
+                                            let bytes = msg.payload.as_cow();
+                                            if bytes.len() >= 24 {
+                                                hdr.copy_from_slice(&bytes[..24]);
+                                                let recv = now_unix_ns_estimate();
+                                                if handler_tx2.try_send((topic_idx, recv, hdr)).is_err() {
+                                                    stats_cb2.error_count.fetch_add(1, Ordering::Relaxed);
+                                                }
+                                                if !first_received_cb2.swap(true, Ordering::Relaxed) {
+                                                    stats_cb2.increment_active_connections();
+                                                }
+                                            }
+                                        }),
+                                    )
+                                    .await
+                                {
+                                    Ok(s) => {
+                                        stats_cb.increment_connections();
+                                        transport = Some(t);
+                                        sub = Some(s);
+                                    }
+                                    Err(e) => {
+                                        warn!(key = %key, error = %e, "Subscribe error");
+                                        stats_cb.record_connection_failure();
+                                        let _ = t.shutdown().await;
+                                        tokio::time::sleep(Duration::from_millis(250)).await;
+                                        continue;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!(key = %key, error = %e, "Transport connect error");
+                                stats_cb.record_connection_failure();
+                                tokio::time::sleep(Duration::from_millis(250)).await;
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Crash check
+                    if crash_injector.is_enabled() && crash_injector.should_crash() {
+                        if crash_injector.consume_crash() {
+                            info!(key = %key, "[multi_topic_sub] Topic crash injected");
+                            stats_cb.record_crash_injected();
+
+                            if let Some(s) = sub.take() {
+                                let _ = s.force_disconnect().await;
+                                if first_received.load(Ordering::Relaxed) {
+                                    stats_cb.decrement_active_connections();
+                                }
+                                stats_cb.decrement_connections();
+                            }
+                            if let Some(t) = transport.take() {
+                                let _ = t.force_disconnect().await;
+                            }
+
+                            let repair_time = crash_injector.sample_repair_time();
+                            tokio::time::sleep(repair_time).await;
+                            crash_injector.schedule_next_crash_after(repair_time);
+                            stats_cb.record_reconnect();
+                            continue;
+                        }
+                    }
+
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+
+                // Cleanup
+                if let Some(s) = sub.take() {
+                    let _ = s.shutdown().await;
+                    if first_received.load(Ordering::Relaxed) {
+                        stats_cb.decrement_active_connections();
+                    }
+                    stats_cb.decrement_connections();
+                }
+                if let Some(t) = transport.take() {
+                    let _ = t.shutdown().await;
+                }
+            }));
+        }
+
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_secs(config.duration_secs)) => {},
+            _ = tokio::signal::ctrl_c() => {},
+        }
+        stop.store(true, Ordering::Relaxed);
+        let _ = join_all(handles).await;
+
+        if let Some(h) = snapshot_handle {
+            h.abort();
+        }
+        let s = stats.snapshot().await;
+        info!(
+            recv = s.received_count,
+            errors = s.error_count,
+            total_tps = format!("{:.2}", s.total_throughput()),
+            p99_ms = format!("{:.2}", s.latency_ns_p99 as f64 / 1_000_000.0),
+            crashes = s.crashes_injected,
+            reconnects = s.reconnects,
+            "[multi_topic_sub] done"
+        );
+        return Ok(());
+    }
+
+    // Crash injection setup (process-wide crash/reconnect)
+    let mut crash_injector = CrashInjector::new(config.crash_config.clone());
 
     'reconnect: loop {
         // Check duration limit

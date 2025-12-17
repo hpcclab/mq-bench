@@ -208,6 +208,14 @@ enum Commands {
         /// RNG seed for reproducible crash patterns
         #[arg(long)]
         crash_seed: Option<u64>,
+
+        /// Crash/reconnect topics independently (per-topic schedule) instead of crashing all topics at once
+        #[arg(long, default_value = "false")]
+        crash_per_topic: bool,
+
+        /// Deterministic phase staggering (seconds) applied per topic index (requires --crash-per-topic)
+        #[arg(long, default_value = "0")]
+        crash_stagger_secs: f64,
     },
     /// Multi-topic subscriber: spawn many per-key subscriptions
     #[command(name = "mt-sub")]
@@ -289,6 +297,14 @@ enum Commands {
         /// RNG seed for reproducible crash patterns
         #[arg(long)]
         crash_seed: Option<u64>,
+
+        /// Crash/reconnect topics independently (per-topic schedule) instead of crashing all topics at once
+        #[arg(long, default_value = "false")]
+        crash_per_topic: bool,
+
+        /// Deterministic phase staggering (seconds) applied per topic index (requires --crash-per-topic)
+        #[arg(long, default_value = "0")]
+        crash_stagger_secs: f64,
     },
     /// Subscriber role
     Sub {
@@ -657,6 +673,8 @@ async fn main() -> Result<()> {
             mttr,
             crash_count,
             crash_seed,
+            crash_per_topic,
+            crash_stagger_secs,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
@@ -730,6 +748,8 @@ async fn main() -> Result<()> {
                 shared_stats: shared_stats.clone(),
                 disable_internal_snapshot: true,
                 crash_config: crash_cfg,
+                crash_per_topic,
+                crash_stagger_secs,
             };
             run_multi_topic(cfg).await?;
             if let Some(stats) = shared_stats {
@@ -765,6 +785,8 @@ async fn main() -> Result<()> {
             mttr,
             crash_count,
             crash_seed,
+            crash_per_topic,
+            crash_stagger_secs,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
@@ -833,6 +855,8 @@ async fn main() -> Result<()> {
                 shared_stats: shared_stats.clone(),
                 disable_internal_snapshot: true,
                 crash_config: crash_cfg,
+                crash_per_topic,
+                crash_stagger_secs,
             };
             run_multi_topic_sub(cfg).await?;
             if let Some(stats) = shared_stats {

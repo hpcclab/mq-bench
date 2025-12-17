@@ -34,11 +34,11 @@ SUBSCRIBERS="${SUBSCRIBERS:--1}"
 
 # Publish parameters
 PAYLOAD="${PAYLOAD:-64}"
-RATE="${RATE:-10}"          # per publisher msg/s
-DURATION="${DURATION:-30}"
+RATE="${RATE:-1}"          # per publisher msg/s
+DURATION="${DURATION:-60}"
 
 # Which QoS levels to run (space-separated), e.g. "1 2" or "1".
-QOS_LEVELS="${QOS_LEVELS:-1 2}"
+QOS_LEVELS="${QOS_LEVELS:-0 1 2}"
 
 # Failure injection (subscriber built-in)
 # IMPORTANT: force_disconnect() simulates HARD CRASH (no graceful disconnect).
@@ -49,10 +49,17 @@ QOS_LEVELS="${QOS_LEVELS:-1 2}"
 #
 # To reduce loss: increase SUB_MTTR >> broker session_expiry (e.g., 30s)
 # OR: Use QOS_LEVELS=1 and accept some loss as expected behavior
-SUB_MTTF="${SUB_MTTF:-5}"          # Longer MTTF = fewer crashes
-SUB_MTTR="${SUB_MTTR:-3}"          # Longer MTTR = more realistic recovery
-SUB_CRASH_COUNT="${SUB_CRASH_COUNT:-5}"  # Fewer crashes for cleaner test
+SUB_MTTF="${SUB_MTTF:-10}"          # Longer MTTF = fewer crashes
+SUB_MTTR="${SUB_MTTR:-2}"          # Longer MTTR = more realistic recovery
+SUB_CRASH_COUNT="${SUB_CRASH_COUNT:-10}"  # Fewer crashes for cleaner test
 SUB_CRASH_SEED="${SUB_CRASH_SEED:-54321}"
+
+# Crash scheduling scope
+# - 0: crash/reconnect the whole mt-sub process (all topics at once)
+# - 1: crash/reconnect each topic independently (spreads crashes across topics)
+SUB_CRASH_PER_TOPIC="${SUB_CRASH_PER_TOPIC:-1}"
+# Optional deterministic phase staggering (seconds) applied per topic index.
+SUB_CRASH_STAGGER_SECS="${SUB_CRASH_STAGGER_SECS:-0}"
 
 # Share transport flags (0 = per-key transports, 1 = shared transport)
 # NOTE: Crash injection only works with per-topic transports (share_transport=0)
@@ -65,8 +72,8 @@ SUB_EXTRA_DRAIN_SECS="${SUB_EXTRA_DRAIN_SECS:-15}"
 
 # Optional: process-level publisher crash loop (0 disables)
 PUB_CRASH_LOOP="${PUB_CRASH_LOOP:-0}"
-PUB_MTTF="${PUB_MTTF:-1.5}"
-PUB_MTTR="${PUB_MTTR:-1}"
+PUB_MTTF="${PUB_MTTF:-10}"
+PUB_MTTR="${PUB_MTTR:-2}"
 PUB_CRASH_COUNT="${PUB_CRASH_COUNT:-10}"
 PUB_CRASH_SEED="${PUB_CRASH_SEED:-12345}"
 
@@ -249,6 +256,14 @@ run_single_test() {
   # Subscriber runs longer than publisher to drain broker queue
   local sub_duration=$((DURATION + SUB_EXTRA_DRAIN_SECS))
 
+  local sub_crash_scope_flags=()
+  if [[ "$SUB_CRASH_PER_TOPIC" == "1" ]]; then
+    sub_crash_scope_flags+=(--crash-per-topic)
+    if [[ "${SUB_CRASH_STAGGER_SECS}" != "0" ]]; then
+      sub_crash_scope_flags+=(--crash-stagger-secs "$SUB_CRASH_STAGGER_SECS")
+    fi
+  fi
+
   # Start mt-sub with built-in crash injection
   "$BINARY" mt-sub \
     --engine mqtt \
@@ -266,6 +281,7 @@ run_single_test() {
     --csv "$sub_csv" \
     --enable-retry \
     --mttf "$SUB_MTTF" --mttr "$SUB_MTTR" --crash-count "$SUB_CRASH_COUNT" --crash-seed "$SUB_CRASH_SEED" \
+    "${sub_crash_scope_flags[@]}" \
     >"$sub_log" 2>&1 &
   local sub_pid=$!
 
@@ -400,47 +416,65 @@ main() {
   log_info "Test ID: $test_id"
   echo ""
 
+  # Collect per-QoS summary values (keyed by QoS level)
+  declare -A qos_sent qos_recv qos_err qos_dup qos_gaps qos_crash qos_reconn qos_loss qos_p50 qos_p95 qos_p99
+
   # Run each QoS level
   local qos
   for qos in $QOS_LEVELS; do
     run_qos_comparison "$qos" "$test_id"
 
-    # Save per-QoS summary values
-    if [[ "$qos" == "1" ]]; then
-      qos1_sent=$_MT_SENT; qos1_recv=$_MT_RECEIVED; qos1_err=$_MT_ERRORS
-      qos1_dup=$_MT_DUPLICATES; qos1_gaps=$_MT_GAPS
-      qos1_crash=$_MT_SUB_CRASHES; qos1_reconn=$_MT_SUB_RECONNECTS
-      qos1_loss=$_MT_LOSS; qos1_p50=$_MT_LAT_P50; qos1_p95=$_MT_LAT_P95; qos1_p99=$_MT_LAT_P99
-    elif [[ "$qos" == "2" ]]; then
-      qos2_sent=$_MT_SENT; qos2_recv=$_MT_RECEIVED; qos2_err=$_MT_ERRORS
-      qos2_dup=$_MT_DUPLICATES; qos2_gaps=$_MT_GAPS
-      qos2_crash=$_MT_SUB_CRASHES; qos2_reconn=$_MT_SUB_RECONNECTS
-      qos2_loss=$_MT_LOSS; qos2_p50=$_MT_LAT_P50; qos2_p95=$_MT_LAT_P95; qos2_p99=$_MT_LAT_P99
-    fi
+    qos_sent["$qos"]="$_MT_SENT"
+    qos_recv["$qos"]="$_MT_RECEIVED"
+    qos_err["$qos"]="$_MT_ERRORS"
+    qos_dup["$qos"]="$_MT_DUPLICATES"
+    qos_gaps["$qos"]="$_MT_GAPS"
+    qos_crash["$qos"]="$_MT_SUB_CRASHES"
+    qos_reconn["$qos"]="$_MT_SUB_RECONNECTS"
+    qos_loss["$qos"]="${_MT_LOSS}%"
+    qos_p50["$qos"]="${_MT_LAT_P50}ms"
+    qos_p95["$qos"]="${_MT_LAT_P95}ms"
+    qos_p99["$qos"]="${_MT_LAT_P99}ms"
   done
 
-  # Comparison table if both QoS 1 and 2 were run
-  if echo " $QOS_LEVELS " | grep -q " 1 " && echo " $QOS_LEVELS " | grep -q " 2 "; then
-    echo "========================================"
-    echo "     Multi-topic QoS Comparison Summary"
-    echo "========================================"
+  # Summary table for all QoS levels that were run
+  echo "========================================"
+  echo "        Multi-topic QoS Summary"
+  echo "========================================"
+  echo ""
+
+  printf "%-18s" "Metric"
+  for qos in $QOS_LEVELS; do
+    printf " %-12s" "QoS${qos}"
+  done
+  echo ""
+  echo "--------------------------------------------------------------"
+
+  _row() {
+    local label="$1"; shift
+    local arr_name="$1"; shift
+    printf "%-18s" "$label"
+    for qos in $QOS_LEVELS; do
+      local v
+      v=$(eval "echo \${${arr_name}[\"$qos\"]:-0}")
+      printf " %-12s" "$v"
+    done
     echo ""
-    printf "%-20s %-12s %-12s\n" "Metric" "QoS1" "QoS2"
-    echo "--------------------------------------------"
-    printf "%-20s %-12s %-12s\n" "Sent" "${qos1_sent:-0}" "${qos2_sent:-0}"
-    printf "%-20s %-12s %-12s\n" "Received" "${qos1_recv:-0}" "${qos2_recv:-0}"
-    printf "%-20s %-12s %-12s\n" "Errors" "${qos1_err:-0}" "${qos2_err:-0}"
-    printf "%-20s %-12s %-12s\n" "Duplicates" "${qos1_dup:-0}" "${qos2_dup:-0}"
-    printf "%-20s %-12s %-12s\n" "Gaps" "${qos1_gaps:-0}" "${qos2_gaps:-0}"
-    printf "%-20s %-12s %-12s\n" "Sub Crashes" "${qos1_crash:-0}" "${qos2_crash:-0}"
-    printf "%-20s %-12s %-12s\n" "Reconnects" "${qos1_reconn:-0}" "${qos2_reconn:-0}"
-    printf "%-20s %-12s %-12s\n" "Loss %" "${qos1_loss:-N/A}%" "${qos2_loss:-N/A}%"
-    printf "%-20s %-12s %-12s\n" "Latency p50" "${qos1_p50:-0}ms" "${qos2_p50:-0}ms"
-    printf "%-20s %-12s %-12s\n" "Latency p95" "${qos1_p95:-0}ms" "${qos2_p95:-0}ms"
-    printf "%-20s %-12s %-12s\n" "Latency p99" "${qos1_p99:-0}ms" "${qos2_p99:-0}ms"
-    echo "--------------------------------------------"
-    echo ""
-  fi
+  }
+
+  _row "Sent" qos_sent
+  _row "Received" qos_recv
+  _row "Errors" qos_err
+  _row "Duplicates" qos_dup
+  _row "Gaps" qos_gaps
+  _row "Sub Crashes" qos_crash
+  _row "Reconnects" qos_reconn
+  _row "Loss" qos_loss
+  _row "Latency p50" qos_p50
+  _row "Latency p95" qos_p95
+  _row "Latency p99" qos_p99
+  echo "--------------------------------------------------------------"
+  echo ""
 
   echo "Artifacts saved to: $ARTIFACTS_DIR"
 }
