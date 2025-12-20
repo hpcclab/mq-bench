@@ -71,9 +71,11 @@ impl Transport for AmqpTransport {
             .create_channel()
             .await
             .map_err(|e| TransportError::Connect(e.to_string()))?;
+        // Use empty string to let RabbitMQ generate a unique queue name (amq.gen-XXX)
+        // This allows multiple subscribers to coexist without RESOURCE_LOCKED errors
         let queue = channel
             .queue_declare(
-                "mq_bench_sub",
+                "",
                 QueueDeclareOptions {
                     durable: false,
                     exclusive: true,

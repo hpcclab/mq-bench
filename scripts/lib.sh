@@ -218,15 +218,16 @@ make_connect_args() {
 			_out=(--engine zenoh --connect "endpoint=${ep}" --connect "mode=peer")
 			;;
 		mqtt)
-			# Generic MQTT engine. Requires MQTT_HOST and MQTT_PORT. Optional MQTT_USERNAME/MQTT_PASSWORD.
+			# Generic MQTT engine. Requires MQTT_HOST and MQTT_PORT. Optional MQTT_USERNAME/MQTT_PASSWORD/MQTT_QOS.
 			local host="${MQTT_HOST:-127.0.0.1}"; local port="${MQTT_PORT:-1883}"
-			local user_opt=() pass_opt=() max_opts=()
+			local user_opt=() pass_opt=() max_opts=() qos_opt=()
 			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
 			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			if [[ -n "${MQTT_QOS:-}" ]]; then qos_opt=(--connect "qos=${MQTT_QOS}"); fi
 			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
 			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
 			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${qos_opt[@]}" "${max_opts[@]}")
 			;;
 		amqp)
 			# Deprecated: use ENGINE=rabbitmq. Keep as alias.
@@ -241,24 +242,32 @@ make_connect_args() {
 			;;
 		rabbitmq)
 			# RabbitMQ over AMQP (native adapter); default
-			local host="${RABBITMQ_HOST:-127.0.0.1}"
-			local port="${RABBITMQ_PORT:-5672}"
-			local user="${RABBITMQ_USER:-guest}"
-			local pass="${RABBITMQ_PASS:-guest}"
-			local vhost="${RABBITMQ_VHOST:-/}"
-			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
-			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			# Check for pre-built URL first, otherwise construct from components
+			local url="${RABBITMQ_URL:-}"
+			if [[ -z "${url}" ]]; then
+				local host="${RABBITMQ_HOST:-127.0.0.1}"
+				local port="${RABBITMQ_PORT:-5672}"
+				local user="${RABBITMQ_USER:-guest}"
+				local pass="${RABBITMQ_PASS:-guest}"
+				local vhost="${RABBITMQ_VHOST:-/}"
+				if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+				url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			fi
 			_out=(--engine rabbitmq --connect "url=${url}")
 			;;
 		rabbitmq-amqp)
 			# Explicit RabbitMQ over AMQP
-			local host="${RABBITMQ_HOST:-127.0.0.1}"
-			local port="${RABBITMQ_PORT:-5672}"
-			local user="${RABBITMQ_USER:-guest}"
-			local pass="${RABBITMQ_PASS:-guest}"
-			local vhost="${RABBITMQ_VHOST:-/}"
-			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
-			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			# Check for pre-built URL first, otherwise construct from components
+			local url="${RABBITMQ_URL:-}"
+			if [[ -z "${url}" ]]; then
+				local host="${RABBITMQ_HOST:-127.0.0.1}"
+				local port="${RABBITMQ_PORT:-5672}"
+				local user="${RABBITMQ_USER:-guest}"
+				local pass="${RABBITMQ_PASS:-guest}"
+				local vhost="${RABBITMQ_VHOST:-/}"
+				if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+				url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			fi
 			_out=(--engine rabbitmq --connect "url=${url}")
 			;;
 		rabbitmq-mqtt)

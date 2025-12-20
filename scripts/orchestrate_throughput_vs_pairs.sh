@@ -43,6 +43,8 @@ SNAPSHOT=1
 RAMP_UP_SECS=5
 WARMUP_SECS=0               # warmup duration (0 to disable)
 WARMUP_PAYLOAD=1024           # warmup payload size in bytes
+IGNORE_START_SECS=5           # seconds to ignore from beginning of data
+IGNORE_END_SECS=5             # seconds to ignore from end of data
 RUN_ID_PREFIX="scale"
 TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
 DEFAULT_TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
@@ -50,7 +52,7 @@ START_SERVICES=0
 DRY_RUN=${DRY_RUN:-0}
 HOST="${HOST:-}"
 SUMMARY_OVERRIDE="${SUMMARY_OVERRIDE:-}"
-INTERVAL_SEC=15
+INTERVAL_SEC=65  # Allow TIME_WAIT sockets to clear (default kernel timeout is 60s)
 
 # Sequential / Remote execution
 SEQUENTIAL=0
@@ -62,6 +64,11 @@ APPEND_LATEST=0              # append to most recent results directory
 MQTT_BROKERS="mosquitto:127.0.0.1:1883 emqx:127.0.0.1:1884 hivemq:127.0.0.1:1885 rabbitmq:127.0.0.1:1886 artemis:127.0.0.1:1887"
 DEFAULT_MQTT_BROKERS="${MQTT_BROKERS}"
 declare -a MQTT_BROKERS_ARR=()
+
+# AMQP brokers (name:host:port). Default to local compose ports.
+AMQP_BROKERS="rabbitmq:127.0.0.1:5672"
+DEFAULT_AMQP_BROKERS="${AMQP_BROKERS}"
+declare -a AMQP_BROKERS_ARR=()
 
 # Helper to clean smart quotes from a string
 clean_quotes() {
@@ -179,12 +186,22 @@ while [[ $# -gt 0 ]]; do
       _raw_brokers=$(clean_quotes "${_raw_brokers}")
       MQTT_BROKERS="${_raw_brokers}" 
       ;;
+    --amqp-brokers)
+      shift; 
+      _raw_brokers="${1:-}"
+      _raw_brokers=$(clean_quotes "${_raw_brokers}")
+      AMQP_BROKERS="${_raw_brokers}" 
+      ;;
     --interval-sec)
       shift; INTERVAL_SEC=${1:-0} ;;
     --warmup)
       shift; WARMUP_SECS=${1:-10} ;;
     --warmup-payload)
       shift; WARMUP_PAYLOAD=${1:-1024} ;;
+    --ignore-start-secs)
+      shift; IGNORE_START_SECS=${1:-5} ;;
+    --ignore-end-secs)
+      shift; IGNORE_END_SECS=${1:-5} ;;
     --sequential)
       SEQUENTIAL=1 ;;
     --ssh-target)
@@ -268,74 +285,194 @@ if [[ -n "${HOST}" ]]; then
   MQTT_BROKERS_ARR=("${_REWRITTEN[@]}")
 fi
 
+# Materialize AMQP brokers array and apply HOST rewrite if needed
+IFS=' ' read -r -a AMQP_BROKERS_ARR <<<"${AMQP_BROKERS}"
+
+# If user provided only names (no host:port), try to resolve from defaults
+declare -a _RESOLVED_AMQP_BROKERS=()
+for tok in "${AMQP_BROKERS_ARR[@]}"; do
+  if [[ "${tok}" != *:* ]]; then
+    # Look up in DEFAULT_AMQP_BROKERS
+    found=""
+    for def in ${DEFAULT_AMQP_BROKERS}; do
+      IFS=: read -r dname dhost dport <<<"${def}"
+      if [[ "${dname}" == "${tok}" ]]; then
+        found="${def}"
+        break
+      fi
+    done
+    if [[ -n "${found}" ]]; then
+      _RESOLVED_AMQP_BROKERS+=("${found}")
+    else
+      log "WARN: AMQP Broker '${tok}' has no host:port and not found in defaults. Skipping."
+    fi
+  else
+    _RESOLVED_AMQP_BROKERS+=("${tok}")
+  fi
+done
+AMQP_BROKERS_ARR=("${_RESOLVED_AMQP_BROKERS[@]}")
+
+if [[ -n "${HOST}" ]]; then
+  declare -a _REWRITTEN=()
+  for tok in "${AMQP_BROKERS_ARR[@]}"; do IFS=: read -r bname _bhost bport <<<"${tok}"; _REWRITTEN+=("${bname}:${HOST}:${bport}"); done
+  AMQP_BROKERS_ARR=("${_REWRITTEN[@]}")
+fi
+
 # Header
 if [[ ! -s "${SUMMARY_CSV}" ]]; then
-  echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,stdev_ms,interval_stdev_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes,avg_cpu_perc,avg_mem_perc,avg_mem_used_bytes" > "${SUMMARY_CSV}"
+  echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes,avg_cpu_perc,avg_mem_perc,avg_mem_used_bytes" > "${SUMMARY_CSV}"
 fi
 
 append_summary_from_artifacts() {
-  local transport="$1" payload="$2" total_rate="$3" run_id="$4" art_dir="$5"
-  local sub_csv pub_csv last_sub last_pub
+  local transport="$1" payload="$2" total_rate="$3" run_id="$4" art_dir="$5" pairs="$6"
+  local sub_csv pub_csv
   sub_csv="${art_dir}/sub.csv"
   pub_csv="${art_dir}/pub.csv"
   if [[ ! -f "${sub_csv}" ]]; then
     if [[ -f "${art_dir}/sub_agg.csv" ]]; then sub_csv="${art_dir}/sub_agg.csv"; else log "WARN: Missing subscriber CSV in ${art_dir}"; return 0; fi
   fi
   if [[ ! -f "${pub_csv}" ]]; then if [[ -f "${art_dir}/mt_pub.csv" ]]; then pub_csv="${art_dir}/mt_pub.csv"; fi; fi
-  last_sub=$(tail -n +2 "${sub_csv}" 2>/dev/null | tail -n1 || true)
-  last_pub=$(tail -n +2 "${pub_csv}" 2>/dev/null | tail -n1 || true)
-  if [[ -z "${last_sub}" ]]; then log "WARN: No subscriber data for ${run_id}"; return 0; fi
   
-  # Calculate steady-state mean throughput (column 6)
-  # Skip warmup + ramp-up rows at start and last 3 rows at end (end-of-run drops)
-  local skip_rows=$(( ${WARMUP_SECS:-10} + ${RAMP_UP_SECS:-5} ))
-  local skip_end_rows=3
-  local total_lines
-  total_lines=$(wc -l < "${sub_csv}")
-  local steady_state_tps
-  steady_state_tps=$(awk -F, -v skip="${skip_rows}" -v skip_end="${skip_end_rows}" -v total="${total_lines}" '
-    NR > 1 + skip && NR <= total - skip_end && NF >= 6 { 
-        val = $6 + 0
-        if (val > 0) {
-            sum += val
-            count++
-        }
+  # Calculate steady-state metrics by ignoring first IGNORE_START_SECS and last IGNORE_END_SECS
+  # Columns: 1=timestamp, 2=sent_count, 3=received_count, 4=error_count, 5=total_throughput,
+  #          6=interval_throughput, 7=p50, 8=p95, 9=p99, 10=min, 11=max, 12=mean, 13=connections, 14=active_connections
+  local steady_state_metrics
+  steady_state_metrics=$(awk -F, -v ignore_start="${IGNORE_START_SECS}" -v ignore_end="${IGNORE_END_SECS}" '
+    NR == 1 { next }  # skip header
+    {
+        # First pass: collect all timestamps to determine time range
+        ts = $1 + 0
+        if (min_ts == "" || ts < min_ts) min_ts = ts
+        if (max_ts == "" || ts > max_ts) max_ts = ts
+        
+        # Store row data for second pass
+        row_ts[NR] = ts
+        row_recv[NR] = $3 + 0
+        row_sent[NR] = $2 + 0
+        row_err[NR] = $4 + 0
+        row_p50[NR] = $7 + 0
+        row_p95[NR] = $8 + 0
+        row_p99[NR] = $9 + 0
+        row_mean[NR] = $12 + 0
+        total_rows = NR
     }
     END {
-        if (count > 0) {
-            printf "%.2f", sum / count
-        } else {
-            printf "0.00"
+        # Calculate the valid time window
+        window_start = min_ts + ignore_start
+        window_end = max_ts - ignore_end
+        
+        # Second pass: filter rows within the time window
+        for (i = 2; i <= total_rows; i++) {
+            ts = row_ts[i]
+            if (ts >= window_start && ts <= window_end && row_recv[i] > 0) {
+                if (first_ts == "") {
+                    first_ts = ts
+                    first_recv = row_recv[i]
+                    first_sent = row_sent[i]
+                    first_err = row_err[i]
+                }
+                last_ts = ts
+                last_recv = row_recv[i]
+                last_sent = row_sent[i]
+                last_err = row_err[i]
+                
+                # Accumulate latency values for averaging
+                sum_p50 += row_p50[i]
+                sum_p95 += row_p95[i]
+                sum_p99 += row_p99[i]
+                sum_mean += row_mean[i]
+                count++
+            }
         }
+        
+        if (count == 0) {
+            # No steady-state rows found, output zeros
+            print "0.00,0,0,0,0,0,0,0,0,0"
+            exit
+        }
+        
+        # Calculate TPS from delta: (last_recv - first_recv) / (last_ts - first_ts)
+        duration = last_ts - first_ts
+        if (duration > 0) {
+            tps = (last_recv - first_recv) / duration
+        } else {
+            # Only 1 row matched, cannot compute delta TPS
+            tps = 0
+        }
+        
+        # Average latencies over steady-state period
+        avg_p50 = sum_p50 / count
+        avg_p95 = sum_p95 / count
+        avg_p99 = sum_p99 / count
+        
+        # Delta counts during steady-state
+        delta_recv = last_recv - first_recv
+        delta_sent = last_sent - first_sent
+        delta_err = last_err - first_err
+        
+        # Output includes first_ts and last_ts for docker stats filtering
+        printf "%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%d,%d,%d", tps, avg_p50, avg_p95, avg_p99, delta_sent, delta_recv, delta_err, count, first_ts, last_ts
     }
   ' "${sub_csv}")
-
-  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev
-  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev <<<"${last_sub}"
   
-  # Use the steady-state mean TPS instead of max or final cumulative TPS
-  tps="${steady_state_tps}"
-
-  local pub_tps sent; pub_tps=""; sent="${_sent}"
-  if [[ -n "${last_pub}" ]]; then
-    local _pts psent _prev _perr ptt _pit _a _b _c _d _e _f
-    IFS=, read -r _pts psent _prev _perr ptt _pit _a _b _c _d _e _f <<<"${last_pub}"
-    pub_tps="${ptt}"; sent="${psent}"
+  if [[ -z "${steady_state_metrics}" ]]; then
+    log "WARN: No subscriber data for ${run_id}"
+    return 0
   fi
-  local p50_ms p95_ms p99_ms stdev_ms interval_stdev_ms
-  p50_ms=$(awk -v n="${p50}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  p95_ms=$(awk -v n="${p95}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  p99_ms=$(awk -v n="${p99}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  stdev_ms=$(awk -v n="${stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  interval_stdev_ms=$(awk -v n="${interval_stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  
+  local tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts
+  IFS=, read -r tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts <<<"${steady_state_metrics}"
+  
+  if [[ "${steady_rows}" -eq 0 ]]; then
+    log "WARN: No steady-state rows found for ${run_id} (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s)"
+    return 0
+  fi
+  
+  log "Steady-state: ${steady_rows} rows (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s), TPS=${tps}, time_range=${steady_start_ts}-${steady_end_ts}"
 
-  # Docker stats aggregation (optional)
+  # Calculate publisher TPS using same time-based filtering
+  local pub_tps=""
+  if [[ -f "${pub_csv}" ]]; then
+    pub_tps=$(awk -F, -v ignore_start="${IGNORE_START_SECS}" -v ignore_end="${IGNORE_END_SECS}" '
+      NR == 1 { next }
+      {
+          ts = $1 + 0
+          if (min_ts == "" || ts < min_ts) min_ts = ts
+          if (max_ts == "" || ts > max_ts) max_ts = ts
+          row_ts[NR] = ts
+          row_sent[NR] = $2 + 0
+          total_rows = NR
+      }
+      END {
+          window_start = min_ts + ignore_start
+          window_end = max_ts - ignore_end
+          for (i = 2; i <= total_rows; i++) {
+              ts = row_ts[i]
+              if (ts >= window_start && ts <= window_end && row_sent[i] > 0) {
+                  if (first_ts == "") { first_ts = ts; first_sent = row_sent[i] }
+                  last_ts = ts; last_sent = row_sent[i]
+              }
+          }
+          duration = last_ts - first_ts
+          if (duration > 0) { printf "%.2f", (last_sent - first_sent) / duration }
+          else { print "" }
+      }
+    ' "${pub_csv}")
+  fi
+  
+  # Convert latencies from ns to ms
+  local p50_ms p95_ms p99_ms
+  p50_ms=$(awk -v n="${avg_p50_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  p95_ms=$(awk -v n="${avg_p95_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  p99_ms=$(awk -v n="${avg_p99_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+
+  # Docker stats aggregation (optional) - filtered to steady-state time range
   local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used
   max_cpu=""; max_mem_perc=""; max_mem_used=""
   avg_cpu=""; avg_mem_perc=""; avg_mem_used=""
   if [[ -f "${stats_csv}" ]]; then
     local agg
-    agg=$(awk -F, '
+    agg=$(awk -F, -v start_ts="${steady_start_ts}" -v end_ts="${steady_end_ts}" '
       NR==1 { 
         # Detect format: remote collector (5 cols) vs local (many cols)
         is_remote=(NF==5 && $3=="cpu_perc");
@@ -343,6 +480,12 @@ append_summary_from_artifacts() {
         next 
       }
       {
+        # Filter by steady-state timestamp range
+        ts = $1 + 0
+        if (start_ts > 0 && end_ts > 0) {
+          if (ts < start_ts || ts > end_ts) next
+        }
+        
         if (is_remote) {
            # Remote format: timestamp,container,cpu_perc,mem_perc,mem_usage
            c=$3; gsub(/%/,"",c); c+=0
@@ -385,13 +528,15 @@ append_summary_from_artifacts() {
         } else {
           avg_cpu=0; avg_mem_perc=0; avg_mem_used=0
         }
-        printf("%.6f,%.6f,%.0f,%.6f,%.6f,%.0f", mcpu,mperc,mused,avg_cpu,avg_mem_perc,avg_mem_used) 
+        printf("%.6f,%.6f,%.0f,%.6f,%.6f,%.0f,%d", mcpu,mperc,mused,avg_cpu,avg_mem_perc,avg_mem_used,count) 
       }
     ' "${stats_csv}" || true)
-    IFS=, read -r max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used <<<"${agg}"
+    local stats_rows
+    IFS=, read -r max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used stats_rows <<<"${agg}"
+    log "Docker stats: ${stats_rows} rows in steady-state time range"
   fi
 
-  echo "${transport},${payload},${total_rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${interval_stdev_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used},${avg_cpu},${avg_mem_perc},${avg_mem_used}" >> "${SUMMARY_CSV}"
+  echo "${transport},${payload},${total_rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used},${avg_cpu},${avg_mem_perc},${avg_mem_used}" >> "${SUMMARY_CSV}"
 }
 
 # Map transport/broker to docker-compose service names
@@ -406,6 +551,8 @@ get_services() {
     emqx) echo "emqx" ;;
     hivemq) echo "hivemq" ;;
     artemis) echo "artemis" ;;
+    rabbitmq-amqp) echo "rabbitmq" ;;
+    artemis-amqp) echo "artemis" ;;
     *) echo "" ;;
   esac
 }
@@ -457,6 +604,17 @@ wait_for_port() {
 # Track which services have been started (for restart vs up logic)
 declare -A STARTED_SERVICES=()
 
+# Kill any orphan mq-bench processes to ensure clean state
+cleanup_processes() {
+  log "Cleaning up orphan mq-bench processes..."
+  pkill -f "mq-bench.*mt-sub" 2>/dev/null || true
+  pkill -f "mq-bench.*mt-pub" 2>/dev/null || true
+  pkill -f "mq-bench.*sub" 2>/dev/null || true
+  pkill -f "mq-bench.*pub" 2>/dev/null || true
+  # Brief pause to allow processes to terminate
+  sleep 1
+}
+
 manage_service() {
   local action="$1" # up, down, or restart
   local services="$2"
@@ -466,12 +624,30 @@ manage_service() {
   if [[ "$action" == "up" ]]; then
     log "Starting services: ${services}"
     # Ensure clean state first
+    cleanup_processes
     docker_compose_cmd down
+    # Wait for connections to settle after stopping broker
+    if [[ "${DRY_RUN}" != 1 ]]; then
+      log "Waiting 10s for connections to settle..."
+      sleep 10
+    fi
     docker_compose_cmd "up -d" "$services"
+    # Give broker time to fully initialize (not just open port)
+    if [[ "${DRY_RUN}" != 1 ]]; then sleep 5; fi
     STARTED_SERVICES["$services"]=1
   elif [[ "$action" == "restart" ]]; then
-    log "Restarting services: ${services}"
-    docker_compose_cmd "restart" "$services"
+    # Full restart (down+up) to clear broker state completely
+    log "Full restarting services: ${services}"
+    cleanup_processes
+    docker_compose_cmd down
+    # Wait for connections to settle after stopping broker
+    if [[ "${DRY_RUN}" != 1 ]]; then
+      log "Waiting 10s for connections to settle..."
+      sleep 10
+    fi
+    docker_compose_cmd "up -d" "$services"
+    # Give broker time to fully initialize (not just open port)
+    if [[ "${DRY_RUN}" != 1 ]]; then sleep 5; fi
   elif [[ "$action" == "down" ]]; then
     log "Stopping services: ${services}"
     docker_compose_cmd down
@@ -484,6 +660,8 @@ get_standard_port() {
     redis) echo "6379" ;;
     nats) echo "4222" ;;
     rabbitmq) echo "5672" ;;
+    rabbitmq-amqp) echo "5672" ;;
+    artemis-amqp) echo "5673" ;;
     *) echo "" ;;
   esac
 }
@@ -530,7 +708,16 @@ run_warmup() {
       if [[ "${broker_name}" == "artemis" ]]; then
         host_env="${host_env} MQTT_USERNAME=admin MQTT_PASSWORD=admin"
       fi
-      run "ENGINE=mqtt ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\" >/dev/null 2>&1" || true ;;
+      run "ENGINE=mqtt ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\"" || true ;;
+    amqp)
+      if [[ -z "${broker_name}" ]]; then return 0; fi
+      local amqp_user="guest" amqp_pass="guest" amqp_vhost="%2f"
+      if [[ "${broker_name}" == "artemis" ]]; then
+        amqp_user="admin"; amqp_pass="admin"; amqp_vhost=""
+      fi
+      local amqp_url="amqp://${amqp_user}:${amqp_pass}@${broker_host}:${broker_port}/${amqp_vhost}"
+      host_env="RABBITMQ_URL=${amqp_url}"
+      run "ENGINE=rabbitmq ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\"" || true ;;
   esac
 
   # Clean up warmup artifacts
@@ -558,10 +745,14 @@ run_single_execution() {
   local stats_csv="${art_dir}/docker_stats.csv"
   mkdir -p "${art_dir}"
 
+  # Calculate extended duration for stats collection to cover ramp-up + duration + shutdown buffer
+  # This ensures docker stats captures the entire experiment lifecycle
+  local stats_duration=$(( RAMP_UP_SECS + DURATION + 15 ))
+
   # Start stats collector (remote or local)
   if [[ -n "${HOST}" ]]; then
-    log "Starting remote stats collector on ${HOST}..."
-    "${SCRIPT_DIR}/collect_remote_docker_stats.sh" "${HOST}" "${stats_csv}" "${DURATION}" >/dev/null 2>&1 &
+    log "Starting remote stats collector on ${HOST} for ${stats_duration}s..."
+    "${SCRIPT_DIR}/collect_remote_docker_stats.sh" "${HOST}" "${stats_csv}" "${stats_duration}" >/dev/null 2>&1 &
     stats_pid=$!
   else
     # Local stats collection using lib.sh helper
@@ -620,7 +811,32 @@ run_single_execution() {
         wait "${stats_pid}" 2>/dev/null || true
       fi
       
-      append_summary_from_artifacts "${br_transport}" "${payload}" "${total_rate}" "${rid}" "${art_dir}"
+      append_summary_from_artifacts "${br_transport}" "${payload}" "${total_rate}" "${rid}" "${art_dir}" "${pairs}"
+      return 0 ;;
+    amqp)
+      if [[ -z "${broker_name}" ]]; then
+        log "ERROR: AMQP transport requires broker details"; return 1
+      fi
+      local br_transport="amqp_${broker_name}"
+      local amqp_user="guest" amqp_pass="guest" amqp_vhost="%2f"
+      
+      # Inject credentials for Artemis (different from RabbitMQ)
+      if [[ "${broker_name}" == "artemis" ]]; then
+        amqp_user="admin"; amqp_pass="admin"; amqp_vhost=""
+      fi
+      
+      local amqp_url="amqp://${amqp_user}:${amqp_pass}@${broker_host}:${broker_port}/${amqp_vhost}"
+      host_env="RABBITMQ_URL=${amqp_url}"
+
+      run "ENGINE=rabbitmq ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
+      
+      # Stop stats collector
+      if [[ -n "${stats_pid}" ]] && (( stats_pid > 0 )); then
+        kill "${stats_pid}" 2>/dev/null || true
+        wait "${stats_pid}" 2>/dev/null || true
+      fi
+      
+      append_summary_from_artifacts "${br_transport}" "${payload}" "${total_rate}" "${rid}" "${art_dir}" "${pairs}"
       return 0 ;;
     *) log "Unknown transport: ${transport}"; return 1 ;;
   esac
@@ -631,7 +847,7 @@ run_single_execution() {
     wait "${stats_pid}" 2>/dev/null || true
   fi
 
-  append_summary_from_artifacts "${transport}" "${payload}" "${total_rate}" "${rid}" "${art_dir}"
+  append_summary_from_artifacts "${transport}" "${payload}" "${total_rate}" "${rid}" "${art_dir}" "${pairs}"
 }
 
 main() {
@@ -706,10 +922,53 @@ main() {
             
             log "Run: transport=mqtt broker=${bname} pairs=${n} payload=${payload_bytes}B per_pub_rate=${per_rate}/s total_rate=${total}/s"
             run_single_execution "mqtt" "${n}" "${payload_bytes}" "${per_rate}" "${total}" "${bname}" "${bhost}" "${bport}"
-            
-            if [[ ${INTERVAL_SEC} -gt 0 ]]; then
-              if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
+          done
+          
+          # Stop service if sequential (after all pairs for this broker)
+          if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
+             manage_service down "$svc"
+          fi
+        done
+      fi
+    elif [[ "${t}" == "amqp" ]]; then
+      # AMQP: Iterate brokers (rabbitmq on 5672, artemis on 5673)
+      if [[ ${#AMQP_BROKERS_ARR[@]} -eq 0 ]]; then
+        log "WARN: No AMQP brokers defined; skipping"
+      else
+        for b in "${AMQP_BROKERS_ARR[@]}"; do
+          IFS=: read -r bname bhost bport <<<"${b}"
+          local svc=""
+          local first_iteration=1
+          
+          if [[ $SEQUENTIAL -eq 1 ]]; then
+             svc=$(get_services "${bname}-amqp")
+          fi
+
+          for n in "${PAIRS_LIST[@]}"; do
+            # Start or restart service before each iteration
+            if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
+               if [[ $first_iteration -eq 1 ]]; then
+                  manage_service up "$svc"
+                  first_iteration=0
+               else
+                  manage_service restart "$svc"
+               fi
+               wait_for_port "${bhost}" "${bport}"
+               # Warmup after broker restart
+               run_warmup "amqp" "${n}" "${RATE_PER_PUB:-1}" "${bname}" "${bhost}" "${bport}"
             fi
+
+            local per_rate total
+            if [[ -n "${RATE_PER_PUB}" ]]; then
+              per_rate="${RATE_PER_PUB}"; total=$(( n * per_rate ))
+            elif [[ -n "${TOTAL_RATE}" ]]; then
+              total="${TOTAL_RATE}"; per_rate=$(( total / n ))
+            else
+              per_rate=1; total=$(( n * per_rate ))
+            fi
+            
+            log "Run: transport=amqp broker=${bname} pairs=${n} payload=${payload_bytes}B per_pub_rate=${per_rate}/s total_rate=${total}/s"
+            run_single_execution "amqp" "${n}" "${payload_bytes}" "${per_rate}" "${total}" "${bname}" "${bhost}" "${bport}"
           done
           
           # Stop service if sequential (after all pairs for this broker)
@@ -756,10 +1015,6 @@ main() {
         
         log "Run: transport=${t} pairs=${n} payload=${payload_bytes}B per_pub_rate=${per_rate}/s total_rate=${total}/s"
         run_single_execution "${t}" "${n}" "${payload_bytes}" "${per_rate}" "${total}"
-        
-        if [[ ${INTERVAL_SEC} -gt 0 ]]; then
-          if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
-        fi
       done
       
       # Stop service if sequential (after all pairs for this transport)

@@ -30,6 +30,8 @@ services:
   hivemq:
     image: hivemq/hivemq-ce:latest
     container_name: hivemq
+    environment:
+      - JAVA_OPTS=-Xms1g -Xmx4g
     ports:
       - "1885:1883"   # MQTT TCP
       - "8081:8080"   # Dashboard (optional)
@@ -42,8 +44,12 @@ services:
     container_name: rabbitmq
     # Enable MQTT plugin and start server
     command: ["bash", "-lc", "rabbitmq-plugins enable --offline rabbitmq_mqtt; rabbitmq-server"]
+    environment:
+      - RABBITMQ_MNESIA_BASE=/tmp/rabbitmq-mnesia
     volumes:
       - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    tmpfs:
+      - /tmp/rabbitmq-mnesia:size=512M
     ports:
       - "5672:5672"   # AMQP
       - "15672:15672" # Management UI
@@ -58,6 +64,10 @@ services:
     environment:
       - ARTEMIS_USER=admin
       - ARTEMIS_PASSWORD=admin
+      - AMQ_JOURNAL_TYPE=NIO
+      - AMQ_DATA_DIR=/var/lib/artemis-instance/data
+    tmpfs:
+      - /var/lib/artemis-instance/data:size=512M
     ports:
       - "5673:5672"   # AMQP 1.0 (host 5673 to avoid RabbitMQ 5672)
       - "1887:1883"   # MQTT (host 1887; Artemis MQTT)
@@ -92,7 +102,7 @@ services:
         hard: 300000
 
   router1:
-    image: eclipse/zenoh-bridge-mqtt:1.6.2
+    image: eclipse/zenoh-bridge-mqtt:1.7.0
     container_name: router1
     command: ["-c", "/etc/zenoh/router1.json5"]
     ports:

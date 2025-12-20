@@ -32,26 +32,32 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Defaults
 PAIRS=10                # N pub/sub pairs
-TOTAL_RATE=1000         # msgs/s (system-wide)
+TOTAL_RATE=100         # msgs/s (system-wide)
 DURATION=30             # seconds
-SNAPSHOT=5
+SNAPSHOT=1
 RUN_ID_PREFIX="latency"
 # Include zenoh-mqtt as a distinct label (internally uses zenoh engine)
 TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
-# Default payloads (bytes): 1KB, 2KB, 4KB, 8KB, 16KB, 32KB, 64KB, 128KB, 256KB, 512KB, 1MB, 2MB
-PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152)
+# Default payloads (bytes): 1KB, 2KB, 4KB, 8KB, 16KB, 32KB, 64KB, 128KB, 256KB, 512KB, 1MB
+PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576)
+PAYLOADS=(1024 16384 1048576)  # 1KB, 16KB, 1MB for quicker runs
 # Keep immutable copies for fallback if user passes empty strings to flags
 DEFAULT_TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
-DEFAULT_PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152)
+# DEFAULT_PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152)
+DEFAULT_PAYLOADS=(1024 16384 1048576)  # 1KB, 16KB, 1MB for quicker runs
 START_SERVICES=0
 DRY_RUN=${DRY_RUN:-0}
 HOST="${HOST:-}" 
 SUMMARY_OVERRIDE="${SUMMARY_OVERRIDE:-}"  # optional path to existing summary.csv to append
-INTERVAL_SEC=15           # optional sleep between tests
+INTERVAL_SEC=65           # sleep between tests (TCP TIME_WAIT is 60s)
 LATENCY_ONLY=0            # only capture latency columns in summary
-WARMUP_DURATION=5         # duration for warmup run
+WARMUP_SECS=0             # duration for warmup run
 WARMUP_PAYLOAD=1024       # payload size for warmup
 SKIP_SUMMARY=0            # internal flag to skip writing to summary.csv
+RAMP_UP_SECS=5            # ramp-up time for pub/sub connections
+APPEND_LATEST=0           # append to most recent results directory
+IGNORE_START_SECS=5       # seconds to ignore from beginning of data
+IGNORE_END_SECS=5         # seconds to ignore from end of data
 
 # Sequential / Remote execution
 SEQUENTIAL=0
@@ -120,6 +126,22 @@ PLOTS_DIR=""
 SUMMARY_CSV=""
 
 init_dirs() {
+  # Handle --append-latest: find and use most recent results directory
+  if [[ ${APPEND_LATEST} -eq 1 ]] && [[ -z "${SUMMARY_OVERRIDE}" ]] && [[ -z "${BENCH_DIR}" ]]; then
+    local latest_dir
+    latest_dir=$(ls -1d "${REPO_ROOT}/results/latency_vs_payload_"* 2>/dev/null | sort -r | head -1 || true)
+    if [[ -n "${latest_dir}" ]] && [[ -d "${latest_dir}" ]]; then
+      BENCH_DIR="${latest_dir}"
+      RAW_DIR="${BENCH_DIR}/raw_data"
+      PLOTS_DIR="${BENCH_DIR}/plots"
+      # Extract timestamp from directory name
+      TS="${latest_dir##*latency_vs_payload_}"
+      log "Appending to existing run: ${BENCH_DIR}"
+    else
+      log "WARN: --append-latest specified but no existing latency_vs_payload_* directory found. Creating new."
+    fi
+  fi
+
   # Use existing TS if set, else generate
   if [[ -z "${TS}" ]]; then TS="$(timestamp)"; fi
   # Default bench dir if none provided via overrides
@@ -235,12 +257,22 @@ while [[ $# -gt 0 ]]; do
       shift; INTERVAL_SEC=${1:-0} ;;
     --latency-only)
       LATENCY_ONLY=1 ;;
+    --warmup)
+      shift; WARMUP_SECS=${1:-5} ;;
+    --warmup-payload)
+      shift; WARMUP_PAYLOAD=${1:-1024} ;;
+    --ignore-start-secs)
+      shift; IGNORE_START_SECS=${1:-5} ;;
+    --ignore-end-secs)
+      shift; IGNORE_END_SECS=${1:-5} ;;
     --sequential)
       SEQUENTIAL=1 ;;
     --ssh-target)
       shift; SSH_TARGET=${1:-} ;;
     --remote-dir)
       shift; REMOTE_DIR=${1:-} ;;
+    --append-latest)
+      APPEND_LATEST=1 ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -316,9 +348,9 @@ fi
 # Header
 if [[ ! -s "${SUMMARY_CSV}" ]]; then
   if [[ ${LATENCY_ONLY} -eq 1 ]]; then
-    echo "transport,payload,rate,run_id,p50_ms,p95_ms,p99_ms,stdev_ms,interval_stdev_ms" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,p50_ms,p95_ms,p99_ms" > "${SUMMARY_CSV}"
   else
-    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,stdev_ms,interval_stdev_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
   fi
 fi
 
@@ -334,10 +366,10 @@ ensure_services() {
   fi
 }
 
-# Append last-snapshot metrics from a run directory into SUMMARY_CSV
+# Append steady-state metrics from a run directory into SUMMARY_CSV
 append_summary_from_artifacts() {
   local transport="$1" payload="$2" rate="$3" run_id="$4" art_dir="$5"
-  local sub_csv pub_csv last_sub last_pub
+  local sub_csv pub_csv
   sub_csv="${art_dir}/sub.csv"
   pub_csv="${art_dir}/pub.csv"
   if [[ ! -f "${sub_csv}" ]]; then
@@ -352,36 +384,147 @@ append_summary_from_artifacts() {
       pub_csv="${art_dir}/mt_pub.csv"
     fi
   fi
-  last_sub=$(tail -n +2 "${sub_csv}" 2>/dev/null | tail -n1 || true)
-  last_pub=$(tail -n +2 "${pub_csv}" 2>/dev/null | tail -n1 || true)
-  if [[ -z "${last_sub}" ]]; then
-    log "WARN: No subscriber data for ${run_id}"; return 0
+  
+  # Calculate steady-state metrics by ignoring first IGNORE_START_SECS and last IGNORE_END_SECS
+  # Columns: 1=timestamp, 2=sent_count, 3=received_count, 4=error_count, 5=total_throughput,
+  #          6=interval_throughput, 7=p50, 8=p95, 9=p99, 10=min, 11=max, 12=mean, 13=connections, 14=active_connections
+  local steady_state_metrics
+  steady_state_metrics=$(awk -F, -v ignore_start="${IGNORE_START_SECS}" -v ignore_end="${IGNORE_END_SECS}" '
+    NR == 1 { next }  # skip header
+    {
+        # First pass: collect all timestamps to determine time range
+        ts = $1 + 0
+        if (min_ts == "" || ts < min_ts) min_ts = ts
+        if (max_ts == "" || ts > max_ts) max_ts = ts
+        
+        # Store row data for second pass
+        row_ts[NR] = ts
+        row_recv[NR] = $3 + 0
+        row_sent[NR] = $2 + 0
+        row_err[NR] = $4 + 0
+        row_p50[NR] = $7 + 0
+        row_p95[NR] = $8 + 0
+        row_p99[NR] = $9 + 0
+        row_mean[NR] = $12 + 0
+        total_rows = NR
+    }
+    END {
+        # Calculate the valid time window
+        window_start = min_ts + ignore_start
+        window_end = max_ts - ignore_end
+        
+        # Second pass: filter rows within the time window
+        for (i = 2; i <= total_rows; i++) {
+            ts = row_ts[i]
+            if (ts >= window_start && ts <= window_end && row_recv[i] > 0) {
+                if (first_ts == "") {
+                    first_ts = ts
+                    first_recv = row_recv[i]
+                    first_sent = row_sent[i]
+                    first_err = row_err[i]
+                }
+                last_ts = ts
+                last_recv = row_recv[i]
+                last_sent = row_sent[i]
+                last_err = row_err[i]
+                
+                # Accumulate latency values for averaging
+                sum_p50 += row_p50[i]
+                sum_p95 += row_p95[i]
+                sum_p99 += row_p99[i]
+                sum_mean += row_mean[i]
+                count++
+            }
+        }
+        
+        if (count == 0) {
+            # No steady-state rows found, output zeros
+            print "0.00,0,0,0,0,0,0,0,0,0"
+            exit
+        }
+        
+        # Calculate TPS from delta: (last_recv - first_recv) / (last_ts - first_ts)
+        duration = last_ts - first_ts
+        if (duration > 0) {
+            tps = (last_recv - first_recv) / duration
+        } else {
+            # Only 1 row matched, cannot compute delta TPS
+            tps = 0
+        }
+        
+        # Average latencies over steady-state period
+        avg_p50 = sum_p50 / count
+        avg_p95 = sum_p95 / count
+        avg_p99 = sum_p99 / count
+        
+        # Delta counts during steady-state
+        delta_recv = last_recv - first_recv
+        delta_sent = last_sent - first_sent
+        delta_err = last_err - first_err
+        
+        # Output includes first_ts and last_ts for docker stats filtering
+        printf "%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%d,%d,%d", tps, avg_p50, avg_p95, avg_p99, delta_sent, delta_recv, delta_err, count, first_ts, last_ts
+    }
+  ' "${sub_csv}")
+  
+  if [[ -z "${steady_state_metrics}" ]]; then
+    log "WARN: No subscriber data for ${run_id}"
+    return 0
   fi
-  # sub: ts,sent,recv,errors,tps,itps,p50,p95,p99,min,max,mean,stdev,interval_stdev,...
-  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev
-  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev <<<"${last_sub}"
-  local pub_tps sent
-  pub_tps=""; sent="${_sent}"
-  if [[ -n "${last_pub}" ]]; then
-    # pub: ts,sent,recv,errors,tt,it,...
-    local _pts psent _prev _perr ptt _pit _a _b _c _d _e _f
-    IFS=, read -r _pts psent _prev _perr ptt _pit _a _b _c _d _e _f <<<"${last_pub}"
-    pub_tps="${ptt}"; sent="${psent}"
+  
+  local tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts
+  IFS=, read -r tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts <<<"${steady_state_metrics}"
+  
+  if [[ "${steady_rows}" -eq 0 ]]; then
+    log "WARN: No steady-state rows found for ${run_id} (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s)"
+    return 0
   fi
-  local ns_to_ms='awk -v n="$1" '\''BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}'\''' 
-  local p50_ms p95_ms p99_ms stdev_ms interval_stdev_ms
-  p50_ms=$(awk -v n="${p50}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  p95_ms=$(awk -v n="${p95}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  p99_ms=$(awk -v n="${p99}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  stdev_ms=$(awk -v n="${stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
-  interval_stdev_ms=$(awk -v n="${interval_stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  
+  log "Steady-state: ${steady_rows} rows (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s), TPS=${tps}, time_range=${steady_start_ts}-${steady_end_ts}"
 
-  # Docker stats aggregation (optional)
-  local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used
+  # Calculate publisher TPS using same time-based filtering
+  local pub_tps=""
+  if [[ -f "${pub_csv}" ]]; then
+    pub_tps=$(awk -F, -v ignore_start="${IGNORE_START_SECS}" -v ignore_end="${IGNORE_END_SECS}" '
+      NR == 1 { next }
+      {
+          ts = $1 + 0
+          if (min_ts == "" || ts < min_ts) min_ts = ts
+          if (max_ts == "" || ts > max_ts) max_ts = ts
+          row_ts[NR] = ts
+          row_sent[NR] = $2 + 0
+          total_rows = NR
+      }
+      END {
+          window_start = min_ts + ignore_start
+          window_end = max_ts - ignore_end
+          for (i = 2; i <= total_rows; i++) {
+              ts = row_ts[i]
+              if (ts >= window_start && ts <= window_end && row_sent[i] > 0) {
+                  if (first_ts == "") { first_ts = ts; first_sent = row_sent[i] }
+                  last_ts = ts; last_sent = row_sent[i]
+              }
+          }
+          duration = last_ts - first_ts
+          if (duration > 0) { printf "%.2f", (last_sent - first_sent) / duration }
+          else { print "" }
+      }
+    ' "${pub_csv}")
+  fi
+  
+  # Convert latencies from ns to ms
+  local p50_ms p95_ms p99_ms
+  p50_ms=$(awk -v n="${avg_p50_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  p95_ms=$(awk -v n="${avg_p95_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  p99_ms=$(awk -v n="${avg_p99_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+
+  # Docker stats aggregation (optional) - filtered to steady-state time range
+  local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used
   max_cpu=""; max_mem_perc=""; max_mem_used=""
+  avg_cpu=""; avg_mem_perc=""; avg_mem_used=""
   if [[ -f "${stats_csv}" ]]; then
     local agg
-    agg=$(awk -F, '
+    agg=$(awk -F, -v start_ts="${steady_start_ts}" -v end_ts="${steady_end_ts}" '
       NR==1 { 
         # Detect format: remote collector (5 cols) vs local (many cols)
         is_remote=(NF==5 && $3=="cpu_perc");
@@ -389,6 +532,12 @@ append_summary_from_artifacts() {
         next 
       }
       {
+        # Filter by steady-state timestamp range
+        ts = $1 + 0
+        if (start_ts > 0 && end_ts > 0) {
+          if (ts < start_ts || ts > end_ts) next
+        }
+        
         if (is_remote) {
            # Remote format: timestamp,container,cpu_perc,mem_perc,mem_usage
            c=$3; gsub(/%/,"",c); c+=0
@@ -413,18 +562,36 @@ append_summary_from_artifacts() {
            }
         }
         
+        # Max values
         if (c>mcpu) mcpu=c
         if (perc>mperc) mperc=perc
         if (used_b>mused) mused=used_b
+        
+        # Sum for averages
+        sum_cpu+=c
+        sum_mem_perc+=perc
+        sum_mem_used+=used_b
+        count++
       }
-      END{ if(mcpu=="")mcpu=0; if(mperc=="")mperc=0; if(mused=="")mused=0; printf("%.6f,%.6f,%.0f", mcpu,mperc,mused) }
+      END{ 
+        if(mcpu=="")mcpu=0; if(mperc=="")mperc=0; if(mused=="")mused=0
+        if(count>0) {
+          avg_cpu=sum_cpu/count; avg_mem_perc=sum_mem_perc/count; avg_mem_used=sum_mem_used/count
+        } else {
+          avg_cpu=0; avg_mem_perc=0; avg_mem_used=0
+        }
+        printf("%.6f,%.6f,%.0f,%.6f,%.6f,%.0f,%d", mcpu,mperc,mused,avg_cpu,avg_mem_perc,avg_mem_used,count) 
+      }
     ' "${stats_csv}" || true)
-    IFS=, read -r max_cpu max_mem_perc max_mem_used <<<"${agg}"
+    local stats_rows
+    IFS=, read -r max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used stats_rows <<<"${agg}"
+    log "Docker stats: ${stats_rows} rows in steady-state time range"
   fi
+
   if [[ ${LATENCY_ONLY} -eq 1 ]]; then
-    echo "${transport},${payload},${rate},${run_id},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${interval_stdev_ms}" >> "${SUMMARY_CSV}"
+    echo "${transport},${payload},${rate},${run_id},${p50_ms},${p95_ms},${p99_ms}" >> "${SUMMARY_CSV}"
   else
-    echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${interval_stdev_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
+    echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
   fi
 }
 
@@ -440,6 +607,21 @@ get_services() {
     emqx) echo "emqx" ;;
     hivemq) echo "hivemq" ;;
     artemis) echo "artemis" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Get standard port for a transport
+get_standard_port() {
+  case "$1" in
+    zenoh|zenoh-mqtt) echo "7447" ;;
+    redis) echo "6379" ;;
+    nats) echo "4222" ;;
+    rabbitmq) echo "5672" ;;
+    mosquitto) echo "1883" ;;
+    emqx) echo "1884" ;;
+    hivemq) echo "1885" ;;
+    artemis) echo "1887" ;;
     *) echo "" ;;
   esac
 }
@@ -467,9 +649,44 @@ docker_compose_cmd() {
   fi
 }
 
+# Kill any orphan mq-bench processes to ensure clean state
+cleanup_processes() {
+  log "Cleaning up orphan mq-bench processes..."
+  pkill -f "mq-bench.*mt-sub" 2>/dev/null || true
+  pkill -f "mq-bench.*mt-pub" 2>/dev/null || true
+  pkill -f "mq-bench.*sub" 2>/dev/null || true
+  pkill -f "mq-bench.*pub" 2>/dev/null || true
+  # Brief pause to allow processes to terminate
+  sleep 1
+}
+
+# Wait for a TCP port to become available
+wait_for_port() {
+  local host="$1"
+  local port="$2"
+  local timeout="${3:-60}"
+  log "Waiting for ${host}:${port}..."
+  local start_ts=$(date +%s)
+  while true; do
+    if timeout 1 bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" 2>/dev/null; then
+       log "Port ${host}:${port} is open."
+       return 0
+    fi
+    local now_ts=$(date +%s)
+    if (( now_ts - start_ts > timeout )); then
+      log "Timeout waiting for ${host}:${port}"
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+# Track which services have been started (for restart vs up logic)
+declare -A STARTED_SERVICES=()
+
 # Manage service lifecycle if sequential mode is enabled
 manage_service() {
-  local action="$1" # up or down
+  local action="$1" # up, down, or restart
   local services="$2"
   if [[ $SEQUENTIAL -eq 0 ]]; then return 0; fi
   if [[ -z "$services" ]]; then return 0; fi
@@ -477,9 +694,29 @@ manage_service() {
   if [[ "$action" == "up" ]]; then
     log "Starting services: ${services}"
     # Ensure clean state first
+    cleanup_processes
     docker_compose_cmd down
+    # Wait for connections to settle after stopping broker
+    if [[ "${DRY_RUN}" != 1 ]]; then
+      log "Waiting 10s for connections to settle..."
+      sleep 10
+    fi
     docker_compose_cmd "up -d" "$services"
-    # Give it a moment to settle
+    # Give broker time to fully initialize (not just open port)
+    if [[ "${DRY_RUN}" != 1 ]]; then sleep 5; fi
+    STARTED_SERVICES["$services"]=1
+  elif [[ "$action" == "restart" ]]; then
+    # Full restart (down+up) to clear broker state completely
+    log "Full restarting services: ${services}"
+    cleanup_processes
+    docker_compose_cmd down
+    # Wait for connections to settle after stopping broker
+    if [[ "${DRY_RUN}" != 1 ]]; then
+      log "Waiting 10s for connections to settle..."
+      sleep 10
+    fi
+    docker_compose_cmd "up -d" "$services"
+    # Give broker time to fully initialize (not just open port)
     if [[ "${DRY_RUN}" != 1 ]]; then sleep 5; fi
   elif [[ "$action" == "down" ]]; then
     log "Stopping services: ${services}"
@@ -505,7 +742,7 @@ run_single_execution() {
   local rid="${RUN_ID_PREFIX}_$(timestamp)_${rid_suffix}"
   local art_dir="${REPO_ROOT}/artifacts/${rid}/fanout_multi_topic_perkey"
   local env_common
-  env_common="TENANTS=${pairs} REGIONS=1 SERVICES=1 SHARDS=1 SUBSCRIBERS=${pairs} PUBLISHERS=${pairs} PAYLOAD=${payload} RATE=${per_rate} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT} TOPIC_PREFIX=bench/pair"
+  env_common="TENANTS=${pairs} REGIONS=1 SERVICES=1 SHARDS=1 SUBSCRIBERS=${pairs} PUBLISHERS=${pairs} PAYLOAD=${payload} RATE=${per_rate} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT} RAMP_UP_SECS=${RAMP_UP_SECS} TOPIC_PREFIX=bench/pair"
 
   local host_env=""
   local remote_stats_pid=""
@@ -599,89 +836,100 @@ main() {
       else
         for b in "${MQTT_BROKERS_ARR[@]}"; do
           IFS=: read -r bname bhost bport <<<"${b}"
+          local svc=""
+          local first_iteration=1
           
-          # Start service if sequential
           if [[ $SEQUENTIAL -eq 1 ]]; then
-             local svc
              svc=$(get_services "$bname")
-             manage_service up "$svc"
-          fi
-          
-          # Warmup run
-          log "Warmup: transport=mqtt broker=${bname} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_DURATION}s"
-          # Temporarily override DURATION and set SKIP_SUMMARY
-          local _orig_dur="${DURATION}"
-          DURATION="${WARMUP_DURATION}"
-          SKIP_SUMMARY=1
-          run_single_execution "mqtt" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}"
-          SKIP_SUMMARY=0
-          DURATION="${_orig_dur}"
-          
-          # Cooldown after warmup
-          if [[ ${INTERVAL_SEC} -gt 0 ]]; then
-             log "Cooldown: sleeping ${INTERVAL_SEC}s..."
-             if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
           fi
 
           for p in "${PAYLOADS[@]}"; do
+            # Start or restart service before each iteration
+            if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
+               if [[ $first_iteration -eq 1 ]]; then
+                  manage_service up "$svc"
+                  first_iteration=0
+               else
+                  manage_service restart "$svc"
+               fi
+               wait_for_port "${bhost}" "${bport}"
+               
+               # Warmup after broker restart (skip if WARMUP_SECS=0)
+               if [[ ${WARMUP_SECS} -gt 0 ]]; then
+                 log "Warmup: transport=mqtt broker=${bname} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_SECS}s"
+                 local _orig_dur="${DURATION}"
+                 DURATION="${WARMUP_SECS}"
+                 SKIP_SUMMARY=1
+                 run_single_execution "mqtt" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}"
+                 SKIP_SUMMARY=0
+                 DURATION="${_orig_dur}"
+               fi
+            fi
+
             log "Run: transport=mqtt broker=${bname} payload=${p}B pairs=${PAIRS} total_rate=${TOTAL_RATE}/s"
             run_single_execution "mqtt" "${p}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}"
             
-            # Interval sleep (cooldown)
-            if [[ ${INTERVAL_SEC} -gt 0 ]]; then
+            # Interval sleep (cooldown) - only if not sequential (restart handles settling)
+            if [[ $SEQUENTIAL -eq 0 ]] && [[ ${INTERVAL_SEC} -gt 0 ]]; then
               log "Cooldown: sleeping ${INTERVAL_SEC}s..."
               if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
             fi
           done
           
-          # Stop service if sequential
-          if [[ $SEQUENTIAL -eq 1 ]]; then
-             local svc
-             svc=$(get_services "$bname")
+          # Stop service if sequential (after all payloads for this broker)
+          if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
              manage_service down "$svc"
           fi
         done
       fi
     else
       # Non-MQTT transports
+      local svc=""
+      local port=""
+      local first_iteration=1
       
-      # Start service if sequential
       if [[ $SEQUENTIAL -eq 1 ]]; then
-         local svc
          svc=$(get_services "$t")
-         manage_service up "$svc"
-      fi
-      
-      # Warmup run
-      log "Warmup: transport=${t} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_DURATION}s"
-      local _orig_dur="${DURATION}"
-      DURATION="${WARMUP_DURATION}"
-      SKIP_SUMMARY=1
-      run_single_execution "${t}" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}"
-      SKIP_SUMMARY=0
-      DURATION="${_orig_dur}"
-      
-      # Cooldown after warmup
-      if [[ ${INTERVAL_SEC} -gt 0 ]]; then
-         log "Cooldown: sleeping ${INTERVAL_SEC}s..."
-         if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
+         port=$(get_standard_port "$t")
       fi
 
       for p in "${PAYLOADS[@]}"; do
+        # Start or restart service before each iteration
+        if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
+           if [[ $first_iteration -eq 1 ]]; then
+              manage_service up "$svc"
+              first_iteration=0
+           else
+              manage_service restart "$svc"
+           fi
+           if [[ -n "$port" ]]; then
+              wait_for_port "${HOST:-127.0.0.1}" "$port"
+           fi
+           
+           # Warmup after broker restart (skip if WARMUP_SECS=0)
+           if [[ ${WARMUP_SECS} -gt 0 ]]; then
+             log "Warmup: transport=${t} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_SECS}s"
+             local _orig_dur="${DURATION}"
+             DURATION="${WARMUP_SECS}"
+             SKIP_SUMMARY=1
+             run_single_execution "${t}" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}"
+             SKIP_SUMMARY=0
+             DURATION="${_orig_dur}"
+           fi
+        fi
+
         log "Run: transport=${t} payload=${p}B pairs=${PAIRS} total_rate=${TOTAL_RATE}/s"
         run_single_execution "${t}" "${p}" "${PAIRS}" "${TOTAL_RATE}"
         
-        # Interval sleep (cooldown)
-        if [[ ${INTERVAL_SEC} -gt 0 ]]; then
+        # Interval sleep (cooldown) - only if not sequential (restart handles settling)
+        if [[ $SEQUENTIAL -eq 0 ]] && [[ ${INTERVAL_SEC} -gt 0 ]]; then
           log "Cooldown: sleeping ${INTERVAL_SEC}s..."
           if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
         fi
       done
       
-      # Stop service if sequential
-      if [[ $SEQUENTIAL -eq 1 ]]; then
-         local svc
-         svc=$(get_services "$t")
+      # Stop service if sequential (after all payloads for this transport)
+      if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
          manage_service down "$svc"
       fi
     fi

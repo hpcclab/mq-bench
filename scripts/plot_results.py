@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--summary", required=True, help="Path to summary.csv")
     p.add_argument("--out-dir", help="Output directory for plots (default: 'plots' subdirectory in summary's folder)")
     p.add_argument("--only-latency-vs-payload", action="store_true", help="Only generate Latency vs Payload plots")
+    p.add_argument("--latex", action="store_true", help="Generate plots optimized for LaTeX double-column papers (smaller size, larger fonts, PDF output)")
     return p.parse_args()
 
 
@@ -55,36 +56,86 @@ MARKER_MAP = {
 }
 
 LINESTYLE_MAP = {
-    "mqtt_mosquitto": "-",
-    "mqtt_emqx": "--",
+    "mqtt_mosquitto": "--",
+    "mqtt_emqx": ":",
     "mqtt_hivemq": "-.",
-    "mqtt_rabbitmq": ":",
-    "mqtt_artemis": "-",
-    "mqtt": "-",
-    "redis": "--",
-    "nats": "-.",
-    "zenoh": "-",
-    "rabbitmq": ":",
+    "mqtt_rabbitmq": (0, (5, 1)),      # densely dashed
+    "mqtt_artemis": (0, (3, 1, 1, 1)), # densely dash-dotted
+    "mqtt": "--",
+    "redis": (0, (3, 5, 1, 5)),        # dash-dotted with gaps
+    "nats": (0, (5, 5)),               # loosely dashed
+    "zenoh": (0, (1, 1)),              # densely dotted
+    "rabbitmq": (0, (5, 1)),           # densely dashed
+}
+
+LINEWIDTH_MAP = {
+    "mqtt_mosquitto": 2.0,
+    "mqtt_emqx": 2.0,
+    "mqtt_hivemq": 2.0,
+    "mqtt_rabbitmq": 2.0,
+    "mqtt_artemis": 2.0,
+    "mqtt": 2.0,
+    "redis": 2.0,
+    "nats": 2.5,
+    "zenoh": 2.0,
+    "zenoh_mqtt": 2.0,
+    "rabbitmq": 2.0,
+}
+
+# Fixed color map to keep consistent colors
+COLOR_MAP = {
+    "mqtt_mosquitto": "#1f77b4",  # blue
+    "mqtt_emqx": "#ff7f0e",       # orange
+    "mqtt_hivemq": "#2ca02c",     # green
+    "mqtt_rabbitmq": "#d62728",   # red
+    "mqtt_artemis": "#9467bd",    # purple
+    "mqtt": "#1f77b4",
+    "redis": "#8c564b",           # brown
+    "nats": "#e377c2",            # pink
+    "zenoh": "#7f7f7f",           # gray
+    "zenoh_mqtt": "#bcbd22",      # olive
+    "rabbitmq": "#d62728",        # red (same as mqtt_rabbitmq, different marker)
 }
 
 _MARKERS_CYCLE = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "+", "x"]
-_STYLES_CYCLE = ["-", "--", "-.", ":"]
+_STYLES_CYCLE = ["--", "-.", ":", (0, (5, 1)), (0, (1, 1)), (0, (3, 1, 1, 1))]
+
+# Default figure size for all plots (width, height in inches)
+DEFAULT_FIGSIZE = (10, 6)
+DEFAULT_MARKER_SIZE = 8
+_COLORS_CYCLE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+
+# LaTeX paper settings - same structure as default but with bolder lines and larger text
+LATEX_FIGSIZE = (10, 6)  # Keep same size as default
+LATEX_MARKER_SIZE = 12
+LATEX_LINEWIDTH = 2.8
+LATEX_DPI = 300
+LATEX_FONT_SIZE = 18
+LATEX_TITLE_SIZE = 20
+LATEX_LEGEND_SIZE = 16
 
 
 def _norm_label(lbl: str) -> str:
     return (lbl or "").strip().lower().replace("-", "_")
 
 
-def style_for(lbl: str) -> Tuple[str, str]:
+def style_for(lbl: str) -> Tuple[str, str, float, str]:
+    """Returns (marker, linestyle, linewidth, color) for a given label."""
     key = _norm_label(lbl)
     marker = MARKER_MAP.get(key)
-    # All lines solid by default; keep marker distinct per broker/transport
-    linestyle = "-"
-    if marker is None:
+    linestyle = LINESTYLE_MAP.get(key)
+    linewidth = LINEWIDTH_MAP.get(key, 2.0)
+    color = COLOR_MAP.get(key)
+    if marker is None or linestyle is None or color is None:
         # Deterministic fallback based on label hash
         idx = abs(hash(key))
-        marker = _MARKERS_CYCLE[idx % len(_MARKERS_CYCLE)]
-    return marker, linestyle
+        if marker is None:
+            marker = _MARKERS_CYCLE[idx % len(_MARKERS_CYCLE)]
+        if linestyle is None:
+            linestyle = _STYLES_CYCLE[idx % len(_STYLES_CYCLE)]
+        if color is None:
+            color = _COLORS_CYCLE[idx % len(_COLORS_CYCLE)]
+    return marker, linestyle, linewidth, color
 
 
 def load_records(csv_path: str):
@@ -105,8 +156,11 @@ def load_records(csv_path: str):
                     "max_mem_perc": float(r.get("max_mem_perc", "") or float("nan")),
                     "max_mem_bytes": float(r.get("max_mem_used_bytes", "") or float("nan")),
                     "avg_cpu": float(r.get("avg_cpu_perc", "") or float("nan")),
+                    "avg_cpu_cores": float(r.get("avg_cpu_perc", "") or float("nan")) / 100.0 if r.get("avg_cpu_perc", "") else float("nan"),
                     "avg_mem_perc": float(r.get("avg_mem_perc", "") or float("nan")),
                     "avg_mem_bytes": float(r.get("avg_mem_used_bytes", "") or float("nan")),
+                    "avg_mem_mb": float(r.get("avg_mem_used_bytes", "") or float("nan")) / (1024.0 * 1024.0) if r.get("avg_mem_used_bytes", "") else float("nan"),
+                    "max_mem_mb": float(r.get("max_mem_used_bytes", "") or float("nan")) / (1024.0 * 1024.0) if r.get("max_mem_used_bytes", "") else float("nan"),
                     "connections": int(r.get("connections", "") or 0),
                     "active_connections": int(r.get("active_connections", "") or 0),
                     "run_id": r.get("run_id", ""),
@@ -114,6 +168,7 @@ def load_records(csv_path: str):
                 # Extract pairs 'n<NNN>' from run_id if present
                 rid = item.get("run_id", "")
                 pairs = None
+                rate_per_pub = None
                 if rid:
                     m = re.search(r"[_-]n(\d+)(?:[_-]|$)", rid)
                     if m:
@@ -121,7 +176,15 @@ def load_records(csv_path: str):
                             pairs = int(m.group(1))
                         except Exception:
                             pairs = None
+                    # Extract rate_per_pub 'r<NNN>' from run_id if present
+                    m_rate = re.search(r"[_-]r(\d+)(?:[_-]|$)", rid)
+                    if m_rate:
+                        try:
+                            rate_per_pub = int(m_rate.group(1))
+                        except Exception:
+                            rate_per_pub = None
                 item["pairs"] = pairs
+                item["rate_per_pub"] = rate_per_pub
                 recs.append(item)
             except Exception:
                 # Skip malformed rows
@@ -179,36 +242,65 @@ def add_legend_top(ax, fig, max_cols: int = 4, reserve_top: float = 0.82) -> Non
     fig.legend(handles2, labels2, loc="upper center", bbox_to_anchor=(0.5, 0.99), ncol=ncol, frameon=False)
 
 
-def format_pairs_axis(ax, data_xs: list) -> None:
-    """Format the x-axis for pairs plots with scientific notation like 2×10³."""
-    from matplotlib.ticker import FuncFormatter, FixedLocator
+def format_pairs_axis(ax, data_xs: list, use_thousands: bool = True) -> None:
+    """Format the x-axis for pairs plots.
     
-    def sci_formatter(x, pos):
+    If use_thousands=True, display values divided by 1000 (e.g., 500->0.5, 1000->1, 2000->2).
+    The caller should update the axis label to include '(×1000)'.
+    """
+    from matplotlib.ticker import FuncFormatter, FixedLocator, NullLocator
+    
+    def thousands_formatter(x, pos):
         if x <= 0:
             return "0"
-        exp = int(math.floor(math.log10(x)))
-        coef = x / (10 ** exp)
-        if abs(coef - round(coef)) < 0.01:
-            coef = int(round(coef))
-        if exp == 0:
-            return f"{coef}"
-        elif exp == 1:
-            return f"{int(coef * 10)}" if coef != 1 else "10"
-        elif exp == 2:
-            return f"{int(coef * 100)}" if coef == 1 else f"{coef}×10²"
+        val = x / 1000.0
+        # Show as integer if it's a whole number, otherwise one decimal
+        if val == int(val):
+            return f"{int(val)}"
         else:
-            # Use superscript for exponent
-            superscripts = "⁰¹²³⁴⁵⁶⁷⁸⁹"
-            exp_str = "".join(superscripts[int(d)] for d in str(exp))
-            if coef == 1:
-                return f"10{exp_str}"
-            return f"{coef}×10{exp_str}"
+            return f"{val:.1f}"
     
-    # Set tick locations to actual data points
+    # Set tick locations to actual data points only
     if data_xs:
         unique_xs = sorted(set(data_xs))
         ax.xaxis.set_major_locator(FixedLocator(unique_xs))
-    ax.xaxis.set_major_formatter(FuncFormatter(sci_formatter))
+        # Disable minor ticks to prevent log scale from adding extra ticks (e.g., 600)
+        ax.xaxis.set_minor_locator(NullLocator())
+    ax.xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+
+
+def format_throughput_axis(ax) -> None:
+    """Format the y-axis for throughput plots, showing values in ×10000."""
+    from matplotlib.ticker import FuncFormatter
+    
+    def ten_thousands_formatter(x, pos):
+        if x <= 0:
+            return "0"
+        val = x / 10000.0
+        # Show as integer if it's a whole number, otherwise one decimal
+        if val == int(val):
+            return f"{int(val)}"
+        else:
+            return f"{val:.1f}"
+    
+    ax.yaxis.set_major_formatter(FuncFormatter(ten_thousands_formatter))
+
+
+def format_memory_mb_axis(ax) -> None:
+    """Format the y-axis for memory plots, showing MB values as GB (÷1000)."""
+    from matplotlib.ticker import FuncFormatter
+    
+    def gb_formatter(x, pos):
+        if x <= 0:
+            return "0"
+        val = x / 1000.0  # Convert MB to GB
+        # Show as integer if it's a whole number, otherwise one decimal
+        if val == int(val):
+            return f"{int(val)}"
+        else:
+            return f"{val:.1f}"
+    
+    ax.yaxis.set_major_formatter(FuncFormatter(gb_formatter))
 
 
 def main() -> int:
@@ -227,6 +319,36 @@ def main() -> int:
     except Exception as e:
         print(f"[plot] matplotlib not available: {e}\nInstall with: pip install matplotlib", file=sys.stderr)
         return 0
+
+    # Configure matplotlib for LaTeX mode if requested
+    if args.latex:
+        plt.rcParams.update({
+            'font.size': LATEX_FONT_SIZE,
+            'axes.titlesize': LATEX_TITLE_SIZE,
+            'axes.labelsize': LATEX_FONT_SIZE,
+            'xtick.labelsize': LATEX_FONT_SIZE - 1,
+            'ytick.labelsize': LATEX_FONT_SIZE - 1,
+            'legend.fontsize': LATEX_LEGEND_SIZE,
+            'figure.figsize': LATEX_FIGSIZE,
+            'figure.dpi': LATEX_DPI,
+            'savefig.dpi': LATEX_DPI,
+            'lines.linewidth': LATEX_LINEWIDTH,
+            'lines.markersize': LATEX_MARKER_SIZE,
+            'axes.linewidth': 0.8,
+            'grid.linewidth': 0.5,
+            'font.family': 'serif',
+            'mathtext.fontset': 'cm',  # Computer Modern for math
+        })
+        figsize = LATEX_FIGSIZE
+        marker_size = LATEX_MARKER_SIZE
+        plot_dpi = LATEX_DPI
+        plot_ext = ".pdf"  # Vector format for LaTeX
+        print(f"[plot] LaTeX mode enabled: {figsize[0]}x{figsize[1]} inches, {plot_dpi} DPI, PDF output")
+    else:
+        figsize = DEFAULT_FIGSIZE
+        marker_size = DEFAULT_MARKER_SIZE
+        plot_dpi = 150
+        plot_ext = ".png"
 
     records = load_records(args.summary)
     if not records:
@@ -274,7 +396,7 @@ def main() -> int:
     # Throughput vs offered rate (skip if latency-only)
     if not latency_only and not args.only_latency_vs_payload:
         for payload in payloads:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
                 xs, ys = [], []
                 # Preserve input order of rates on X axis
@@ -288,15 +410,16 @@ def main() -> int:
                     xs.append(rate)
                     ys.append(sub_tps)
                 if xs and ys:
-                    m, ls = style_for(t)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
+                    m, ls, lw, clr = style_for(t)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
             ax.set_title(f"Throughput vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
-            ax.set_ylabel("Delivered throughput (msg/s)")
-            ax.grid(True, alpha=0.3)
+            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
+            format_throughput_axis(ax)
+            ax.grid(True, alpha=0.4, linestyle="--")
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             throughput_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -334,42 +457,51 @@ def main() -> int:
             if not plot_data:
                 continue
             
-            # Plot 1: Log scale (existing behavior)
-            fig, ax = plt.subplots(figsize=(7, 4))
+            # Determine rate_per_pub from the data (should be consistent across all records for this payload)
+            rate_per_pub_set = set()
             for t, (xs, ys) in plot_data.items():
-                m, ls = style_for(t)
-                ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
-            ax.set_title(f"Delivered Throughput vs Pairs (payload={payload}B) [Log Scale]")
-            ax.set_xlabel("Pairs (N publishers = N subscribers)")
-            ax.set_ylabel("Delivered throughput (msg/s)")
-            ax.grid(True, alpha=0.3)
+                for rec in by_pt.get((payload, t), []):
+                    if rec.get("rate_per_pub") is not None:
+                        rate_per_pub_set.add(rec["rate_per_pub"])
+            rate_per_pub_str = ""
+            if len(rate_per_pub_set) == 1:
+                rate_per_pub_str = f"{list(rate_per_pub_set)[0]} msg/s/pub"
+            elif len(rate_per_pub_set) > 1:
+                rate_per_pub_str = f"{sorted(rate_per_pub_set)} msg/s/pub"
+            
+            # Plot 1: Log scale (existing behavior)
+            fig, ax = plt.subplots(figsize=figsize)
+            for t, (xs, ys) in plot_data.items():
+                m, ls, lw, clr = style_for(t)
+                ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
+            ax.set_title(f"Delivered Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Delivered Throughput vs Pairs")
+            ax.set_xlabel("Pub-Sub Pairs (×1000)")
+            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
+            ax.grid(True, alpha=0.4, linestyle="--")
             ax.set_xscale("log")
             format_pairs_axis(ax, all_xs)
+            format_throughput_axis(ax)
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_log.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_log{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             throughput_pairs_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
             
             # Plot 2: Linear scale (new)
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for t, (xs, ys) in plot_data.items():
-                m, ls = style_for(t)
-                ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
-            ax.set_title(f"Delivered Throughput vs Pairs (payload={payload}B) [Linear Scale]")
-            ax.set_xlabel("Pairs (N publishers = N subscribers)")
-            ax.set_ylabel("Delivered throughput (msg/s)")
-            ax.grid(True, alpha=0.3)
-            # Linear scale - use default formatting with thousands separator
-            ax.ticklabel_format(style='plain', axis='x')
-            try:
-                from matplotlib.ticker import FuncFormatter
-                ax.xaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ',')))
-            except Exception:
-                pass
+                m, ls, lw, clr = style_for(t)
+                ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
+            ax.set_title(f"Delivered Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Delivered Throughput vs Pairs")
+            ax.set_xlabel("Pub-Sub Pairs (×1000)")
+            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
+            ax.grid(True, alpha=0.4, linestyle="--")
+            # Linear scale - use thousands formatter
+            format_pairs_axis(ax, all_xs)
+            format_throughput_axis(ax)
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_linear.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_linear{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             throughput_pairs_imgs_linear[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -395,12 +527,17 @@ def main() -> int:
     def plot_latency_pairs(metric_key: str, title_prefix: str) -> dict:
         out = {}
         for payload in payloads:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             all_xs = []  # Collect all x values for axis formatting
+            rate_per_pub_set = set()  # Collect rate_per_pub values
             for t in transports:
                 lst = by_pt_lat_pairs.get((payload, t), [])
                 if not lst:
                     continue
+                # Collect rate_per_pub from records
+                for rec in lst:
+                    if rec.get("rate_per_pub") is not None:
+                        rate_per_pub_set.add(rec["rate_per_pub"])
                 # Deduplicate by pairs count (keep last entry for each pairs value)
                 lst = dedupe_by_pairs(lst)
                 lst = sorted(lst, key=lambda x: (x.get("pairs") or 0))
@@ -413,16 +550,22 @@ def main() -> int:
                     xs.append(pairs)
                     ys.append(val)
                 if xs and ys:
-                    m, ls = style_for(t)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
+                    m, ls, lw, clr = style_for(t)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
                     all_xs.extend(xs)
             if not ax.has_data():
                 plt.close(fig)
                 continue
-            ax.set_title(f"{title_prefix} vs Pairs (payload={payload}B)")
-            ax.set_xlabel("Pairs (N publishers = N subscribers)")
+            # Build rate_per_pub string for title
+            rate_per_pub_str = ""
+            if len(rate_per_pub_set) == 1:
+                rate_per_pub_str = f"{list(rate_per_pub_set)[0]} msg/s/pub"
+            elif len(rate_per_pub_set) > 1:
+                rate_per_pub_str = f"{sorted(rate_per_pub_set)} msg/s/pub"
+            ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
+            ax.set_xlabel("Pub-Sub Pairs (×1000)")
             ax.set_ylabel(f"{title_prefix} (ms)")
-            ax.grid(True, alpha=0.3)
+            ax.grid(True, alpha=0.4, linestyle="--")
             # Use log scales for readability and latency convention
             try:
                 ax.set_xscale("log")
@@ -434,8 +577,8 @@ def main() -> int:
                 pass
             format_pairs_axis(ax, all_xs)
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             out[payload] = os.path.basename(fn)
             plt.close(fig)
         return out
@@ -449,19 +592,25 @@ def main() -> int:
     cpu_pairs_imgs = {}
     mem_pairs_imgs = {}
     avg_cpu_pairs_imgs = {}
+    avg_cpu_cores_pairs_imgs = {}
     avg_mem_pairs_imgs = {}
 
-    def plot_metric_vs_pairs(metric_key: str, title_prefix: str, y_label: str) -> dict:
+    def plot_metric_vs_pairs(metric_key: str, title_prefix: str, y_label: str, y_formatter=None) -> dict:
         out = {}
         if args.only_latency_vs_payload:
             return out
         for payload in payloads:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             all_xs = []  # Collect all x values for axis formatting
+            rate_per_pub_set = set()  # Collect rate_per_pub values
             for t in transports:
                 lst = by_pt_lat_pairs.get((payload, t), [])
                 if not lst:
                     continue
+                # Collect rate_per_pub from records
+                for rec in lst:
+                    if rec.get("rate_per_pub") is not None:
+                        rate_per_pub_set.add(rec["rate_per_pub"])
                 # Deduplicate by pairs count (keep last entry for each pairs value)
                 lst = dedupe_by_pairs(lst)
                 lst = sorted(lst, key=lambda x: (x.get("pairs") or 0))
@@ -474,24 +623,28 @@ def main() -> int:
                     xs.append(pairs)
                     ys.append(val)
                 if xs and ys:
-                    m, ls = style_for(t)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
+                    m, ls, lw, clr = style_for(t)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
                     all_xs.extend(xs)
             if not ax.has_data():
                 plt.close(fig)
                 continue
-            ax.set_title(f"{title_prefix} vs Pairs (payload={payload}B)")
-            ax.set_xlabel("Pairs (N publishers = N subscribers)")
+            # Build rate_per_pub string for title
+            rate_per_pub_str = ""
+            if len(rate_per_pub_set) == 1:
+                rate_per_pub_str = f"{list(rate_per_pub_set)[0]} msg/s/pub"
+            elif len(rate_per_pub_set) > 1:
+                rate_per_pub_str = f"{sorted(rate_per_pub_set)} msg/s/pub"
+            ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
+            ax.set_xlabel("Pub-Sub Pairs (×1000)")
             ax.set_ylabel(y_label)
-            ax.grid(True, alpha=0.3)
-            try:
-                ax.set_xscale("log")
-            except Exception:
-                pass
+            if y_formatter:
+                y_formatter(ax)
+            ax.grid(True, alpha=0.4, linestyle="--")
             format_pairs_axis(ax, all_xs)
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             out[payload] = os.path.basename(fn)
             plt.close(fig)
         return out
@@ -500,12 +653,15 @@ def main() -> int:
         cpu_pairs_imgs = plot_metric_vs_pairs("max_cpu", "Max CPU%", "Max CPU (%)")
         mem_pairs_imgs = plot_metric_vs_pairs("max_mem_perc", "Max Memory%", "Max Memory (%)")
         avg_cpu_pairs_imgs = plot_metric_vs_pairs("avg_cpu", "Avg CPU%", "Avg CPU (%)")
+        avg_cpu_cores_pairs_imgs = plot_metric_vs_pairs("avg_cpu_cores", "Avg CPU Cores Used", "CPU Cores Used")
         avg_mem_pairs_imgs = plot_metric_vs_pairs("avg_mem_perc", "Avg Memory%", "Avg Memory (%)")
+        avg_mem_mb_pairs_imgs = plot_metric_vs_pairs("avg_mem_mb", "Avg Memory", "Avg Memory (GB)", y_formatter=format_memory_mb_axis)
+        max_mem_mb_pairs_imgs = plot_metric_vs_pairs("max_mem_mb", "Max Memory", "Max Memory (GB)", y_formatter=format_memory_mb_axis)
 
     # P99 vs offered rate (skip if latency-only; it's rate-based summary)
     if not latency_only and not args.only_latency_vs_payload:
         for payload in payloads:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
                 xs, ys = [], []
                 for rate in rates:
@@ -519,8 +675,8 @@ def main() -> int:
                     xs.append(rate)
                     ys.append(p99)
                 if xs and ys:
-                    m, ls = style_for(t)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
+                    m, ls, lw, clr = style_for(t)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
             ax.set_title(f"P99 latency vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
             ax.set_ylabel("P99 latency (ms)")
@@ -529,17 +685,17 @@ def main() -> int:
                 ax.set_yscale("log")
             except Exception:
                 pass
-            ax.grid(True, alpha=0.3)
+            ax.grid(True, alpha=0.4, linestyle="--")
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             p99_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
     # Max CPU% vs offered rate (skip if latency-only)
     if not latency_only and not args.only_latency_vs_payload:
         for payload in payloads:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
                 xs, ys = [], []
                 for rate in rates:
@@ -552,22 +708,22 @@ def main() -> int:
                     xs.append(rate)
                     ys.append(mc)
                 if xs and ys:
-                    m, ls = style_for(t)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
+                    m, ls, lw, clr = style_for(t)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
             ax.set_title(f"Max CPU% vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
             ax.set_ylabel("Max CPU (%)")
-            ax.grid(True, alpha=0.3)
+            ax.grid(True, alpha=0.4, linestyle="--")
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"max_cpu_vs_rate_payload{payload}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"max_cpu_vs_rate_payload{payload}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             cpu_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
     # Max Memory% vs offered rate (skip if latency-only)
     if not latency_only and not args.only_latency_vs_payload:
         for payload in payloads:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
                 xs, ys = [], []
                 for rate in rates:
@@ -580,15 +736,15 @@ def main() -> int:
                     xs.append(rate)
                     ys.append(mm)
                 if xs and ys:
-                    m, ls = style_for(t)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
+                    m, ls, lw, clr = style_for(t)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
             ax.set_title(f"Max Memory% vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
             ax.set_ylabel("Max Memory (%)")
-            ax.grid(True, alpha=0.3)
+            ax.grid(True, alpha=0.4, linestyle="--")
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"max_mem_vs_rate_payload{payload}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"max_mem_vs_rate_payload{payload}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             mem_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -599,7 +755,7 @@ def main() -> int:
     def plot_metric_vs_payload(metric_key: str, title_prefix: str, y_label: str, dataset, log_y: bool = True) -> dict:
         out = {}
         for rate in rates:
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             log_kb_set = set()
             for t in transports:
                 # gather all records for this (rate, transport) across payloads
@@ -630,8 +786,8 @@ def main() -> int:
                     log_kb_set.add(x_log)
                     ys.append(val)
                 if xs and ys:
-                    m, ls = style_for(t)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=t)
+                    m, ls, lw, clr = style_for(t)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
             
             if not ax.has_data():
                 plt.close(fig)
@@ -649,7 +805,7 @@ def main() -> int:
             else:
                 ax.set_ylim(bottom=0)
 
-            ax.grid(True, alpha=0.3)
+            ax.grid(True, alpha=0.4, linestyle="--")
             
             if log_kb_set:
                 xs_sorted = sorted(log_kb_set)
@@ -670,8 +826,8 @@ def main() -> int:
             ax.xaxis.set_major_formatter(FuncFormatter(log_formatter))
             
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"{metric_key}_vs_payload_rate{rate}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"{metric_key}_vs_payload_rate{rate}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             out[rate] = os.path.basename(fn)
             plt.close(fig)
         return out
@@ -726,25 +882,26 @@ def main() -> int:
             for rr in rows:
                 by_label[rr["label"]].append(rr)
 
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for label, lst in by_label.items():
                 lst = sorted(lst, key=lambda x: x["subs"])
                 xs = [x["subs"] for x in lst if math.isfinite(x.get("sub_tps", float("nan")))]
                 ys = [x["sub_tps"] for x in lst if math.isfinite(x.get("sub_tps", float("nan")))]
-                m, ls = style_for(label)
-                ax.plot(xs, ys, marker=m, linestyle=ls, label=label)
+                m, ls, lw, clr = style_for(label)
+                ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
             ax.set_title(f"Delivered throughput vs Fanout (payload={payload}B, rate={rate}/s)")
             ax.set_xlabel("Fanout (subscribers)")
-            ax.set_ylabel("Delivered throughput (msg/s)")
-            ax.grid(True, alpha=0.3)
+            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
+            format_throughput_axis(ax)
+            ax.grid(True, alpha=0.4, linestyle="--")
             add_legend_top(ax, fig)
-            fn = os.path.join(args.out_dir, f"throughput-vs-fanout_payload{payload}_rate{rate}.png")
-            fig.savefig(fn, dpi=150)
+            fn = os.path.join(args.out_dir, f"throughput-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
+            fig.savefig(fn, dpi=plot_dpi)
             fanout_imgs[(payload, rate)] = os.path.basename(fn)
             plt.close(fig)
 
             # CPU vs fanout
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for label, lst in by_label.items():
                 lst = sorted(lst, key=lambda x: x["subs"])
                 xs, ys = [], []
@@ -755,20 +912,20 @@ def main() -> int:
                     xs.append(x["subs"]) 
                     ys.append(v)
                 if xs and ys:
-                    m, ls = style_for(label)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=label)
+                    m, ls, lw, clr = style_for(label)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
             ax.set_title(f"Max CPU% vs Fanout (payload={payload}B, rate={rate}/s)")
             ax.set_xlabel("Fanout (subscribers)")
             ax.set_ylabel("Max CPU (%)")
-            ax.grid(True, alpha=0.3)
+            ax.grid(True, alpha=0.4, linestyle="--")
             add_legend_top(ax, fig)
-            fn_cpu = os.path.join(args.out_dir, f"max-cpu-vs-fanout_payload{payload}_rate{rate}.png")
-            fig.savefig(fn_cpu, dpi=150)
+            fn_cpu = os.path.join(args.out_dir, f"max-cpu-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
+            fig.savefig(fn_cpu, dpi=plot_dpi)
             fanout_cpu_imgs[(payload, rate)] = os.path.basename(fn_cpu)
             plt.close(fig)
 
             # Memory% vs fanout
-            fig, ax = plt.subplots(figsize=(7, 4))
+            fig, ax = plt.subplots(figsize=figsize)
             for label, lst in by_label.items():
                 lst = sorted(lst, key=lambda x: x["subs"])
                 xs, ys = [], []
@@ -779,15 +936,15 @@ def main() -> int:
                     xs.append(x["subs"]) 
                     ys.append(v)
                 if xs and ys:
-                    m, ls = style_for(label)
-                    ax.plot(xs, ys, marker=m, linestyle=ls, label=label)
+                    m, ls, lw, clr = style_for(label)
+                    ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
             ax.set_title(f"Max Memory% vs Fanout (payload={payload}B, rate={rate}/s)")
             ax.set_xlabel("Fanout (subscribers)")
             ax.set_ylabel("Max Memory (%)")
-            ax.grid(True, alpha=0.3)
+            ax.grid(True, alpha=0.4, linestyle="--")
             add_legend_top(ax, fig)
-            fn_mem = os.path.join(args.out_dir, f"max-memory-vs-fanout_payload{payload}_rate{rate}.png")
-            fig.savefig(fn_mem, dpi=150)
+            fn_mem = os.path.join(args.out_dir, f"max-memory-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
+            fig.savefig(fn_mem, dpi=plot_dpi)
             fanout_mem_imgs[(payload, rate)] = os.path.basename(fn_mem)
             plt.close(fig)
 
@@ -843,8 +1000,23 @@ def main() -> int:
             except Exception:
                 pass
             try:
+                if 'avg_cpu_cores_pairs_imgs' in locals() and avg_cpu_cores_pairs_imgs:
+                    f.write("- [Avg CPU Cores Used vs Pairs](#avg-cpu-cores-used-vs-pairs)\n")
+            except Exception:
+                pass
+            try:
                 if 'avg_mem_pairs_imgs' in locals() and avg_mem_pairs_imgs:
                     f.write("- [Avg Memory% vs Pairs](#avg-memory-vs-pairs)\n")
+            except Exception:
+                pass
+            try:
+                if 'avg_mem_mb_pairs_imgs' in locals() and avg_mem_mb_pairs_imgs:
+                    f.write("- [Avg Memory (MB) vs Pairs](#avg-memory-mb-vs-pairs)\n")
+            except Exception:
+                pass
+            try:
+                if 'max_mem_mb_pairs_imgs' in locals() and max_mem_mb_pairs_imgs:
+                    f.write("- [Max Memory (MB) vs Pairs](#max-memory-mb-vs-pairs)\n")
             except Exception:
                 pass
 
@@ -958,6 +1130,18 @@ def main() -> int:
                 pass
 
             try:
+                if 'avg_cpu_cores_pairs_imgs' in locals() and avg_cpu_cores_pairs_imgs:
+                    f.write("## Avg CPU Cores Used vs Pairs\n\n")
+                    for payload in payloads:
+                        img = avg_cpu_cores_pairs_imgs.get(payload)
+                        if not img:
+                            continue
+                        f.write(f"### payload={payload}B\n\n")
+                        f.write(f"![avg cpu cores used vs pairs payload {payload}]({img})\n\n")
+            except Exception:
+                pass
+
+            try:
                 if 'avg_mem_pairs_imgs' in locals() and avg_mem_pairs_imgs:
                     f.write("## Avg Memory% vs Pairs\n\n")
                     for payload in payloads:
@@ -966,6 +1150,30 @@ def main() -> int:
                             continue
                         f.write(f"### payload={payload}B\n\n")
                         f.write(f"![avg mem vs pairs payload {payload}]({img})\n\n")
+            except Exception:
+                pass
+
+            try:
+                if 'avg_mem_mb_pairs_imgs' in locals() and avg_mem_mb_pairs_imgs:
+                    f.write("## Avg Memory (MB) vs Pairs\n\n")
+                    for payload in payloads:
+                        img = avg_mem_mb_pairs_imgs.get(payload)
+                        if not img:
+                            continue
+                        f.write(f"### payload={payload}B\n\n")
+                        f.write(f"![avg mem mb vs pairs payload {payload}]({img})\n\n")
+            except Exception:
+                pass
+
+            try:
+                if 'max_mem_mb_pairs_imgs' in locals() and max_mem_mb_pairs_imgs:
+                    f.write("## Max Memory (MB) vs Pairs\n\n")
+                    for payload in payloads:
+                        img = max_mem_mb_pairs_imgs.get(payload)
+                        if not img:
+                            continue
+                        f.write(f"### payload={payload}B\n\n")
+                        f.write(f"![max mem mb vs pairs payload {payload}]({img})\n\n")
             except Exception:
                 pass
 
