@@ -5,8 +5,10 @@ use tokio::sync::RwLock;
 
 /// Statistics collector for latency and throughput
 pub struct Stats {
-    // Latency histogram (nanosecond precision)
+    // Latency histogram (nanosecond precision) - cumulative
     latency_hist: RwLock<Histogram<u64>>,
+    // Interval latency histogram - reset after each snapshot
+    interval_latency_hist: RwLock<Histogram<u64>>,
 
     // Counters
     pub sent_count: AtomicU64,
@@ -49,6 +51,7 @@ impl Stats {
         Self {
             // 1ns to 60s range, 3 significant digits
             latency_hist: RwLock::new(Histogram::new_with_bounds(1, 60_000_000_000, 3).unwrap()),
+            interval_latency_hist: RwLock::new(Histogram::new_with_bounds(1, 60_000_000_000, 3).unwrap()),
             sent_count: AtomicU64::new(0),
             received_count: AtomicU64::new(0),
             error_count: AtomicU64::new(0),
@@ -89,6 +92,9 @@ impl Stats {
         }
 
         if let Ok(mut hist) = self.latency_hist.try_write() {
+            let _ = hist.record(latency_ns);
+        }
+        if let Ok(mut hist) = self.interval_latency_hist.try_write() {
             let _ = hist.record(latency_ns);
         }
     }
@@ -184,9 +190,17 @@ impl Stats {
             }
         }
         // Record all latencies under a single histogram write lock
-        let mut hist = self.latency_hist.write().await;
-        for &lat in latencies_ns {
-            let _ = hist.record(lat);
+        {
+            let mut hist = self.latency_hist.write().await;
+            for &lat in latencies_ns {
+                let _ = hist.record(lat);
+            }
+        }
+        {
+            let mut hist = self.interval_latency_hist.write().await;
+            for &lat in latencies_ns {
+                let _ = hist.record(lat);
+            }
         }
     }
 
@@ -214,6 +228,16 @@ impl Stats {
         let min = hist.min();
         let max = hist.max();
         let mean = hist.mean();
+        let stdev = hist.stdev();
+        drop(hist);
+
+        // Get interval stdev and reset interval histogram
+        let interval_stdev = {
+            let mut interval_hist = self.interval_latency_hist.write().await;
+            let s = interval_hist.stdev();
+            interval_hist.reset();
+            s
+        };
 
         let total_elapsed = now.duration_since(self.start_time);
         let since_last = {
@@ -268,6 +292,8 @@ impl Stats {
             latency_ns_min: min,
             latency_ns_max: max,
             latency_ns_mean: mean,
+            latency_ns_stdev: stdev,
+            interval_latency_ns_stdev: interval_stdev,
             connections: conns,
             active_connections: active_conns,
             connection_attempts: conn_attempts,
@@ -297,6 +323,7 @@ impl Stats {
         self.duplicate_count.store(0, Ordering::Relaxed);
         self.gap_count.store(0, Ordering::Relaxed);
         self.latency_hist.write().await.reset();
+        self.interval_latency_hist.write().await.reset();
         *self.last_snapshot.write().await = Instant::now();
     }
 }
@@ -319,6 +346,8 @@ pub struct StatsSnapshot {
     pub latency_ns_min: u64,
     pub latency_ns_max: u64,
     pub latency_ns_mean: f64,
+    pub latency_ns_stdev: f64,
+    pub interval_latency_ns_stdev: f64,
     pub connections: u64,
     pub active_connections: u64,
     pub connection_attempts: u64,
@@ -377,7 +406,7 @@ impl StatsSnapshot {
     /// Convert to CSV row
     pub fn to_csv_row(&self) -> String {
         format!(
-            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{:.2},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{:.2},{:.2},{:.2},{},{},{},{},{},{},{},{},{}",
             self.timestamp,
             self.sent_count,
             self.received_count,
@@ -390,6 +419,8 @@ impl StatsSnapshot {
             self.latency_ns_min,
             self.latency_ns_max,
             self.latency_ns_mean,
+            self.latency_ns_stdev,
+            self.interval_latency_ns_stdev,
             self.connections,
             self.active_connections,
             self.connection_attempts,
@@ -404,7 +435,7 @@ impl StatsSnapshot {
 
     /// CSV header
     pub fn csv_header() -> &'static str {
-        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p50,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean,connections,active_connections,connection_attempts,connection_failures,crashes_injected,reconnects,reconnect_failures,duplicate_count,gap_count"
+        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p50,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean,latency_ns_stdev,interval_latency_ns_stdev,connections,active_connections,connection_attempts,connection_failures,crashes_injected,reconnects,reconnect_failures,duplicate_count,gap_count"
     }
 }
 

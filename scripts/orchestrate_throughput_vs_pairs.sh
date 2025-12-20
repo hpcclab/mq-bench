@@ -270,7 +270,7 @@ fi
 
 # Header
 if [[ ! -s "${SUMMARY_CSV}" ]]; then
-  echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes,avg_cpu_perc,avg_mem_perc,avg_mem_used_bytes" > "${SUMMARY_CSV}"
+  echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,stdev_ms,interval_stdev_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes,avg_cpu_perc,avg_mem_perc,avg_mem_used_bytes" > "${SUMMARY_CSV}"
 fi
 
 append_summary_from_artifacts() {
@@ -310,8 +310,8 @@ append_summary_from_artifacts() {
     }
   ' "${sub_csv}")
 
-  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean
-  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean <<<"${last_sub}"
+  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev
+  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev <<<"${last_sub}"
   
   # Use the steady-state mean TPS instead of max or final cumulative TPS
   tps="${steady_state_tps}"
@@ -322,10 +322,12 @@ append_summary_from_artifacts() {
     IFS=, read -r _pts psent _prev _perr ptt _pit _a _b _c _d _e _f <<<"${last_pub}"
     pub_tps="${ptt}"; sent="${psent}"
   fi
-  local p50_ms p95_ms p99_ms
+  local p50_ms p95_ms p99_ms stdev_ms interval_stdev_ms
   p50_ms=$(awk -v n="${p50}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p95_ms=$(awk -v n="${p95}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p99_ms=$(awk -v n="${p99}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  stdev_ms=$(awk -v n="${stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  interval_stdev_ms=$(awk -v n="${interval_stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
 
   # Docker stats aggregation (optional)
   local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used
@@ -389,7 +391,7 @@ append_summary_from_artifacts() {
     IFS=, read -r max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used <<<"${agg}"
   fi
 
-  echo "${transport},${payload},${total_rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used},${avg_cpu},${avg_mem_perc},${avg_mem_used}" >> "${SUMMARY_CSV}"
+  echo "${transport},${payload},${total_rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${interval_stdev_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used},${avg_cpu},${avg_mem_perc},${avg_mem_used}" >> "${SUMMARY_CSV}"
 }
 
 # Map transport/broker to docker-compose service names

@@ -26,7 +26,7 @@ use std::time::Duration;
 use tokio::signal;
 use tokio::sync::mpsc;
 use tokio::time::interval;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 pub struct ReliablePublisherConfig {
     pub engine: Engine,
@@ -202,7 +202,7 @@ pub async fn run_reliable_publisher(config: ReliablePublisherConfig) -> Result<(
         // Track inflight messages: packet_id -> sequence_number
         let inflight: Arc<tokio::sync::Mutex<HashMap<u16, u64>>> =
             Arc::new(tokio::sync::Mutex::new(HashMap::new()));
-        let inflight_clone = Arc::clone(&inflight);
+        let _inflight_clone = Arc::clone(&inflight);
 
         // Spawn eventloop poller that sends ACK notifications
         let ack_tx_clone = ack_tx.clone();

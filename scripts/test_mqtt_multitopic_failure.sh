@@ -33,9 +33,9 @@ PUBLISHERS="${PUBLISHERS:--1}"
 SUBSCRIBERS="${SUBSCRIBERS:--1}"
 
 # Publish parameters
-PAYLOAD="${PAYLOAD:-64}"
+PAYLOAD="${PAYLOAD:-1024}"
 RATE="${RATE:-1}"          # per publisher msg/s
-DURATION="${DURATION:-60}"
+DURATION="${DURATION:-180}"
 
 # Which QoS levels to run (space-separated), e.g. "1 2" or "1".
 QOS_LEVELS="${QOS_LEVELS:-0 1 2}"
@@ -49,9 +49,9 @@ QOS_LEVELS="${QOS_LEVELS:-0 1 2}"
 #
 # To reduce loss: increase SUB_MTTR >> broker session_expiry (e.g., 30s)
 # OR: Use QOS_LEVELS=1 and accept some loss as expected behavior
-SUB_MTTF="${SUB_MTTF:-10}"          # Longer MTTF = fewer crashes
-SUB_MTTR="${SUB_MTTR:-2}"          # Longer MTTR = more realistic recovery
-SUB_CRASH_COUNT="${SUB_CRASH_COUNT:-10}"  # Fewer crashes for cleaner test
+SUB_MTTF="${SUB_MTTF:-30}"          # Longer MTTF = fewer crashes
+SUB_MTTR="${SUB_MTTR:-5}"          # Longer MTTR = more realistic recovery
+SUB_CRASH_COUNT="${SUB_CRASH_COUNT:-100}"  # Fewer crashes for cleaner test
 SUB_CRASH_SEED="${SUB_CRASH_SEED:-54321}"
 
 # Crash scheduling scope
@@ -72,9 +72,9 @@ SUB_EXTRA_DRAIN_SECS="${SUB_EXTRA_DRAIN_SECS:-15}"
 
 # Optional: process-level publisher crash loop (0 disables)
 PUB_CRASH_LOOP="${PUB_CRASH_LOOP:-0}"
-PUB_MTTF="${PUB_MTTF:-10}"
-PUB_MTTR="${PUB_MTTR:-2}"
-PUB_CRASH_COUNT="${PUB_CRASH_COUNT:-10}"
+PUB_MTTF="${PUB_MTTF:-30}"
+PUB_MTTR="${PUB_MTTR:-5}"
+PUB_CRASH_COUNT="${PUB_CRASH_COUNT:-100}"
 PUB_CRASH_SEED="${PUB_CRASH_SEED:-12345}"
 
 # Colors
@@ -335,24 +335,29 @@ run_single_test() {
   local errors
   errors=$(csv_last_field "$sub_csv" 4)
   local dup
-  dup=$(csv_last_field "$sub_csv" 20)
+  dup=$(csv_last_field "$sub_csv" 22)
   local gaps
-  gaps=$(csv_last_field "$sub_csv" 21)
+  gaps=$(csv_last_field "$sub_csv" 23)
   local sub_crashes
-  sub_crashes=$(csv_last_field "$sub_csv" 17)
+  sub_crashes=$(csv_last_field "$sub_csv" 19)
   local sub_reconnects
-  sub_reconnects=$(csv_last_field "$sub_csv" 18)
+  sub_reconnects=$(csv_last_field "$sub_csv" 20)
   local sub_reconnect_failures
-  sub_reconnect_failures=$(csv_last_field "$sub_csv" 19)
+  sub_reconnect_failures=$(csv_last_field "$sub_csv" 21)
 
   local lat_p50_ns lat_p95_ns lat_p99_ns
   lat_p50_ns=$(csv_last_field "$sub_csv" 7)
   lat_p95_ns=$(csv_last_field "$sub_csv" 8)
   lat_p99_ns=$(csv_last_field "$sub_csv" 9)
-  local lat_p50_ms lat_p95_ms lat_p99_ms
+  local lat_stdev_ns lat_interval_stdev_ns
+  lat_stdev_ns=$(csv_last_field "$sub_csv" 13)
+  lat_interval_stdev_ns=$(csv_last_field "$sub_csv" 14)
+  local lat_p50_ms lat_p95_ms lat_p99_ms lat_stdev_ms lat_interval_stdev_ms
   lat_p50_ms=$(ns_to_ms "$lat_p50_ns")
   lat_p95_ms=$(ns_to_ms "$lat_p95_ns")
   lat_p99_ms=$(ns_to_ms "$lat_p99_ns")
+  lat_stdev_ms=$(ns_to_ms "$lat_stdev_ns")
+  lat_interval_stdev_ms=$(ns_to_ms "$lat_interval_stdev_ns")
 
   local loss_pct="N/A"
   if [[ "$sent" -gt 0 ]]; then
@@ -371,6 +376,8 @@ run_single_test() {
   _MT_LAT_P50=$lat_p50_ms
   _MT_LAT_P95=$lat_p95_ms
   _MT_LAT_P99=$lat_p99_ms
+  _MT_LAT_STDEV=$lat_stdev_ms
+  _MT_LAT_INTERVAL_STDEV=$lat_interval_stdev_ms
   _MT_SUB_LOG=$sub_log
   _MT_PUB_LOG=$pub_log
   _MT_SUB_CSV=$sub_csv
@@ -396,6 +403,8 @@ run_qos_comparison() {
   echo "  Latency p50:       ${_MT_LAT_P50}ms"
   echo "  Latency p95:       ${_MT_LAT_P95}ms"
   echo "  Latency p99:       ${_MT_LAT_P99}ms"
+  echo "  Latency stdev:     ${_MT_LAT_STDEV}ms"
+  echo "  Interval stdev:    ${_MT_LAT_INTERVAL_STDEV}ms"
   echo "  Logs:              $_MT_SUB_LOG $_MT_PUB_LOG"
   echo "  CSV:               $_MT_SUB_CSV $_MT_PUB_CSV"
   echo ""

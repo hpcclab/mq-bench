@@ -316,9 +316,9 @@ fi
 # Header
 if [[ ! -s "${SUMMARY_CSV}" ]]; then
   if [[ ${LATENCY_ONLY} -eq 1 ]]; then
-    echo "transport,payload,rate,run_id,p50_ms,p95_ms,p99_ms" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,p50_ms,p95_ms,p99_ms,stdev_ms,interval_stdev_ms" > "${SUMMARY_CSV}"
   else
-    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,stdev_ms,interval_stdev_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
   fi
 fi
 
@@ -357,9 +357,9 @@ append_summary_from_artifacts() {
   if [[ -z "${last_sub}" ]]; then
     log "WARN: No subscriber data for ${run_id}"; return 0
   fi
-  # sub: ts,sent,recv,errors,tps,itps,p50,p95,p99,min,max,mean
-  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean
-  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean <<<"${last_sub}"
+  # sub: ts,sent,recv,errors,tps,itps,p50,p95,p99,min,max,mean,stdev,interval_stdev,...
+  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev
+  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev <<<"${last_sub}"
   local pub_tps sent
   pub_tps=""; sent="${_sent}"
   if [[ -n "${last_pub}" ]]; then
@@ -369,10 +369,12 @@ append_summary_from_artifacts() {
     pub_tps="${ptt}"; sent="${psent}"
   fi
   local ns_to_ms='awk -v n="$1" '\''BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}'\''' 
-  local p50_ms p95_ms p99_ms
+  local p50_ms p95_ms p99_ms stdev_ms interval_stdev_ms
   p50_ms=$(awk -v n="${p50}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p95_ms=$(awk -v n="${p95}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p99_ms=$(awk -v n="${p99}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  stdev_ms=$(awk -v n="${stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  interval_stdev_ms=$(awk -v n="${interval_stdev}" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
 
   # Docker stats aggregation (optional)
   local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used
@@ -420,9 +422,9 @@ append_summary_from_artifacts() {
     IFS=, read -r max_cpu max_mem_perc max_mem_used <<<"${agg}"
   fi
   if [[ ${LATENCY_ONLY} -eq 1 ]]; then
-    echo "${transport},${payload},${rate},${run_id},${p50_ms},${p95_ms},${p99_ms}" >> "${SUMMARY_CSV}"
+    echo "${transport},${payload},${rate},${run_id},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${interval_stdev_ms}" >> "${SUMMARY_CSV}"
   else
-    echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
+    echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${interval_stdev_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
   fi
 }
 

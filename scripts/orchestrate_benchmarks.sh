@@ -171,7 +171,7 @@ fi
 # Write header if file is new/empty and we're going to append runs
 if [[ ${PLOTS_ONLY} -eq 0 ]]; then
   if [[ ! -s "${SUMMARY_CSV}" ]]; then
-    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,stdev_ms,interval_stdev_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
   fi
 fi
 
@@ -211,9 +211,9 @@ parse_and_append_summary() {
   if [[ -z "${last_sub}" ]]; then
     log "WARN: Empty sub.csv for ${run_id}"; return 0
   fi
-  # Expect: ts,sent,recv,errors,tps,itps,p50,p95,p99,min,max,mean,connections,active_connections
-  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean _conns _active
-  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean _conns _active <<<"${last_sub}"
+  # Expect: ts,sent,recv,errors,tps,itps,p50,p95,p99,min,max,mean,stdev,interval_stdev,connections,active_connections,...
+  local _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev _conns _active
+  IFS=, read -r _ts _sent recv _err tps _it p50 p95 p99 _min _max _mean stdev interval_stdev _conns _active <<<"${last_sub}"
   # Publisher total tps (optional)
   local pub_tps sent
   pub_tps=""
@@ -227,12 +227,14 @@ parse_and_append_summary() {
   fi
   local errors
   errors="${_err}"
-  # Convert ns to ms for p50/95/99 if numeric
+  # Convert ns to ms for p50/95/99/stdev if numeric
   ns_to_ms() { awk -v n="$1" 'BEGIN{if(n==""||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}'; }
-  local p50_ms p95_ms p99_ms
+  local p50_ms p95_ms p99_ms stdev_ms interval_stdev_ms
   p50_ms=$(ns_to_ms "${p50}")
   p95_ms=$(ns_to_ms "${p95}")
   p99_ms=$(ns_to_ms "${p99}")
+  stdev_ms=$(ns_to_ms "${stdev}")
+  interval_stdev_ms=$(ns_to_ms "${interval_stdev}")
   # Aggregate docker stats if available (compute precise mem% from used/total)
   local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used
   max_cpu=""; max_mem_perc=""; max_mem_used=""
@@ -313,7 +315,7 @@ parse_and_append_summary() {
     ' "${stats_csv}" || true)
     IFS=, read -r max_cpu max_mem_perc max_mem_used <<<"${agg}"
   fi
-  echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${errors},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
+  echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${interval_stdev_ms},${pub_tps},${sent},${recv},${errors},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
 }
 
 # Start remote docker stats collection (returns PID in REMOTE_STATS_PID global)
