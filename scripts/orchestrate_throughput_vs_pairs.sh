@@ -320,7 +320,7 @@ fi
 
 # Header
 if [[ ! -s "${SUMMARY_CSV}" ]]; then
-  echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes,avg_cpu_perc,avg_mem_perc,avg_mem_used_bytes" > "${SUMMARY_CSV}"
+  echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,stdev_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes,avg_cpu_perc,avg_mem_perc,avg_mem_used_bytes" > "${SUMMARY_CSV}"
 fi
 
 append_summary_from_artifacts() {
@@ -354,6 +354,7 @@ append_summary_from_artifacts() {
         row_p95[NR] = $8 + 0
         row_p99[NR] = $9 + 0
         row_mean[NR] = $12 + 0
+        row_interval_stdev[NR] = $14 + 0
         total_rows = NR
     }
     END {
@@ -381,13 +382,15 @@ append_summary_from_artifacts() {
                 sum_p95 += row_p95[i]
                 sum_p99 += row_p99[i]
                 sum_mean += row_mean[i]
+                # Use sum of squares for RMS calculation of stdev
+                sum_interval_stdev_sq += row_interval_stdev[i] * row_interval_stdev[i]
                 count++
             }
         }
         
         if (count == 0) {
             # No steady-state rows found, output zeros
-            print "0.00,0,0,0,0,0,0,0,0,0"
+            print "0.00,0,0,0,0,0,0,0,0,0,0,0"
             exit
         }
         
@@ -404,6 +407,8 @@ append_summary_from_artifacts() {
         avg_p50 = sum_p50 / count
         avg_p95 = sum_p95 / count
         avg_p99 = sum_p99 / count
+        # RMS of interval stdevs: sqrt(mean of variances)
+        rms_interval_stdev = sqrt(sum_interval_stdev_sq / count)
         
         # Delta counts during steady-state
         delta_recv = last_recv - first_recv
@@ -411,7 +416,7 @@ append_summary_from_artifacts() {
         delta_err = last_err - first_err
         
         # Output includes first_ts and last_ts for docker stats filtering
-        printf "%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%d,%d,%d", tps, avg_p50, avg_p95, avg_p99, delta_sent, delta_recv, delta_err, count, first_ts, last_ts
+        printf "%.2f,%.0f,%.0f,%.0f,%.2f,%.0f,%.0f,%.0f,%d,%d,%d", tps, avg_p50, avg_p95, avg_p99, rms_interval_stdev, delta_sent, delta_recv, delta_err, count, first_ts, last_ts
     }
   ' "${sub_csv}")
   
@@ -420,8 +425,8 @@ append_summary_from_artifacts() {
     return 0
   fi
   
-  local tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts
-  IFS=, read -r tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts <<<"${steady_state_metrics}"
+  local tps avg_p50_ns avg_p95_ns avg_p99_ns avg_stdev_ns sent recv _err steady_rows steady_start_ts steady_end_ts
+  IFS=, read -r tps avg_p50_ns avg_p95_ns avg_p99_ns avg_stdev_ns sent recv _err steady_rows steady_start_ts steady_end_ts <<<"${steady_state_metrics}"
   
   if [[ "${steady_rows}" -eq 0 ]]; then
     log "WARN: No steady-state rows found for ${run_id} (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s)"
@@ -460,11 +465,12 @@ append_summary_from_artifacts() {
     ' "${pub_csv}")
   fi
   
-  # Convert latencies from ns to ms
-  local p50_ms p95_ms p99_ms
+  # Convert latencies from ns to ms (stdev uses interval_stdev for per-interval variability)
+  local p50_ms p95_ms p99_ms stdev_ms
   p50_ms=$(awk -v n="${avg_p50_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p95_ms=$(awk -v n="${avg_p95_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p99_ms=$(awk -v n="${avg_p99_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  stdev_ms=$(awk -v n="${avg_stdev_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
 
   # Docker stats aggregation (optional) - filtered to steady-state time range
   local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used
@@ -536,7 +542,7 @@ append_summary_from_artifacts() {
     log "Docker stats: ${stats_rows} rows in steady-state time range"
   fi
 
-  echo "${transport},${payload},${total_rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used},${avg_cpu},${avg_mem_perc},${avg_mem_used}" >> "${SUMMARY_CSV}"
+  echo "${transport},${payload},${total_rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${stdev_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used},${avg_cpu},${avg_mem_perc},${avg_mem_used}" >> "${SUMMARY_CSV}"
 }
 
 # Map transport/broker to docker-compose service names
