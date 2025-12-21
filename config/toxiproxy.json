@@ -1,0 +1,62 @@
+[
+  {
+    "name": "mqtt_mosquitto_pub",
+    "listen": "0.0.0.0:21883",
+    "upstream": "127.0.0.1:1883",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_mosquitto_sub",
+    "listen": "0.0.0.0:22883",
+    "upstream": "127.0.0.1:1883",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_emqx_pub",
+    "listen": "0.0.0.0:21884",
+    "upstream": "127.0.0.1:1884",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_emqx_sub",
+    "listen": "0.0.0.0:22884",
+    "upstream": "127.0.0.1:1884",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_hivemq_pub",
+    "listen": "0.0.0.0:21885",
+    "upstream": "127.0.0.1:1885",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_hivemq_sub",
+    "listen": "0.0.0.0:22885",
+    "upstream": "127.0.0.1:1885",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_rabbitmq_pub",
+    "listen": "0.0.0.0:21886",
+    "upstream": "127.0.0.1:1886",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_rabbitmq_sub",
+    "listen": "0.0.0.0:22886",
+    "upstream": "127.0.0.1:1886",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_artemis_pub",
+    "listen": "0.0.0.0:21887",
+    "upstream": "127.0.0.1:1887",
+    "enabled": true
+  },
+  {
+    "name": "mqtt_artemis_sub",
+    "listen": "0.0.0.0:22887",
+    "upstream": "127.0.0.1:1887",
+    "enabled": true
+  }
+]

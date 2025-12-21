@@ -16,7 +16,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BINARY="${PROJECT_DIR}/target/release/mq-bench"
-ARTIFACTS_DIR="${PROJECT_DIR}/artifacts/mt_mqtt_failure_$(date +%Y%m%d_%H%M%S)"
+# Allow override via environment variable
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-${PROJECT_DIR}/artifacts/mt_mqtt_failure_$(date +%Y%m%d_%H%M%S)}"
 
 BROKER_HOST="${BROKER_HOST:-127.0.0.1}"
 BROKER_PORT="${BROKER_PORT:-1883}"
@@ -264,6 +265,15 @@ run_single_test() {
     fi
   fi
 
+  # Build credential flags if username/password are set
+  local cred_flags=()
+  if [[ -n "${MQTT_USERNAME:-}" ]]; then
+    cred_flags+=(--connect "username=${MQTT_USERNAME}")
+  fi
+  if [[ -n "${MQTT_PASSWORD:-}" ]]; then
+    cred_flags+=(--connect "password=${MQTT_PASSWORD}")
+  fi
+
   # Start mt-sub with built-in crash injection
   "$BINARY" mt-sub \
     --engine mqtt \
@@ -272,6 +282,7 @@ run_single_test() {
     --connect "client_id=mt-sub-$run_id" \
     --connect "qos=$qos" \
     --connect "clean_session=false" \
+    "${cred_flags[@]}" \
     --topic-prefix "$TOPIC_PREFIX/$run_id" \
     --tenants "$TENANTS" --regions "$REGIONS" --services "$SERVICES" --shards "$SHARDS" \
     --subscribers "$SUBSCRIBERS" \
@@ -296,6 +307,7 @@ run_single_test() {
     --connect "client_id=mt-pub-$run_id"
     --connect "qos=$qos"
     --connect "clean_session=false"
+    "${cred_flags[@]}"
     --topic-prefix "$TOPIC_PREFIX/$run_id"
     --tenants "$TENANTS" --regions "$REGIONS" --services "$SERVICES" --shards "$SHARDS"
     --publishers "$PUBLISHERS"

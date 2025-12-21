@@ -146,26 +146,48 @@ impl Transport for MqttTransport {
         }
         let (client, mut eventloop) = AsyncClient::new(options, 65536);
         client
-            .subscribe(topic, self.qos)
+            .subscribe(topic.clone(), self.qos)
             .await
             .map_err(|e| TransportError::Subscribe(e.to_string()))?;
         let handler = std::sync::Arc::new(handler);
+        let qos = self.qos;
         let handle: JoinHandle<()> = tokio::spawn(async move {
+            let mut consecutive_errors = 0u32;
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Incoming::Publish(p))) => {
+                        consecutive_errors = 0;
                         (handler)(TransportMessage {
                             payload: Payload::from_bytes(Bytes::from(p.payload.to_vec())),
                         });
                     }
-                    Ok(_) => {}
+                    Ok(Event::Incoming(Incoming::ConnAck(_))) => {
+                        // Reconnected - re-subscribe to ensure we get messages
+                        consecutive_errors = 0;
+                        tracing::info!(client_id = %cid_debug, "MQTT reconnected, re-subscribing");
+                        if let Err(e) = client.subscribe(topic.clone(), qos).await {
+                            tracing::warn!(client_id = %cid_debug, error = %e, "Failed to re-subscribe after reconnect");
+                        }
+                    }
+                    Ok(_) => {
+                        consecutive_errors = 0;
+                    }
                     Err(e) => {
-                        tracing::warn!(client_id = %cid_debug, error = %e, "MQTT subscription eventloop error, exiting");
-                        break;
+                        consecutive_errors += 1;
+                        // Log at different levels based on error frequency
+                        if consecutive_errors == 1 {
+                            tracing::warn!(client_id = %cid_debug, error = %e, "MQTT connection error, will retry");
+                        } else if consecutive_errors % 10 == 0 {
+                            tracing::debug!(client_id = %cid_debug, error = %e, consecutive = consecutive_errors, "MQTT still reconnecting");
+                        }
+                        // Brief backoff before retry to avoid busy-loop
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        // Continue polling - rumqttc will attempt reconnection
                     }
                 }
             }
-            // drop client on exit
+            // drop client on exit (unreachable in normal operation)
+            #[allow(unreachable_code)]
             drop(client);
         });
         Ok(Box::new(MqttSubscription { handle }))
@@ -186,6 +208,7 @@ impl Transport for MqttTransport {
         let base = sanitize_client_id_base(base);
         let topic_hash = fnv1a64_bytes(topic.as_bytes());
         let cid = format!("pub-{}-{:016x}", base, topic_hash);
+        let cid_debug = cid.clone();
         let mut options = MqttOptions::new(cid, self.host.clone(), self.port);
         options.set_keep_alive(self.keep_alive);
         options.set_max_packet_size(self.max_in, self.max_out);
@@ -197,8 +220,23 @@ impl Transport for MqttTransport {
         }
         let (client, mut eventloop) = AsyncClient::new(options, 65536);
         let poller = tokio::spawn(async move {
+            let mut consecutive_errors = 0u32;
             loop {
-                let _ = eventloop.poll().await;
+                match eventloop.poll().await {
+                    Ok(_) => {
+                        consecutive_errors = 0;
+                    }
+                    Err(e) => {
+                        consecutive_errors += 1;
+                        if consecutive_errors == 1 {
+                            tracing::warn!(client_id = %cid_debug, error = %e, "MQTT publisher connection error, will retry");
+                        } else if consecutive_errors % 10 == 0 {
+                            tracing::debug!(client_id = %cid_debug, consecutive = consecutive_errors, "MQTT publisher still reconnecting");
+                        }
+                        // Brief backoff before retry
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                    }
+                }
             }
         });
         Ok(Box::new(MqttPublisher {
