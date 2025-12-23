@@ -32,6 +32,8 @@ services:
     container_name: hivemq
     environment:
       - JAVA_OPTS=-Xms1g -Xmx4g
+    tmpfs:
+      - /opt/hivemq/data:size=1G
     ports:
       - "1885:1883"   # MQTT TCP
       - "8081:8080"   # Dashboard (optional)

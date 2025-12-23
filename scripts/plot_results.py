@@ -69,17 +69,17 @@ LINESTYLE_MAP = {
 }
 
 LINEWIDTH_MAP = {
-    "mqtt_mosquitto": 2.0,
-    "mqtt_emqx": 2.0,
-    "mqtt_hivemq": 2.0,
-    "mqtt_rabbitmq": 2.0,
-    "mqtt_artemis": 2.0,
-    "mqtt": 2.0,
-    "redis": 2.0,
-    "nats": 2.5,
-    "zenoh": 2.0,
-    "zenoh_mqtt": 2.0,
-    "rabbitmq": 2.0,
+    "mqtt_mosquitto": 3.0,
+    "mqtt_emqx": 3.0,
+    "mqtt_hivemq": 3.0,
+    "mqtt_rabbitmq": 3.0,
+    "mqtt_artemis": 3.0,
+    "mqtt": 3.0,
+    "redis": 3.0,
+    "nats": 3.0,
+    "zenoh": 3.0,
+    "zenoh_mqtt": 3.0,
+    "rabbitmq": 3.0,
 }
 
 # Fixed color map to keep consistent colors
@@ -108,11 +108,12 @@ _COLORS_CYCLE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b
 # LaTeX paper settings - same structure as default but with bolder lines and larger text
 LATEX_FIGSIZE = (10, 6)  # Keep same size as default
 LATEX_MARKER_SIZE = 12
-LATEX_LINEWIDTH = 2.8
+LATEX_LINEWIDTH = 3.0
 LATEX_DPI = 300
-LATEX_FONT_SIZE = 18
-LATEX_TITLE_SIZE = 20
-LATEX_LEGEND_SIZE = 16
+LATEX_FONT_SIZE = 22
+LATEX_AXIS_LABEL_SIZE = 26
+LATEX_TITLE_SIZE = 28
+LATEX_LEGEND_SIZE = 26
 
 
 def _norm_label(lbl: str) -> str:
@@ -124,7 +125,7 @@ def style_for(lbl: str) -> Tuple[str, str, float, str]:
     key = _norm_label(lbl)
     marker = MARKER_MAP.get(key)
     linestyle = LINESTYLE_MAP.get(key)
-    linewidth = LINEWIDTH_MAP.get(key, 2.0)
+    linewidth = LINEWIDTH_MAP.get(key, 3.0)
     color = COLOR_MAP.get(key)
     if marker is None or linestyle is None or color is None:
         # Deterministic fallback based on label hash
@@ -210,12 +211,19 @@ def dedupe_by_pairs(records_list: list) -> list:
     return list(by_pairs.values())
 
 
-def add_legend_top(ax, fig, max_cols: int = 4, reserve_top: float = 0.82) -> None:
+def add_legend_top(ax, fig, max_cols: int = 4, reserve_top: float = 0.82, skip_legend: bool = False) -> None:
     """Place a de-duplicated legend at the top of the figure and reserve
     vertical space to avoid overlap with the title.
 
     reserve_top: fraction of figure height allocated to axes (leave 1-reserve_top for legend).
+    skip_legend: if True, skip adding the legend (useful for LaTeX mode on CPU/Memory plots).
     """
+    if skip_legend:
+        try:
+            fig.tight_layout()
+        except Exception:
+            pass
+        return
     handles, labels = ax.get_legend_handles_labels()
     # De-duplicate while preserving order
     seen = set()
@@ -303,6 +311,51 @@ def format_memory_mb_axis(ax) -> None:
     ax.yaxis.set_major_formatter(FuncFormatter(gb_formatter))
 
 
+def generate_standalone_legend(transports: list, out_dir: str, marker_size: float = 12) -> str:
+    """Generate a standalone legend as a separate PDF file.
+    
+    Creates a horizontal legend with all transport labels and their corresponding
+    markers/colors/linestyles, saved as 'legend.pdf' in the output directory.
+    
+    Returns the filename of the generated legend.
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    
+    # Create custom legend handles for each transport
+    handles = []
+    labels = []
+    for t in sorted(transports):
+        m, ls, lw, clr = style_for(t)
+        handle = Line2D([0], [0], marker=m, linestyle=ls, linewidth=lw, color=clr,
+                       markersize=marker_size, markerfacecolor=clr)
+        handles.append(handle)
+        labels.append(t)
+    
+    if not handles:
+        return ""
+    
+    # Create a figure just for the legend
+    # Use a wide, short figure to accommodate horizontal legend
+    ncol = len(labels)
+    fig_width = max(2.0 * ncol, 8)  # Scale width with number of items
+    fig, ax = plt.subplots(figsize=(fig_width, 0.8))
+    ax.axis('off')
+    
+    # Add the legend centered in the figure
+    legend = fig.legend(handles, labels, loc='center', ncol=ncol, frameon=False,
+                       fontsize=LATEX_LEGEND_SIZE, handlelength=2.5, columnspacing=1.5)
+    
+    # Adjust figure to fit legend tightly
+    fig.tight_layout(pad=0.1)
+    
+    fn = os.path.join(out_dir, "legend.pdf")
+    fig.savefig(fn, dpi=300, bbox_inches='tight', pad_inches=0.1)
+    plt.close(fig)
+    
+    return os.path.basename(fn)
+
+
 def main() -> int:
     args = parse_args()
     
@@ -325,7 +378,7 @@ def main() -> int:
         plt.rcParams.update({
             'font.size': LATEX_FONT_SIZE,
             'axes.titlesize': LATEX_TITLE_SIZE,
-            'axes.labelsize': LATEX_FONT_SIZE,
+            'axes.labelsize': LATEX_AXIS_LABEL_SIZE,
             'xtick.labelsize': LATEX_FONT_SIZE - 1,
             'ytick.labelsize': LATEX_FONT_SIZE - 1,
             'legend.fontsize': LATEX_LEGEND_SIZE,
@@ -412,14 +465,16 @@ def main() -> int:
                 if xs and ys:
                     m, ls, lw, clr = style_for(t)
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
-            ax.set_title(f"Throughput vs Offered Rate (payload={payload}B)")
+            if not args.latex:
+                ax.set_title(f"Throughput vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
-            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
+            ax.set_ylabel("Throughput\n(×10000 msg/s)")
             format_throughput_axis(ax)
-            ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig)
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             throughput_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -474,16 +529,18 @@ def main() -> int:
             for t, (xs, ys) in plot_data.items():
                 m, ls, lw, clr = style_for(t)
                 ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
-            ax.set_title(f"Delivered Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Delivered Throughput vs Pairs")
+            if not args.latex:
+                ax.set_title(f"Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Throughput vs Pairs")
             ax.set_xlabel("Pub-Sub Pairs (×1000)")
-            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
-            ax.grid(True, alpha=0.4, linestyle="--")
+            ax.set_ylabel("Throughput\n(×10000 msg/s)")
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
             ax.set_xscale("log")
             format_pairs_axis(ax, all_xs)
             format_throughput_axis(ax)
-            add_legend_top(ax, fig)
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_log{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             throughput_pairs_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
             
@@ -492,16 +549,18 @@ def main() -> int:
             for t, (xs, ys) in plot_data.items():
                 m, ls, lw, clr = style_for(t)
                 ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
-            ax.set_title(f"Delivered Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Delivered Throughput vs Pairs")
+            if not args.latex:
+                ax.set_title(f"Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Throughput vs Pairs")
             ax.set_xlabel("Pub-Sub Pairs (×1000)")
-            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
-            ax.grid(True, alpha=0.4, linestyle="--")
+            ax.set_ylabel("Throughput\n(×10000 msg/s)")
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
             # Linear scale - use thousands formatter
             format_pairs_axis(ax, all_xs)
             format_throughput_axis(ax)
-            add_legend_top(ax, fig)
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_linear{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             throughput_pairs_imgs_linear[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -562,10 +621,12 @@ def main() -> int:
                 rate_per_pub_str = f"{list(rate_per_pub_set)[0]} msg/s/pub"
             elif len(rate_per_pub_set) > 1:
                 rate_per_pub_str = f"{sorted(rate_per_pub_set)} msg/s/pub"
-            ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
+            if not args.latex:
+                ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
             ax.set_xlabel("Pub-Sub Pairs (×1000)")
             ax.set_ylabel(f"{title_prefix} (ms)")
-            ax.grid(True, alpha=0.4, linestyle="--")
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
             # Use log scales for readability and latency convention
             try:
                 ax.set_xscale("log")
@@ -576,9 +637,9 @@ def main() -> int:
             except Exception:
                 pass
             format_pairs_axis(ax, all_xs)
-            add_legend_top(ax, fig)
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             out[payload] = os.path.basename(fn)
             plt.close(fig)
         return out
@@ -595,7 +656,7 @@ def main() -> int:
     avg_cpu_cores_pairs_imgs = {}
     avg_mem_pairs_imgs = {}
 
-    def plot_metric_vs_pairs(metric_key: str, title_prefix: str, y_label: str, y_formatter=None) -> dict:
+    def plot_metric_vs_pairs(metric_key: str, title_prefix: str, y_label: str, y_formatter=None, skip_legend_in_latex: bool = False) -> dict:
         out = {}
         if args.only_latency_vs_payload:
             return out
@@ -635,28 +696,30 @@ def main() -> int:
                 rate_per_pub_str = f"{list(rate_per_pub_set)[0]} msg/s/pub"
             elif len(rate_per_pub_set) > 1:
                 rate_per_pub_str = f"{sorted(rate_per_pub_set)} msg/s/pub"
-            ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
+            if not args.latex:
+                ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
             ax.set_xlabel("Pub-Sub Pairs (×1000)")
             ax.set_ylabel(y_label)
             if y_formatter:
                 y_formatter(ax)
-            ax.grid(True, alpha=0.4, linestyle="--")
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
             format_pairs_axis(ax, all_xs)
-            add_legend_top(ax, fig)
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             out[payload] = os.path.basename(fn)
             plt.close(fig)
         return out
 
     if by_pt_lat_pairs:
-        cpu_pairs_imgs = plot_metric_vs_pairs("max_cpu", "Max CPU%", "Max CPU (%)")
-        mem_pairs_imgs = plot_metric_vs_pairs("max_mem_perc", "Max Memory%", "Max Memory (%)")
-        avg_cpu_pairs_imgs = plot_metric_vs_pairs("avg_cpu", "Avg CPU%", "Avg CPU (%)")
-        avg_cpu_cores_pairs_imgs = plot_metric_vs_pairs("avg_cpu_cores", "Avg CPU Cores Used", "CPU Cores Used")
-        avg_mem_pairs_imgs = plot_metric_vs_pairs("avg_mem_perc", "Avg Memory%", "Avg Memory (%)")
-        avg_mem_mb_pairs_imgs = plot_metric_vs_pairs("avg_mem_mb", "Avg Memory", "Avg Memory (GB)", y_formatter=format_memory_mb_axis)
-        max_mem_mb_pairs_imgs = plot_metric_vs_pairs("max_mem_mb", "Max Memory", "Max Memory (GB)", y_formatter=format_memory_mb_axis)
+        cpu_pairs_imgs = plot_metric_vs_pairs("max_cpu", "Max CPU%", "Max CPU (%)", skip_legend_in_latex=True)
+        mem_pairs_imgs = plot_metric_vs_pairs("max_mem_perc", "Max Memory%", "Max Memory (%)", skip_legend_in_latex=True)
+        avg_cpu_pairs_imgs = plot_metric_vs_pairs("avg_cpu", "Avg CPU%", "Avg CPU (%)", skip_legend_in_latex=True)
+        avg_cpu_cores_pairs_imgs = plot_metric_vs_pairs("avg_cpu_cores", "Avg CPU Cores Used", "Avg CPU Cores Used", skip_legend_in_latex=True)
+        avg_mem_pairs_imgs = plot_metric_vs_pairs("avg_mem_perc", "Avg Memory%", "Avg Memory (%)", skip_legend_in_latex=True)
+        avg_mem_mb_pairs_imgs = plot_metric_vs_pairs("avg_mem_mb", "Avg Memory", "Avg Memory (GB)", y_formatter=format_memory_mb_axis, skip_legend_in_latex=True)
+        max_mem_mb_pairs_imgs = plot_metric_vs_pairs("max_mem_mb", "Max Memory", "Max Memory (GB)", y_formatter=format_memory_mb_axis, skip_legend_in_latex=True)
 
     # P99 vs offered rate (skip if latency-only; it's rate-based summary)
     if not latency_only and not args.only_latency_vs_payload:
@@ -677,7 +740,8 @@ def main() -> int:
                 if xs and ys:
                     m, ls, lw, clr = style_for(t)
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
-            ax.set_title(f"P99 latency vs Offered Rate (payload={payload}B)")
+            if not args.latex:
+                ax.set_title(f"P99 latency vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
             ax.set_ylabel("P99 latency (ms)")
             # Use logarithmic Y-axis for latency
@@ -685,10 +749,11 @@ def main() -> int:
                 ax.set_yscale("log")
             except Exception:
                 pass
-            ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig)
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             p99_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -710,13 +775,15 @@ def main() -> int:
                 if xs and ys:
                     m, ls, lw, clr = style_for(t)
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
-            ax.set_title(f"Max CPU% vs Offered Rate (payload={payload}B)")
+            if not args.latex:
+                ax.set_title(f"Max CPU% vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
             ax.set_ylabel("Max CPU (%)")
-            ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig)
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"max_cpu_vs_rate_payload{payload}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             cpu_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -738,13 +805,15 @@ def main() -> int:
                 if xs and ys:
                     m, ls, lw, clr = style_for(t)
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
-            ax.set_title(f"Max Memory% vs Offered Rate (payload={payload}B)")
+            if not args.latex:
+                ax.set_title(f"Max Memory% vs Offered Rate (payload={payload}B)")
             ax.set_xlabel("Offered rate (msg/s)")
             ax.set_ylabel("Max Memory (%)")
-            ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig)
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"max_mem_vs_rate_payload{payload}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             mem_imgs[payload] = os.path.basename(fn)
             plt.close(fig)
 
@@ -752,7 +821,7 @@ def main() -> int:
     # One figure per rate; X = payload (bytes), Y = latency (ms); lines per transport
     from matplotlib.ticker import FuncFormatter, MaxNLocator
 
-    def plot_metric_vs_payload(metric_key: str, title_prefix: str, y_label: str, dataset, log_y: bool = True) -> dict:
+    def plot_metric_vs_payload(metric_key: str, title_prefix: str, y_label: str, dataset, log_y: bool = True, skip_legend_in_latex: bool = False) -> dict:
         out = {}
         for rate in rates:
             fig, ax = plt.subplots(figsize=figsize)
@@ -793,7 +862,8 @@ def main() -> int:
                 plt.close(fig)
                 continue
 
-            ax.set_title(f"{title_prefix} vs Payload (rate={rate}/s)")
+            if not args.latex:
+                ax.set_title(f"{title_prefix} vs Payload (rate={rate}/s)")
             ax.set_xlabel("Payload size (log2 KB)")
             ax.set_ylabel(y_label)
             
@@ -805,7 +875,8 @@ def main() -> int:
             else:
                 ax.set_ylim(bottom=0)
 
-            ax.grid(True, alpha=0.4, linestyle="--")
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
             
             if log_kb_set:
                 xs_sorted = sorted(log_kb_set)
@@ -825,9 +896,9 @@ def main() -> int:
 
             ax.xaxis.set_major_formatter(FuncFormatter(log_formatter))
             
-            add_legend_top(ax, fig)
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_payload_rate{rate}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             out[rate] = os.path.basename(fn)
             plt.close(fig)
         return out
@@ -840,8 +911,8 @@ def main() -> int:
     p99_vs_payload_imgs = plot_metric_vs_payload("p99_ms", "P99 latency", "P99 latency (ms)", latency_dataset, log_y=True)
     
     # Generate CPU/Memory vs payload (per rate)
-    cpu_vs_payload_imgs = plot_metric_vs_payload("max_cpu", "Max CPU%", "Max CPU (%)", latency_dataset, log_y=False)
-    mem_vs_payload_imgs = plot_metric_vs_payload("max_mem_perc", "Max Memory%", "Max Memory (%)", latency_dataset, log_y=False)
+    cpu_vs_payload_imgs = plot_metric_vs_payload("max_cpu", "Max CPU%", "Max CPU (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
+    mem_vs_payload_imgs = plot_metric_vs_payload("max_mem_perc", "Max Memory%", "Max Memory (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
 
 
     # Fanout plots: x = subscriber count, y = delivered throughput, per (payload, rate)
@@ -889,14 +960,16 @@ def main() -> int:
                 ys = [x["sub_tps"] for x in lst if math.isfinite(x.get("sub_tps", float("nan")))]
                 m, ls, lw, clr = style_for(label)
                 ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
-            ax.set_title(f"Delivered throughput vs Fanout (payload={payload}B, rate={rate}/s)")
+            if not args.latex:
+                ax.set_title(f"Throughput vs Fanout (payload={payload}B, rate={rate}/s)")
             ax.set_xlabel("Fanout (subscribers)")
-            ax.set_ylabel("Delivered throughput (×10000 msg/s)")
+            ax.set_ylabel("Throughput\n(×10000 msg/s)")
             format_throughput_axis(ax)
-            ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig)
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn = os.path.join(args.out_dir, f"throughput-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
-            fig.savefig(fn, dpi=plot_dpi)
+            fig.savefig(fn, dpi=plot_dpi, bbox_inches='tight')
             fanout_imgs[(payload, rate)] = os.path.basename(fn)
             plt.close(fig)
 
@@ -914,13 +987,15 @@ def main() -> int:
                 if xs and ys:
                     m, ls, lw, clr = style_for(label)
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
-            ax.set_title(f"Max CPU% vs Fanout (payload={payload}B, rate={rate}/s)")
+            if not args.latex:
+                ax.set_title(f"Max CPU% vs Fanout (payload={payload}B, rate={rate}/s)")
             ax.set_xlabel("Fanout (subscribers)")
             ax.set_ylabel("Max CPU (%)")
-            ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig)
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn_cpu = os.path.join(args.out_dir, f"max-cpu-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
-            fig.savefig(fn_cpu, dpi=plot_dpi)
+            fig.savefig(fn_cpu, dpi=plot_dpi, bbox_inches='tight')
             fanout_cpu_imgs[(payload, rate)] = os.path.basename(fn_cpu)
             plt.close(fig)
 
@@ -938,15 +1013,24 @@ def main() -> int:
                 if xs and ys:
                     m, ls, lw, clr = style_for(label)
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
-            ax.set_title(f"Max Memory% vs Fanout (payload={payload}B, rate={rate}/s)")
+            if not args.latex:
+                ax.set_title(f"Max Memory% vs Fanout (payload={payload}B, rate={rate}/s)")
             ax.set_xlabel("Fanout (subscribers)")
             ax.set_ylabel("Max Memory (%)")
-            ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig)
+            if not args.latex:
+                ax.grid(True, alpha=0.4, linestyle="--")
+            add_legend_top(ax, fig, skip_legend=args.latex)
             fn_mem = os.path.join(args.out_dir, f"max-memory-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
-            fig.savefig(fn_mem, dpi=plot_dpi)
+            fig.savefig(fn_mem, dpi=plot_dpi, bbox_inches='tight')
             fanout_mem_imgs[(payload, rate)] = os.path.basename(fn_mem)
             plt.close(fig)
+
+    # Generate standalone legend PDF for LaTeX mode
+    legend_file = None
+    if args.latex:
+        legend_file = generate_standalone_legend(transports, args.out_dir, marker_size=marker_size)
+        if legend_file:
+            print(f"[plot] Generated standalone legend: {legend_file}")
 
     # Build a simple markdown gallery
     try:
@@ -966,7 +1050,7 @@ def main() -> int:
             if mem_imgs:
                 f.write("- [Max Memory% vs Offered Rate](#max-memory-vs-offered-rate)\n")
             if fanout_imgs:
-                f.write("- [Fanout: Delivered throughput](#fanout-delivered-throughput)\n")
+                f.write("- [Fanout: Throughput](#fanout-throughput)\n")
             if fanout_cpu_imgs:
                 f.write("- [Fanout: Max CPU%](#fanout-max-cpu)\n")
             if fanout_mem_imgs:
@@ -1243,7 +1327,7 @@ def main() -> int:
                         f.write(f"![mem vs payload r{rate}]({img})\n\n")
 
             if fanout_imgs:
-                f.write("## Fanout: Delivered throughput\n\n")
+                f.write("## Fanout: Throughput\n\n")
                 # Group by payload, then rate for consistent order
                 pr_keys = sorted(fanout_imgs.keys())
                 by_p = defaultdict(list)

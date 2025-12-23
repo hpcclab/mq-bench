@@ -208,12 +208,16 @@ impl Stats {
         let head_loss = self.head_loss.load(Ordering::Relaxed);
 
         let hist = self.latency_hist.read().await;
+        let p25 = hist.value_at_quantile(0.25);
         let p50 = hist.value_at_quantile(0.5);
+        let p75 = hist.value_at_quantile(0.75);
         let p95 = hist.value_at_quantile(0.95);
         let p99 = hist.value_at_quantile(0.99);
         let min = hist.min();
         let max = hist.max();
         let mean = hist.mean();
+        let stddev = hist.stdev();
+        let sample_count = hist.len();
 
         let total_elapsed = now.duration_since(self.start_time);
         let since_last = {
@@ -262,12 +266,16 @@ impl Stats {
             interval_received_count: interval_received,
             since_first_sent,
             since_first_received,
+            latency_ns_p25: p25,
             latency_ns_p50: p50,
+            latency_ns_p75: p75,
             latency_ns_p95: p95,
             latency_ns_p99: p99,
             latency_ns_min: min,
             latency_ns_max: max,
             latency_ns_mean: mean,
+            latency_ns_stddev: stddev,
+            latency_sample_count: sample_count,
             connections: conns,
             active_connections: active_conns,
             connection_attempts: conn_attempts,
@@ -313,12 +321,16 @@ pub struct StatsSnapshot {
     pub interval_received_count: u64,
     pub since_first_sent: Option<Duration>,
     pub since_first_received: Option<Duration>,
+    pub latency_ns_p25: u64,
     pub latency_ns_p50: u64,
+    pub latency_ns_p75: u64,
     pub latency_ns_p95: u64,
     pub latency_ns_p99: u64,
     pub latency_ns_min: u64,
     pub latency_ns_max: u64,
     pub latency_ns_mean: f64,
+    pub latency_ns_stddev: f64,
+    pub latency_sample_count: u64,
     pub connections: u64,
     pub active_connections: u64,
     pub connection_attempts: u64,
@@ -377,19 +389,23 @@ impl StatsSnapshot {
     /// Convert to CSV row
     pub fn to_csv_row(&self) -> String {
         format!(
-            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{:.2},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{},{},{}",
             self.timestamp,
             self.sent_count,
             self.received_count,
             self.error_count,
             self.total_throughput(),
             self.interval_throughput(),
+            self.latency_ns_p25,
             self.latency_ns_p50,
+            self.latency_ns_p75,
             self.latency_ns_p95,
             self.latency_ns_p99,
             self.latency_ns_min,
             self.latency_ns_max,
             self.latency_ns_mean,
+            self.latency_ns_stddev,
+            self.latency_sample_count,
             self.connections,
             self.active_connections,
             self.connection_attempts,
@@ -404,7 +420,7 @@ impl StatsSnapshot {
 
     /// CSV header
     pub fn csv_header() -> &'static str {
-        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p50,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean,connections,active_connections,connection_attempts,connection_failures,crashes_injected,reconnects,reconnect_failures,duplicate_count,gap_count"
+        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p25,latency_ns_p50,latency_ns_p75,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean,latency_ns_stddev,latency_sample_count,connections,active_connections,connection_attempts,connection_failures,crashes_injected,reconnects,reconnect_failures,duplicate_count,gap_count"
     }
 }
 

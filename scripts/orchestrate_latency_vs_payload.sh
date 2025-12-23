@@ -37,12 +37,12 @@ DURATION=30             # seconds
 SNAPSHOT=1
 RUN_ID_PREFIX="latency"
 # Include zenoh-mqtt as a distinct label (internally uses zenoh engine)
-TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
+TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq amqp mqtt)
 # Default payloads (bytes): 1KB, 2KB, 4KB, 8KB, 16KB, 32KB, 64KB, 128KB, 256KB, 512KB, 1MB
 PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576)
 PAYLOADS=(1024 16384 1048576)  # 1KB, 16KB, 1MB for quicker runs
 # Keep immutable copies for fallback if user passes empty strings to flags
-DEFAULT_TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq mqtt)
+DEFAULT_TRANSPORTS=(zenoh zenoh-mqtt redis nats rabbitmq amqp mqtt)
 # DEFAULT_PAYLOADS=(1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152)
 DEFAULT_PAYLOADS=(1024 16384 1048576)  # 1KB, 16KB, 1MB for quicker runs
 START_SERVICES=0
@@ -58,6 +58,27 @@ RAMP_UP_SECS=5            # ramp-up time for pub/sub connections
 APPEND_LATEST=0           # append to most recent results directory
 IGNORE_START_SECS=5       # seconds to ignore from beginning of data
 IGNORE_END_SECS=5         # seconds to ignore from end of data
+
+# QoS sweep mode
+QOS_SWEEP=0               # enable QoS sweep (0, 1, 2 for supported transports)
+QOS_LEVELS=(0 1 2)        # QoS levels to sweep
+
+# Failure test mode (uses test_mqtt_multitopic_failure.sh)
+FAILURE_TEST=0
+SUB_MTTF=10               # subscriber mean time to failure (seconds)
+SUB_MTTR=2                # subscriber mean time to recovery (seconds)
+SUB_CRASH_COUNT=10        # number of subscriber crashes to inject
+PUB_CRASH_LOOP=0          # enable publisher crash injection (0=off, 1=on)
+PUB_MTTF=10               # publisher mean time to failure
+PUB_MTTR=2                # publisher mean time to recovery
+PUB_CRASH_COUNT=10        # number of publisher crashes
+
+# Transports that support QoS sweep:
+# - mqtt (all MQTT brokers): QoS 0, 1, 2
+# - zenoh: reliability modes (0=best-effort, 1/2=reliable) 
+# - nats: 0=core NATS (at-most-once), 1+=JetStream (at-least-once) - limited support
+# Non-QoS transports: redis (fire-and-forget pub/sub), amqp/rabbitmq (has own delivery modes)
+QOS_SUPPORTED_TRANSPORTS="mqtt zenoh zenoh-mqtt"
 
 # Sequential / Remote execution
 SEQUENTIAL=0
@@ -273,6 +294,30 @@ while [[ $# -gt 0 ]]; do
       shift; REMOTE_DIR=${1:-} ;;
     --append-latest)
       APPEND_LATEST=1 ;;
+    --qos)
+      QOS_SWEEP=1 ;;
+    --qos-levels)
+      shift;
+      if [[ -n "${1:-}" ]]; then
+        IFS=' ,' read -r -a QOS_LEVELS <<<"${1}"
+      fi
+      ;;
+    --failure-test)
+      FAILURE_TEST=1 ;;
+    --sub-mttf)
+      shift; SUB_MTTF=${1:-10} ;;
+    --sub-mttr)
+      shift; SUB_MTTR=${1:-2} ;;
+    --sub-crash-count)
+      shift; SUB_CRASH_COUNT=${1:-10} ;;
+    --pub-crash-loop)
+      PUB_CRASH_LOOP=1 ;;
+    --pub-mttf)
+      shift; PUB_MTTF=${1:-10} ;;
+    --pub-mttr)
+      shift; PUB_MTTR=${1:-2} ;;
+    --pub-crash-count)
+      shift; PUB_CRASH_COUNT=${1:-10} ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -348,9 +393,9 @@ fi
 # Header
 if [[ ! -s "${SUMMARY_CSV}" ]]; then
   if [[ ${LATENCY_ONLY} -eq 1 ]]; then
-    echo "transport,payload,rate,run_id,p50_ms,p95_ms,p99_ms" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,p25_ms,p50_ms,p75_ms,p95_ms,p99_ms,min_ms,max_ms,avg_latency_ms,stddev_ms,sample_count,loss_pct,duplicate_count,sub_mttf,sub_mttr,sub_crash_count,pub_crash_loop,pub_mttf,pub_mttr,pub_crash_count" > "${SUMMARY_CSV}"
   else
-    echo "transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes" > "${SUMMARY_CSV}"
+    echo "transport,payload,rate,run_id,sub_tps,p25_ms,p50_ms,p75_ms,p95_ms,p99_ms,min_ms,max_ms,avg_latency_ms,stddev_ms,sample_count,pub_tps,sent,recv,errors,loss_pct,duplicate_count,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes,sub_mttf,sub_mttr,sub_crash_count,pub_crash_loop,pub_mttf,pub_mttr,pub_crash_count" > "${SUMMARY_CSV}"
   fi
 fi
 
@@ -369,25 +414,41 @@ ensure_services() {
 # Append steady-state metrics from a run directory into SUMMARY_CSV
 append_summary_from_artifacts() {
   local transport="$1" payload="$2" rate="$3" run_id="$4" art_dir="$5"
+  local sub_csv_override="${6:-}"  # optional: explicit path to subscriber CSV
   local sub_csv pub_csv
-  sub_csv="${art_dir}/sub.csv"
-  pub_csv="${art_dir}/pub.csv"
-  if [[ ! -f "${sub_csv}" ]]; then
-    if [[ -f "${art_dir}/sub_agg.csv" ]]; then
-      sub_csv="${art_dir}/sub_agg.csv"
-    else
-      log "WARN: Missing subscriber CSV in ${art_dir}"; return 0
+  
+  # Use override if provided, otherwise search for CSV
+  if [[ -n "${sub_csv_override}" ]] && [[ -f "${sub_csv_override}" ]]; then
+    sub_csv="${sub_csv_override}"
+  else
+    sub_csv="${art_dir}/sub.csv"
+    if [[ ! -f "${sub_csv}" ]]; then
+      if [[ -f "${art_dir}/sub_agg.csv" ]]; then
+        sub_csv="${art_dir}/sub_agg.csv"
+      elif ls "${art_dir}"/mt_sub*.csv 1>/dev/null 2>&1; then
+        # Fallback to mt_sub_qos*.csv for failure tests
+        sub_csv=$(ls -1 "${art_dir}"/mt_sub*.csv 2>/dev/null | head -1)
+      else
+        log "WARN: Missing subscriber CSV in ${art_dir}"; return 0
+      fi
     fi
   fi
+  
+  pub_csv="${art_dir}/pub.csv"
   if [[ ! -f "${pub_csv}" ]]; then
     if [[ -f "${art_dir}/mt_pub.csv" ]]; then
       pub_csv="${art_dir}/mt_pub.csv"
+    elif ls "${art_dir}"/mt_pub*.csv 1>/dev/null 2>&1; then
+      pub_csv=$(ls -1 "${art_dir}"/mt_pub*.csv 2>/dev/null | head -1)
     fi
   fi
   
   # Calculate steady-state metrics by ignoring first IGNORE_START_SECS and last IGNORE_END_SECS
-  # Columns: 1=timestamp, 2=sent_count, 3=received_count, 4=error_count, 5=total_throughput,
-  #          6=interval_throughput, 7=p50, 8=p95, 9=p99, 10=min, 11=max, 12=mean, 13=connections, 14=active_connections
+  # New CSV columns (after stats.rs update):
+  # 1=timestamp, 2=sent_count, 3=received_count, 4=error_count, 5=total_throughput,
+  # 6=interval_throughput, 7=p25, 8=p50, 9=p75, 10=p95, 11=p99, 12=min, 13=max, 14=mean, 15=stddev, 16=sample_count,
+  # 17=connections, 18=active_connections, 19=connection_attempts, 20=connection_failures,
+  # 21=crashes_injected, 22=reconnects, 23=reconnect_failures, 24=duplicate_count, 25=gap_count
   local steady_state_metrics
   steady_state_metrics=$(awk -F, -v ignore_start="${IGNORE_START_SECS}" -v ignore_end="${IGNORE_END_SECS}" '
     NR == 1 { next }  # skip header
@@ -402,10 +463,18 @@ append_summary_from_artifacts() {
         row_recv[NR] = $3 + 0
         row_sent[NR] = $2 + 0
         row_err[NR] = $4 + 0
-        row_p50[NR] = $7 + 0
-        row_p95[NR] = $8 + 0
-        row_p99[NR] = $9 + 0
-        row_mean[NR] = $12 + 0
+        row_p25[NR] = $7 + 0
+        row_p50[NR] = $8 + 0
+        row_p75[NR] = $9 + 0
+        row_p95[NR] = $10 + 0
+        row_p99[NR] = $11 + 0
+        row_min[NR] = $12 + 0
+        row_max[NR] = $13 + 0
+        row_mean[NR] = $14 + 0
+        row_stddev[NR] = $15 + 0
+        row_sample[NR] = $16 + 0
+        row_dup[NR] = $24 + 0
+        row_gap[NR] = $25 + 0
         total_rows = NR
     }
     END {
@@ -427,19 +496,29 @@ append_summary_from_artifacts() {
                 last_recv = row_recv[i]
                 last_sent = row_sent[i]
                 last_err = row_err[i]
+                last_dup = row_dup[i]
+                last_gap = row_gap[i]
                 
                 # Accumulate latency values for averaging
+                sum_p25 += row_p25[i]
                 sum_p50 += row_p50[i]
+                sum_p75 += row_p75[i]
                 sum_p95 += row_p95[i]
                 sum_p99 += row_p99[i]
                 sum_mean += row_mean[i]
+                sum_sample += row_sample[i]
+                # Use the last stddev (cumulative from histogram, not averaged)
+                last_stddev = row_stddev[i]
+                # Track min/max across all steady-state rows
+                if (min_lat == "" || row_min[i] < min_lat) min_lat = row_min[i]
+                if (max_lat == "" || row_max[i] > max_lat) max_lat = row_max[i]
                 count++
             }
         }
         
         if (count == 0) {
             # No steady-state rows found, output zeros
-            print "0.00,0,0,0,0,0,0,0,0,0"
+            print "0.00,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
             exit
         }
         
@@ -453,17 +532,23 @@ append_summary_from_artifacts() {
         }
         
         # Average latencies over steady-state period
+        avg_p25 = sum_p25 / count
         avg_p50 = sum_p50 / count
+        avg_p75 = sum_p75 / count
         avg_p95 = sum_p95 / count
         avg_p99 = sum_p99 / count
+        avg_mean = sum_mean / count
+        # Use last stddev from cumulative histogram (correct for all samples)
+        final_stddev = last_stddev
+        total_samples = sum_sample
         
         # Delta counts during steady-state
         delta_recv = last_recv - first_recv
         delta_sent = last_sent - first_sent
         delta_err = last_err - first_err
         
-        # Output includes first_ts and last_ts for docker stats filtering
-        printf "%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%d,%d,%d", tps, avg_p50, avg_p95, avg_p99, delta_sent, delta_recv, delta_err, count, first_ts, last_ts
+        # Output: tps,p25,p50,p75,p95,p99,min,max,mean,stddev,sample_count,sent,recv,err,count,first_ts,last_ts,gap,dup
+        printf "%.2f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%d,%.0f,%.0f,%.0f,%d,%d,%d,%.0f,%.0f", tps, avg_p25, avg_p50, avg_p75, avg_p95, avg_p99, min_lat, max_lat, avg_mean, final_stddev, total_samples, delta_sent, delta_recv, delta_err, count, first_ts, last_ts, last_gap, last_dup
     }
   ' "${sub_csv}")
   
@@ -472,15 +557,19 @@ append_summary_from_artifacts() {
     return 0
   fi
   
-  local tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts
-  IFS=, read -r tps avg_p50_ns avg_p95_ns avg_p99_ns sent recv _err steady_rows steady_start_ts steady_end_ts <<<"${steady_state_metrics}"
+  local tps avg_p25_ns avg_p50_ns avg_p75_ns avg_p95_ns avg_p99_ns min_ns max_ns avg_mean_ns avg_stddev_ns sample_count sent recv _err steady_rows steady_start_ts steady_end_ts gap_count dup_count
+  IFS=, read -r tps avg_p25_ns avg_p50_ns avg_p75_ns avg_p95_ns avg_p99_ns min_ns max_ns avg_mean_ns avg_stddev_ns sample_count sent recv _err steady_rows steady_start_ts steady_end_ts gap_count dup_count <<<"${steady_state_metrics}"
+  
+  # Calculate loss percentage: (sent - recv) / sent * 100
+  local loss_pct
+  loss_pct=$(awk -v s="${sent}" -v r="${recv}" 'BEGIN{if(s>0){printf("%.1f", (s-r)/s*100)}else{print "0.0"}}')
   
   if [[ "${steady_rows}" -eq 0 ]]; then
     log "WARN: No steady-state rows found for ${run_id} (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s)"
     return 0
   fi
   
-  log "Steady-state: ${steady_rows} rows (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s), TPS=${tps}, time_range=${steady_start_ts}-${steady_end_ts}"
+  log "Steady-state: ${steady_rows} rows (ignore_start=${IGNORE_START_SECS}s, ignore_end=${IGNORE_END_SECS}s), TPS=${tps}, samples=${sample_count}, time_range=${steady_start_ts}-${steady_end_ts}"
 
   # Calculate publisher TPS using same time-based filtering
   local pub_tps=""
@@ -513,10 +602,16 @@ append_summary_from_artifacts() {
   fi
   
   # Convert latencies from ns to ms
-  local p50_ms p95_ms p99_ms
+  local p25_ms p50_ms p75_ms p95_ms p99_ms min_ms max_ms avg_latency_ms stddev_ms
+  p25_ms=$(awk -v n="${avg_p25_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p50_ms=$(awk -v n="${avg_p50_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  p75_ms=$(awk -v n="${avg_p75_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p95_ms=$(awk -v n="${avg_p95_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
   p99_ms=$(awk -v n="${avg_p99_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  min_ms=$(awk -v n="${min_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  max_ms=$(awk -v n="${max_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  avg_latency_ms=$(awk -v n="${avg_mean_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
+  stddev_ms=$(awk -v n="${avg_stddev_ns}" 'BEGIN{if(n==""||n==0||n=="-"||n=="NaN"){print ""}else{printf("%.3f", n/1e6)}}')
 
   # Docker stats aggregation (optional) - filtered to steady-state time range
   local stats_csv="${art_dir}/docker_stats.csv" max_cpu max_mem_perc max_mem_used avg_cpu avg_mem_perc avg_mem_used
@@ -588,10 +683,19 @@ append_summary_from_artifacts() {
     log "Docker stats: ${stats_rows} rows in steady-state time range"
   fi
 
+  # Include failure test params (empty for non-failure runs, populated via append_failure_summary)
+  local ft_mttf="${_FT_SUB_MTTF:-}"
+  local ft_mttr="${_FT_SUB_MTTR:-}"
+  local ft_crash="${_FT_SUB_CRASH_COUNT:-}"
+  local ft_pub_loop="${_FT_PUB_CRASH_LOOP:-}"
+  local ft_pub_mttf="${_FT_PUB_MTTF:-}"
+  local ft_pub_mttr="${_FT_PUB_MTTR:-}"
+  local ft_pub_crash="${_FT_PUB_CRASH_COUNT:-}"
+
   if [[ ${LATENCY_ONLY} -eq 1 ]]; then
-    echo "${transport},${payload},${rate},${run_id},${p50_ms},${p95_ms},${p99_ms}" >> "${SUMMARY_CSV}"
+    echo "${transport},${payload},${rate},${run_id},${p25_ms},${p50_ms},${p75_ms},${p95_ms},${p99_ms},${min_ms},${max_ms},${avg_latency_ms},${stddev_ms},${sample_count},${loss_pct},${dup_count},${ft_mttf},${ft_mttr},${ft_crash},${ft_pub_loop},${ft_pub_mttf},${ft_pub_mttr},${ft_pub_crash}" >> "${SUMMARY_CSV}"
   else
-    echo "${transport},${payload},${rate},${run_id},${tps},${p50_ms},${p95_ms},${p99_ms},${pub_tps},${sent},${recv},${_err},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used}" >> "${SUMMARY_CSV}"
+    echo "${transport},${payload},${rate},${run_id},${tps},${p25_ms},${p50_ms},${p75_ms},${p95_ms},${p99_ms},${min_ms},${max_ms},${avg_latency_ms},${stddev_ms},${sample_count},${pub_tps},${sent},${recv},${_err},${loss_pct},${dup_count},${art_dir},${max_cpu},${max_mem_perc},${max_mem_used},${ft_mttf},${ft_mttr},${ft_crash},${ft_pub_loop},${ft_pub_mttf},${ft_pub_mttr},${ft_pub_crash}" >> "${SUMMARY_CSV}"
   fi
 }
 
@@ -603,6 +707,7 @@ get_services() {
     redis) echo "redis" ;;
     nats) echo "nats" ;;
     rabbitmq) echo "rabbitmq" ;;
+    amqp) echo "rabbitmq" ;;
     mosquitto) echo "mosquitto" ;;
     emqx) echo "emqx" ;;
     hivemq) echo "hivemq" ;;
@@ -617,7 +722,7 @@ get_standard_port() {
     zenoh|zenoh-mqtt) echo "7447" ;;
     redis) echo "6379" ;;
     nats) echo "4222" ;;
-    rabbitmq) echo "5672" ;;
+    rabbitmq|amqp) echo "5672" ;;
     mosquitto) echo "1883" ;;
     emqx) echo "1884" ;;
     hivemq) echo "1885" ;;
@@ -724,15 +829,20 @@ manage_service() {
   fi
 }
 
-# Execute one (transport, payload) combo
+# Execute one (transport, payload, qos) combo
 run_single_execution() {
   local transport="$1" payload="$2" pairs="$3" total_rate="$4"
   local broker_name="${5:-}" broker_host="${6:-}" broker_port="${7:-}"
+  local qos="${8:-}"  # optional QoS level
   
   local per_rate=$(( total_rate / pairs ))
   local rid_suffix="${transport}_p${payload}_n${pairs}_r${per_rate}"
   if [[ -n "${broker_name}" ]]; then
     rid_suffix="${broker_name}_p${payload}_n${pairs}_r${per_rate}"
+  fi
+  # Append QoS to run ID if specified
+  if [[ -n "${qos}" ]]; then
+    rid_suffix="${rid_suffix}_q${qos}"
   fi
   
   if [[ ${SKIP_SUMMARY} -eq 1 ]]; then
@@ -745,8 +855,14 @@ run_single_execution() {
   env_common="TENANTS=${pairs} REGIONS=1 SERVICES=1 SHARDS=1 SUBSCRIBERS=${pairs} PUBLISHERS=${pairs} PAYLOAD=${payload} RATE=${per_rate} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT} RAMP_UP_SECS=${RAMP_UP_SECS} TOPIC_PREFIX=bench/pair"
 
   local host_env=""
+  local qos_env=""
   local remote_stats_pid=""
   local stats_csv="${art_dir}/docker_stats.csv"
+
+  # Set QoS environment variable if specified
+  if [[ -n "${qos}" ]]; then
+    qos_env="MQTT_QOS=${qos}"
+  fi
 
   # Start remote stats collector if HOST is set
   if [[ -n "${HOST}" ]]; then
@@ -763,7 +879,12 @@ run_single_execution() {
       else
         host_env="ENDPOINT_SUB=tcp/127.0.0.1:7447 ENDPOINT_PUB=tcp/127.0.0.1:7447"
       fi
-      run "ENGINE=zenoh ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
+      # Zenoh maps QoS: 0=best-effort, 1/2=reliable
+      local zenoh_qos_env=""
+      if [[ -n "${qos}" ]]; then
+        zenoh_qos_env="ZENOH_QOS=${qos}"
+      fi
+      run "ENGINE=zenoh ${host_env} ${zenoh_qos_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
       ;;
     zenoh-mqtt)
       # Mixed engines via bridge: subscribers over MQTT on 1888 (bridge), publishers over zenoh on 7447
@@ -772,7 +893,7 @@ run_single_execution() {
       else
         host_env="ENGINE_SUB=mqtt MQTT_HOST=127.0.0.1 MQTT_PORT=1888 ENGINE_PUB=zenoh ENDPOINT_PUB=tcp/127.0.0.1:7447"
       fi
-      run "${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
+      run "${host_env} ${qos_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
       ;;
     redis)
       if [[ -n "${HOST}" ]]; then host_env="REDIS_URL=redis://${HOST}:6379"; fi
@@ -786,12 +907,20 @@ run_single_execution() {
       if [[ -n "${HOST}" ]]; then host_env="RABBITMQ_HOST=${HOST}"; fi
       run "ENGINE=rabbitmq ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
       ;;
+    amqp)
+      if [[ -n "${HOST}" ]]; then host_env="RABBITMQ_HOST=${HOST}"; fi
+      run "ENGINE=amqp ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
+      ;;
     mqtt)
       # For MQTT, we expect broker_name/host/port to be passed
       if [[ -z "${broker_name}" ]]; then
         log "ERROR: MQTT transport requires broker details"; return 1
       fi
       local br_transport="mqtt_${broker_name}"
+      # Append QoS to transport name for summary if specified
+      if [[ -n "${qos}" ]]; then
+        br_transport="${br_transport}_q${qos}"
+      fi
       host_env="MQTT_HOST=${broker_host} MQTT_PORT=${broker_port}"
       
       # Inject credentials for Artemis (and potentially others if needed)
@@ -799,7 +928,7 @@ run_single_execution() {
         host_env="${host_env} MQTT_USERNAME=admin MQTT_PASSWORD=admin"
       fi
 
-      run "ENGINE=mqtt ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
+      run "ENGINE=mqtt ${host_env} ${qos_env} ${env_common} bash \"${SCRIPT_DIR}/run_multi_topic_perkey.sh\" \"${rid}\""
       if [[ ${SKIP_SUMMARY} -eq 0 ]]; then
         append_summary_from_artifacts "${br_transport}" "${payload}" "${total_rate}" "${rid}" "${art_dir}"
       fi
@@ -820,8 +949,141 @@ run_single_execution() {
   fi
 }
 
+# Check if transport supports QoS
+transport_supports_qos() {
+  local t="$1"
+  [[ " ${QOS_SUPPORTED_TRANSPORTS} " == *" ${t} "* ]]
+}
+
+# Execute failure test using test_mqtt_multitopic_failure.sh
+run_failure_test_execution() {
+  local transport="$1" payload="$2" pairs="$3" total_rate="$4"
+  local broker_name="${5:-}" broker_host="${6:-}" broker_port="${7:-}"
+  local qos="${8:-0}"
+
+  local per_rate=$(( total_rate / pairs ))
+  local rid_suffix="failure_${broker_name}_p${payload}_n${pairs}_r${per_rate}_q${qos}"
+  local rid="${RUN_ID_PREFIX}_$(timestamp)_${rid_suffix}"
+  local art_dir="${REPO_ROOT}/artifacts/${rid}"
+
+  mkdir -p "${art_dir}"
+
+  # Build environment for the failure test script
+  local env_vars=""
+  env_vars+="BROKER_HOST=${broker_host} "
+  env_vars+="BROKER_PORT=${broker_port} "
+  env_vars+="TOPIC_PREFIX=bench/failure "
+  env_vars+="TENANTS=${pairs} "
+  env_vars+="REGIONS=1 "
+  env_vars+="SERVICES=1 "
+  env_vars+="SHARDS=1 "
+  env_vars+="PUBLISHERS=${pairs} "
+  env_vars+="SUBSCRIBERS=${pairs} "
+  env_vars+="PAYLOAD=${payload} "
+  env_vars+="RATE=${per_rate} "
+  env_vars+="DURATION=${DURATION} "
+  env_vars+="QOS_LEVELS=${qos} "
+  env_vars+="SUB_MTTF=${SUB_MTTF} "
+  env_vars+="SUB_MTTR=${SUB_MTTR} "
+  env_vars+="SUB_CRASH_COUNT=${SUB_CRASH_COUNT} "
+  env_vars+="PUB_CRASH_LOOP=${PUB_CRASH_LOOP} "
+  env_vars+="PUB_MTTF=${PUB_MTTF} "
+  env_vars+="PUB_MTTR=${PUB_MTTR} "
+  env_vars+="PUB_CRASH_COUNT=${PUB_CRASH_COUNT} "
+
+  # Inject credentials for Artemis
+  if [[ "${broker_name}" == "artemis" ]]; then
+    env_vars+="MQTT_USERNAME=admin MQTT_PASSWORD=admin "
+  fi
+
+  log "Failure test: broker=${broker_name} payload=${payload}B qos=${qos} mttf=${SUB_MTTF}s crashes=${SUB_CRASH_COUNT}"
+
+  # Run the failure test script
+  # Note: The script creates its own artifacts dir, but we override via ARTIFACTS_DIR if needed
+  local failure_script="${SCRIPT_DIR}/test_mqtt_multitopic_failure.sh"
+  if [[ ! -x "${failure_script}" ]]; then
+    log "ERROR: Failure test script not found: ${failure_script}"
+    return 1
+  fi
+
+  # Capture output for summary extraction
+  local log_file="${art_dir}/failure_test.log"
+  if [[ "${DRY_RUN}" = 1 ]]; then
+    echo "+ ${env_vars} bash ${failure_script} 2>&1 | tee ${log_file}"
+  else
+    eval "${env_vars} bash ${failure_script}" 2>&1 | tee "${log_file}"
+  fi
+
+  # Extract metrics from the failure test output and append to summary
+  if [[ ${SKIP_SUMMARY} -eq 0 ]] && [[ -f "${log_file}" ]]; then
+    append_failure_summary "mqtt_${broker_name}" "${payload}" "${total_rate}" "${rid}" "${art_dir}" "${qos}" "${log_file}"
+  fi
+}
+
+# Parse failure test results and append to summary CSV
+append_failure_summary() {
+  local transport="$1" payload="$2" rate="$3" run_id="$4" art_dir="$5" qos="$6" log_file="$7"
+
+  # Look for the subscriber CSV in the artifacts created by the failure test
+  # The failure test creates artifacts in artifacts/mt_mqtt_failure_<ts>/
+  # Files are named: mt_sub_qos0.csv, mt_sub_qos1.csv, etc.
+  local latest_failure_dir
+  latest_failure_dir=$(ls -1td "${REPO_ROOT}/artifacts/mt_mqtt_failure_"* 2>/dev/null | head -1 || true)
+
+  if [[ -z "${latest_failure_dir}" ]]; then
+    log "WARN: No failure test artifacts found"
+    return 0
+  fi
+
+  # Find the subscriber CSV - failure test uses mt_sub_qos<N>.csv naming
+  local sub_csv="${latest_failure_dir}/mt_sub_qos${qos}.csv"
+
+  if [[ ! -f "${sub_csv}" ]]; then
+    # Try alternate names: sub_agg.csv, sub.csv, or any mt_sub*.csv
+    sub_csv=$(find "${latest_failure_dir}" -name "sub_agg.csv" -type f 2>/dev/null | head -1 || true)
+    if [[ -z "${sub_csv}" ]]; then
+      sub_csv=$(find "${latest_failure_dir}" -name "mt_sub*.csv" -type f 2>/dev/null | head -1 || true)
+    fi
+    if [[ -z "${sub_csv}" ]]; then
+      sub_csv=$(find "${latest_failure_dir}" -name "sub.csv" -type f 2>/dev/null | head -1 || true)
+    fi
+  fi
+
+  if [[ -z "${sub_csv}" ]] || [[ ! -f "${sub_csv}" ]]; then
+    log "WARN: No subscriber CSV found in ${latest_failure_dir}"
+    return 0
+  fi
+  
+  log "Found failure test CSV: ${sub_csv}"
+
+  # Set failure test params for append_summary_from_artifacts to pick up
+  export _FT_SUB_MTTF="${SUB_MTTF}"
+  export _FT_SUB_MTTR="${SUB_MTTR}"
+  export _FT_SUB_CRASH_COUNT="${SUB_CRASH_COUNT}"
+  export _FT_PUB_CRASH_LOOP="${PUB_CRASH_LOOP}"
+  export _FT_PUB_MTTF="${PUB_MTTF}"
+  export _FT_PUB_MTTR="${PUB_MTTR}"
+  export _FT_PUB_CRASH_COUNT="${PUB_CRASH_COUNT}"
+
+  # Use the standard summary extraction with failure-specific transport label
+  local transport_label="${transport}_q${qos}_failure"
+  append_summary_from_artifacts "${transport_label}" "${payload}" "${rate}" "${run_id}" "$(dirname "${sub_csv}")" "${sub_csv}"
+
+  # Clear failure test params
+  unset _FT_SUB_MTTF _FT_SUB_MTTR _FT_SUB_CRASH_COUNT _FT_PUB_CRASH_LOOP _FT_PUB_MTTF _FT_PUB_MTTR _FT_PUB_CRASH_COUNT
+}
+
 main() {
   log "Latency vs payload benchmark → ${BENCH_DIR}"
+  if [[ ${FAILURE_TEST} -eq 1 ]]; then
+    log "Failure test mode enabled: SUB_MTTF=${SUB_MTTF}s SUB_MTTR=${SUB_MTTR}s crashes=${SUB_CRASH_COUNT}"
+    if [[ ${PUB_CRASH_LOOP} -eq 1 ]]; then
+      log "Publisher crash loop enabled: PUB_MTTF=${PUB_MTTF}s crashes=${PUB_CRASH_COUNT}"
+    fi
+  fi
+  if [[ ${QOS_SWEEP} -eq 1 ]]; then
+    log "QoS sweep enabled: levels ${QOS_LEVELS[*]}"
+  fi
   
   # If NOT sequential, ensure services are up globally (legacy mode)
   if [[ $SEQUENTIAL -eq 0 ]]; then
@@ -829,6 +1091,12 @@ main() {
   fi
 
   for t in "${TRANSPORTS[@]}"; do
+    # Determine QoS levels to iterate
+    local qos_list=("")  # default: single iteration with no QoS
+    if [[ ${QOS_SWEEP} -eq 1 ]] && transport_supports_qos "${t}"; then
+      qos_list=("${QOS_LEVELS[@]}")
+    fi
+
     if [[ "${t}" == "mqtt" ]]; then
       # MQTT: Iterate brokers
       if [[ ${#MQTT_BROKERS_ARR[@]} -eq 0 ]]; then
@@ -843,37 +1111,46 @@ main() {
              svc=$(get_services "$bname")
           fi
 
-          for p in "${PAYLOADS[@]}"; do
-            # Start or restart service before each iteration
-            if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
-               if [[ $first_iteration -eq 1 ]]; then
-                  manage_service up "$svc"
-                  first_iteration=0
-               else
-                  manage_service restart "$svc"
-               fi
-               wait_for_port "${bhost}" "${bport}"
-               
-               # Warmup after broker restart (skip if WARMUP_SECS=0)
-               if [[ ${WARMUP_SECS} -gt 0 ]]; then
-                 log "Warmup: transport=mqtt broker=${bname} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_SECS}s"
-                 local _orig_dur="${DURATION}"
-                 DURATION="${WARMUP_SECS}"
-                 SKIP_SUMMARY=1
-                 run_single_execution "mqtt" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}"
-                 SKIP_SUMMARY=0
-                 DURATION="${_orig_dur}"
-               fi
-            fi
+          for qos in "${qos_list[@]}"; do
+            for p in "${PAYLOADS[@]}"; do
+              # Start or restart service before each iteration
+              if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
+                 if [[ $first_iteration -eq 1 ]]; then
+                    manage_service up "$svc"
+                    first_iteration=0
+                 else
+                    manage_service restart "$svc"
+                 fi
+                 wait_for_port "${bhost}" "${bport}"
+                 
+                 # Warmup after broker restart (skip if WARMUP_SECS=0)
+                 if [[ ${WARMUP_SECS} -gt 0 ]]; then
+                   log "Warmup: transport=mqtt broker=${bname} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_SECS}s"
+                   local _orig_dur="${DURATION}"
+                   DURATION="${WARMUP_SECS}"
+                   SKIP_SUMMARY=1
+                   run_single_execution "mqtt" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}" "${qos}"
+                   SKIP_SUMMARY=0
+                   DURATION="${_orig_dur}"
+                 fi
+              fi
 
-            log "Run: transport=mqtt broker=${bname} payload=${p}B pairs=${PAIRS} total_rate=${TOTAL_RATE}/s"
-            run_single_execution "mqtt" "${p}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}"
-            
-            # Interval sleep (cooldown) - only if not sequential (restart handles settling)
-            if [[ $SEQUENTIAL -eq 0 ]] && [[ ${INTERVAL_SEC} -gt 0 ]]; then
-              log "Cooldown: sleeping ${INTERVAL_SEC}s..."
-              if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
-            fi
+              local qos_info=""
+              if [[ -n "${qos}" ]]; then qos_info=" qos=${qos}"; fi
+              log "Run: transport=mqtt broker=${bname} payload=${p}B pairs=${PAIRS} total_rate=${TOTAL_RATE}/s${qos_info}"
+              
+              if [[ ${FAILURE_TEST} -eq 1 ]]; then
+                run_failure_test_execution "mqtt" "${p}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}" "${qos:-0}"
+              else
+                run_single_execution "mqtt" "${p}" "${PAIRS}" "${TOTAL_RATE}" "${bname}" "${bhost}" "${bport}" "${qos}"
+              fi
+              
+              # Interval sleep (cooldown) - only if not sequential (restart handles settling)
+              if [[ $SEQUENTIAL -eq 0 ]] && [[ ${INTERVAL_SEC} -gt 0 ]]; then
+                log "Cooldown: sleeping ${INTERVAL_SEC}s..."
+                if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
+              fi
+            done
           done
           
           # Stop service if sequential (after all payloads for this broker)
@@ -893,39 +1170,43 @@ main() {
          port=$(get_standard_port "$t")
       fi
 
-      for p in "${PAYLOADS[@]}"; do
-        # Start or restart service before each iteration
-        if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
-           if [[ $first_iteration -eq 1 ]]; then
-              manage_service up "$svc"
-              first_iteration=0
-           else
-              manage_service restart "$svc"
-           fi
-           if [[ -n "$port" ]]; then
-              wait_for_port "${HOST:-127.0.0.1}" "$port"
-           fi
-           
-           # Warmup after broker restart (skip if WARMUP_SECS=0)
-           if [[ ${WARMUP_SECS} -gt 0 ]]; then
-             log "Warmup: transport=${t} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_SECS}s"
-             local _orig_dur="${DURATION}"
-             DURATION="${WARMUP_SECS}"
-             SKIP_SUMMARY=1
-             run_single_execution "${t}" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}"
-             SKIP_SUMMARY=0
-             DURATION="${_orig_dur}"
-           fi
-        fi
+      for qos in "${qos_list[@]}"; do
+        for p in "${PAYLOADS[@]}"; do
+          # Start or restart service before each iteration
+          if [[ $SEQUENTIAL -eq 1 ]] && [[ -n "$svc" ]]; then
+             if [[ $first_iteration -eq 1 ]]; then
+                manage_service up "$svc"
+                first_iteration=0
+             else
+                manage_service restart "$svc"
+             fi
+             if [[ -n "$port" ]]; then
+                wait_for_port "${HOST:-127.0.0.1}" "$port"
+             fi
+             
+             # Warmup after broker restart (skip if WARMUP_SECS=0)
+             if [[ ${WARMUP_SECS} -gt 0 ]]; then
+               log "Warmup: transport=${t} payload=${WARMUP_PAYLOAD}B duration=${WARMUP_SECS}s"
+               local _orig_dur="${DURATION}"
+               DURATION="${WARMUP_SECS}"
+               SKIP_SUMMARY=1
+               run_single_execution "${t}" "${WARMUP_PAYLOAD}" "${PAIRS}" "${TOTAL_RATE}" "" "" "" "${qos}"
+               SKIP_SUMMARY=0
+               DURATION="${_orig_dur}"
+             fi
+          fi
 
-        log "Run: transport=${t} payload=${p}B pairs=${PAIRS} total_rate=${TOTAL_RATE}/s"
-        run_single_execution "${t}" "${p}" "${PAIRS}" "${TOTAL_RATE}"
-        
-        # Interval sleep (cooldown) - only if not sequential (restart handles settling)
-        if [[ $SEQUENTIAL -eq 0 ]] && [[ ${INTERVAL_SEC} -gt 0 ]]; then
-          log "Cooldown: sleeping ${INTERVAL_SEC}s..."
-          if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
-        fi
+          local qos_info=""
+          if [[ -n "${qos}" ]]; then qos_info=" qos=${qos}"; fi
+          log "Run: transport=${t} payload=${p}B pairs=${PAIRS} total_rate=${TOTAL_RATE}/s${qos_info}"
+          run_single_execution "${t}" "${p}" "${PAIRS}" "${TOTAL_RATE}" "" "" "" "${qos}"
+          
+          # Interval sleep (cooldown) - only if not sequential (restart handles settling)
+          if [[ $SEQUENTIAL -eq 0 ]] && [[ ${INTERVAL_SEC} -gt 0 ]]; then
+            log "Cooldown: sleeping ${INTERVAL_SEC}s..."
+            if [[ ${DRY_RUN} -eq 1 ]]; then echo "+ sleep ${INTERVAL_SEC}"; else sleep ${INTERVAL_SEC}; fi
+          fi
+        done
       done
       
       # Stop service if sequential (after all payloads for this transport)
