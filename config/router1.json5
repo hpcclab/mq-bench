@@ -8,17 +8,32 @@
     gossip: { enabled: false }
   },
 
-  // Listen on TCP 7447
-  listen: {
-    endpoints: ["tcp/0.0.0.0:7447"]
-  },
-
   // Hub: no outbound connects needed
   connect: {
     endpoints: ["tcp/router2:7447", "tcp/router3:7447"]
   },
 
-  // Enable MQTT server plugin listening on TCP 1883
+  // High client count tuning
+  transport: {
+    unicast: {
+      max_sessions: 100000,      // Max concurrent client sessions
+      accept_pending: 4096,     // Pending connection queue (increased)
+      accept_timeout: 30000,    // Timeout for accepts (ms) - increased
+    },
+    link: {
+      tx: {
+        batch_size: 65535,      // Larger batches for throughput
+      },
+      rx: {
+        buffer_size: 131072,    // 128KB receive buffer
+      }
+    }
+  },
+
+  // Listen backlog for TCP (important for burst connections)
+  listen: {
+    endpoints: ["tcp/0.0.0.0:7447?so_backlog=4096"]
+  },
   plugins: {
     mqtt: {
       // The plugin uses a single 'port' setting rather than zenoh 'listen.endpoints'

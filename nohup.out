@@ -1,0 +1,37 @@
+[01:26:35] Throughput vs pairs benchmark → /home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635
+[01:26:35] Current ulimit -n is 200000. Attempting to raise to 1048576...
+[01:26:35] WARN: Failed to raise ulimit to 1048576. Trying 65536...
+[01:26:35] Success: ulimit -n is now 65536
+[01:26:35] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635/raw_data/summary.csv | PLOTS_DIR=/home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635/plots | RAW_DIR=/home/cc/mq-bench/results/throughput_vs_pairs_20251211_012635/raw_data
+[01:26:35] Resolved payload (bytes): 1024
+[01:26:35] Pairs list: 4000 | rate-per-pub=10 | total-rate=
+[01:26:35] Starting services: router1
+[01:26:35] [remote] ubuntu@192.168.0.253: cd /home/ubuntu && docker compose down
+ Container router1  Stopping
+[06:15:55] Throughput vs pairs benchmark → /home/cc/mq-bench/results/throughput_vs_pairs_20251215_061555
+[06:15:55] Current ulimit -n is 200000. Attempting to raise to 1048576...
+[06:15:55] WARN: Failed to raise ulimit to 1048576. Trying 65536...
+[06:15:55] Success: ulimit -n is now 65536
+[06:15:55] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/throughput_vs_pairs_20251215_061555/raw_data/summary.csv | PLOTS_DIR=/home/cc/mq-bench/results/throughput_vs_pairs_20251215_061555/plots | RAW_DIR=/home/cc/mq-bench/results/throughput_vs_pairs_20251215_061555/raw_data
+[06:15:55] Resolved payload (bytes): 1048576
+[06:15:55] Pairs list: 500 1000 2000 3000 4000 5000 | rate-per-pub=1 | total-rate=
+[06:15:55] Run: transport=mqtt broker=artemis pairs=500 payload=1048576B per_pub_rate=1/s total_rate=500/s
+[06:15:55] Starting remote stats collector on 192.168.0.253 for 50s...
+[run_multi_topic_perkey] scale_20251215_061555_artemis_p1048576_n500_r1 (ENGINE=mqtt)
+Dims: T=500 R=1 S=1 K=1 | subs=500 pubs=500 mapping=mdim
+Load: payload=1048576 rate_per_pub=1 dur=30s snapshot=1s share_transport=false
+Paths: sub=tcp/127.0.0.1:7447 pub=tcp/127.0.0.1:7447 prefix=bench/pair mode=client
+Starting per-key subscribers
+[cmd] ./target/release/mq-bench --snapshot-interval 1 mt-sub --engine mqtt --connect host=192.168.0.253 --connect port=1887 --connect username=admin --connect password=admin --topic-prefix bench/pair --tenants 500 --regions 1 --services 1 --shards 1 --subscribers 500 --mapping mdim --duration 30 --ramp-up-secs 5 --csv artifacts/scale_20251215_061555_artemis_p1048576_n500_r1/fanout_multi_topic_perkey/sub_agg.csv 
+       1>artifacts/scale_20251215_061555_artemis_p1048576_n500_r1/fanout_multi_topic_perkey/mt_sub.log 2>&1 &
+Waiting 5s for subscribers to stabilize...
+Starting multi-topic publishers
+[cmd] ./target/release/mq-bench --snapshot-interval 1 mt-pub --engine mqtt --connect host=192.168.0.253 --connect port=1887 --connect username=admin --connect password=admin --topic-prefix bench/pair --tenants 500 --regions 1 --services 1 --shards 1 --publishers 500 --mapping mdim --payload 1048576 --rate 1 --ramp-up-secs 5 --duration 30 --csv artifacts/scale_20251215_061555_artemis_p1048576_n500_r1/fanout_multi_topic_perkey/mt_pub.csv 
+       1>artifacts/scale_20251215_061555_artemis_p1048576_n500_r1/fanout_multi_topic_perkey/mt_pub.log 2>&1 &
+[watch] printing status every 1s...
+[watch] printing status every 1s...
+[status] PUB sent=- itps=- tps=- conn=-/- | SUB recv=0 itps=0.00 p99=0.00ms conn=0,450,0/450
+[status] PUB sent=182 itps=181.93 tps=182.25 conn=91,92,0/92 | SUB recv=0 itps=0.00 p99=0.00ms conn=0,500,0/500
+[status] PUB sent=455 itps=273.11 tps=227.70 conn=182,182,0/182 | SUB recv=0 itps=0.00 p99=0.00ms conn=0,500,0/500
+[status] PUB sent=819 itps=363.88 tps=273.13 conn=273,273,0/273 | SUB recv=0 itps=0.00 p99=0.00ms conn=0,500,0/500
+Stopping subscribers (1376359)

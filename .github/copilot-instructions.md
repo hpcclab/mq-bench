@@ -1,65 +1,64 @@
 # mq-bench — AI agent working notes
 
 Purpose
-- Rust benchmarking harness for Zenoh 1.5.1 with a Docker 3-router star topology. Focus: pub/sub now; requester/queryable stubs exist.
+- Multi-transport messaging benchmark harness (MQTT, Redis, NATS, Zenoh, RabbitMQ/AMQP) with pub/sub and req/rep, CSV metrics, and Dockerized brokers.
 
-Architecture at a glance
-- One binary with subcommands (see `src/main.rs`):
-  - pub/sub implemented via `roles::publisher` and `roles::subscriber`
-  - req/qry placeholders in `roles/{requester,queryable}.rs`
-- Zenoh client: explicit endpoints only; discovery disabled in both client and routers.
-- Payloads: first 24 bytes are a custom header (see `src/payload.rs`):
-  - seq: u64, timestamp_ns: u64, payload_size: usize; little-endian
-  - Subscribers parse this to compute end-to-end latency.
-- Rate control: open-loop scheduler (`src/rate.rs`) using fixed nanos interval; no backpressure.
-- Metrics: `metrics::stats` with hdrhistogram; periodic snapshots printed; CSV writer in `src/output.rs`.
-- Logging: `tracing-subscriber` configured via `--log-level` string (e.g., info, debug).
+Architecture (big picture)
+- One binary with subcommands (`src/main.rs`): pub, sub, req, qry, plus multi-topic `mt-pub`/`mt-sub`.
+- Transport abstraction (`src/transport`): `Engine` = zenoh|mqtt|redis|nats|rabbitmq (alias amqp). Builder (`TransportBuilder::connect`) dispatches behind cargo features.
+- Subscribe/query handlers: adapters use handler callbacks for lower overhead; publishers are pre-declared for hot-path publish.
+- Payload format (`src/payload.rs`): first 24 bytes are header [seq: u64, timestamp_ns: u64, payload_size: usize] in little-endian; subscribers decode for latency.
+- Metrics (`metrics::stats`): hdrhistogram-backed; main externalizes snapshots with a shared `Stats` aggregator and periodic writer. CSV via `src/output.rs`.
+- Logging: `tracing-subscriber` via `--log-level`.
 
-Docker/routers
-- Compose spins a 3-router star (`docker-compose.yml`):
-  - router1 hub exposed at 7447; router2 at 7448→7447; router3 at 7449→7447
-  - Router configs in `config/router{1,2,3}.json5` disable scouting and set explicit peers.
-- Typical cross-router sanity: sub connects to 7448 (router2), pub to 7449 (router3). Ensure subscriber starts first.
-
-Developer workflows
-- Build binary: `cargo build --release` (or debug for quick runs).
-- Bring up routers only: `scripts/compose_up.sh`; tear down: `scripts/compose_down.sh`.
+Services & topology (docker-compose.yml)
+- MQTT: Mosquitto 1883, EMQX 1884, HiveMQ 1885, RabbitMQ-MQTT 1886, Artemis-MQTT 1887; Redis 6379; NATS 4222; RabbitMQ AMQP 5672; Artemis AMQP 5673; optional Zenoh 3-router star (7448→7447←7449).
+- Zenoh cross-router sanity: start subscriber against 7448 (router2) and publisher to 7449 (router3). Discovery is disabled; use explicit endpoints.
 
 CLI patterns (current)
-- Publisher: `mq-bench pub --endpoint tcp/127.0.0.1:7449 --topic-prefix bench/topic --payload 1024 --rate 1000 --duration 60`
-- Subscriber: `mq-bench sub --endpoint tcp/127.0.0.1:7448 --expr bench/topic`
-- Notes:
-  - `--endpoint` is a Zenoh locator like `tcp/host:port` (no discovery).
-  - `payload` must be ≥ 24 bytes (header); else it will panic.
-  - CSV output is currently to stdout; file paths are coded but not yet exposed via CLI.
+- Top-level: `--run-id`, `--out-dir`, `--log-level`, `--snapshot-interval`.
+- Engine selection: `--engine zenoh|mqtt|redis|nats|rabbitmq` with `--connect KEY=VALUE` (repeatable). Zenoh back-compat: `--endpoint tcp/host:port`.
+- QoS: `--qos` accepted on pub/sub/qry; mapped per engine (e.g., zenoh 0=best-effort, 1/2=reliable).
+- CSV output: any role accepts `--csv path/to/file.csv`; stdout if omitted (aggregated snapshots handled in `main.rs`).
 
-Code conventions and extension tips
-- When adding a role:
-  - Define a Config struct, open a Zenoh session with `connect/endpoints`, disable `scouting/*`, and spawn a snapshot task using `metrics::Stats` every N seconds.
-  - Use `tokio::select!` with `signal::ctrl_c()` for graceful shutdown.
-- Use `payload::MessageHeader` for latency; prefer little-endian and keep header size fixed at 24 bytes for compatibility.
-- Keep router auto-discovery off for determinism; prefer explicit `connect/endpoints` arrays.
+Quick examples (see README for more):
+- MQTT: `sub --engine mqtt --connect host=127.0.0.1 --connect port=1883 --expr bench/topic` | `pub --engine mqtt --connect host=127.0.0.1 --connect port=1883 --topic-prefix bench/topic --payload 200 --rate 5 --duration 10`
+- NATS: `sub --engine nats --connect host=127.0.0.1 --connect port=4222 --expr bench/topic` | `pub --engine nats --connect host=127.0.0.1 --connect port=4222 ...`
+- Redis: `--engine redis --connect url=redis://127.0.0.1:6379`
+- Zenoh: `--endpoint tcp/127.0.0.1:7448` (sub) and `:7449` (pub)
+- RabbitMQ AMQP: `--engine rabbitmq --connect url=amqp://guest:guest@127.0.0.1:5672/%2f`
 
-Key files
-- CLI and dispatch: `src/main.rs`
-- Roles: `src/roles/{publisher,subscriber}.rs` (req/qry stubs present)
-- Payload header: `src/payload.rs`
-- Metrics & CSV: `src/metrics/stats.rs`, `src/output.rs`
-- Docker topology: `docker-compose.yml`, `config/router*.json5`
-- Example scripts: `test_pubsub.sh`, `debug_test.sh`, `cross_router_test.sh`, `scripts/compose_{up,down}.sh`
+Developer workflows
+- Build: `cargo build --release` (prefer release for perf). Tests: `cargo test` (see `tests/mock_transport_smoke.rs`).
+- Bring up brokers: `docker compose up -d` (all bound to 127.0.0.1). Tear down: `docker compose down`.
+- Scripts (`scripts/`):
+  - `run_baseline.sh`, `run_fanout.sh` (set `ENGINE=zenoh|mqtt|redis|nats|rabbitmq`).
+  - `lib.sh::make_connect_args` turns `ENGINE` + env into `--engine ... --connect KEY=VALUE` pairs.
+  - Optional Docker stats sampler writes `docker_stats.csv` (see `resolve_monitor_containers`, `start_broker_stats_monitor`).
+
+Project conventions
+- Topic names use slash style at the CLI (`bench/topic`, `bench/**`); adapters map to backend-native patterns (e.g., NATS dots, AMQP topic exchange).
+- Discovery is off for determinism; pass explicit connection params.
+- Payload must be ≥ 24 bytes; header is required for latency math.
+- Subscriber-first startup avoids drops at high rates.
+
+Key files to know
+- CLI/dispatch: `src/main.rs`; roles: `src/roles/{publisher,subscriber,requester,queryable,multi_topic}.rs`
+- Transport contracts: `src/transport/{mod,config}.rs` and per-adapter files (mqtt, nats, redis, amqp, zenoh)
+- Metrics/CSV: `src/metrics/stats.rs`, `src/output.rs`; rate control: `src/rate.rs`; time sync: `src/time_sync.rs`
+- Docker/services: `docker-compose.yml`, `config/*` (Zenoh routers, MQTT broker configs)
+
+Adding a new transport (concise checklist)
+- Implement `src/transport/<name>.rs` with `Transport` trait (support subscribe + create_publisher; `request`/`register_queryable` can be stubbed initially).
+- Wire it: add `Engine::<Name>` and builder branch in `src/transport/mod.rs` behind cargo feature `transport-<name>`; map CLI in `src/transport/config.rs::parse_engine`.
+- Cargo.toml: add feature and deps. Scripts: extend `scripts/lib.sh::make_connect_args` and (optionally) add a service to `docker-compose.yml`.
+- Docs: add connect hints and examples in `README.md` under “Transports (current)”.
 
 Pitfalls
-- Wrong host port → wrong router. Use 7447 (router1), 7448 (router2), 7449 (router3).
-- Start subscriber before publisher to avoid initial drops.
-- High rates in debug builds can saturate CPU; prefer `--release` for performance work.
+- Wrong port → wrong broker/router; check compose port map. Zenoh: 7447/7448/7449 hub/star. MQTT variants: 1883–1887. NATS 4222. Redis 6379. RabbitMQ 5672.
+- Debug builds saturate CPU at high rates; use `--release`.
+- Some adapters may not yet support req/rep; see README notes.
 
-How to add a new transport (quick checklist)
-- Create an adapter in `src/transport/<name>.rs` implementing `Transport` (pub/sub first; req/qry optional).
-- Wire it:
-  - Add enum variant in `src/transport/mod.rs` and dispatch in the builder under a new cargo feature `transport-<name>`.
-  - Map CLI string to engine in `src/transport/config.rs::parse_engine`.
-  - Add dependencies and `transport-<name>` feature in `Cargo.toml`.
-- Scripts & UX:
-  - Update `scripts/lib.sh::make_connect_args` to emit `--engine <name>` and `--connect KEY=VALUE` pairs; optionally add orchestrator cases for labels.
-  - Bind a container in `docker-compose.yml` if needed; prefer 127.0.0.1 host ports.
-- Docs: Add connect hints and a short example in README under “Transports (current)”.
+Questions for maintainers (to confirm/extend):
+- Any engine-specific QoS/retention/ack nuances we should encode into adapter defaults?
+- Should scripts default `ENGINE` to a specific broker for CI? Any preferred artifact layout under `./artifacts` beyond current run folders?

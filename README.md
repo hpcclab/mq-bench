@@ -253,3 +253,6 @@ Minimal steps to introduce a new engine (e.g., "foo"):
 - Docs: list the engine under “Transports (current)” with example connect hints.
 
 Tip: keep topic names in slash style at the CLI; if the backend uses a different pattern (e.g., dots), translate internally inside the adapter.
+
+# mq-bench
+Benchmarking of IoT-based message queuing systems.

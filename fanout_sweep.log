@@ -1,0 +1,35 @@
+nohup: ignoring input
+Unknown arg: --ignore-start-secs
+!/usr/bin/env bash
+Orchestrate fanout subscriber sweep: run fanout tests from 1 to N subscribers.
+Supports multiple publishers (M pubs → N subs).
+
+Usage:
+  scripts/orchestrate_fanout_sweep.sh [options]
+
+Options:
+  --max-subs N       Maximum number of subscribers (default: 10)
+  --pubs N           Number of publishers (default: 1)
+  --step N           Subscriber step increment (default: 1)
+  --rate N           Total message rate in msg/s (default: 10000)
+  --duration N       Test duration in seconds (default: 30)
+  --payload N        Payload size in bytes (default: 1024)
+  --engine ENGINE    Transport engine: zenoh|mqtt|redis|nats (default: zenoh)
+  --host HOST        Broker host (default: 127.0.0.1)
+  --port PORT        Broker port (auto-detected per engine if not specified)
+  --interval N       Sleep seconds between runs (default: 5)
+  --dry-run          Print commands without executing
+  -h, --help         Show this help
+
+Examples:
+  # Sweep 1-10 subscribers with zenoh at 10k msg/s
+  scripts/orchestrate_fanout_sweep.sh --max-subs 10 --rate 10000
+
+  # Sweep 1,2,4,8,16,32 subscribers (step by doubling)
+  scripts/orchestrate_fanout_sweep.sh --max-subs 32 --step exp2
+
+  # 4 publishers → 1-20 subscribers with MQTT
+  scripts/orchestrate_fanout_sweep.sh --pubs 4 --engine mqtt --port 1883 --max-subs 20
+
+  # Custom subscriber list
+  SUBS_LIST="1 2 5 10 20 50 100" scripts/orchestrate_fanout_sweep.sh

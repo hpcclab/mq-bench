@@ -185,7 +185,12 @@ stop_broker_stats_monitor() {
 make_connect_args() {
 	local role="${1:?role sub|pub}"; shift
 	local -n _out="${1:?out array var name}"; shift || true
-	local engine="${ENGINE:-zenoh}"
+	# Allow per-role engine override via ENGINE_SUB / ENGINE_PUB, else fallback to ENGINE
+	local role_upper
+	role_upper=$(printf '%s' "${role}" | tr '[:lower:]' '[:upper:]')
+	local engine_var="ENGINE_${role_upper}"
+	local engine="${!engine_var-}"
+	if [[ -z "${engine}" ]]; then engine="${ENGINE:-zenoh}"; fi
 	_out=()
 	case "${engine}" in
 		zenoh)
@@ -213,15 +218,16 @@ make_connect_args() {
 			_out=(--engine zenoh --connect "endpoint=${ep}" --connect "mode=peer")
 			;;
 		mqtt)
-			# Generic MQTT engine. Requires MQTT_HOST and MQTT_PORT. Optional MQTT_USERNAME/MQTT_PASSWORD.
+			# Generic MQTT engine. Requires MQTT_HOST and MQTT_PORT. Optional MQTT_USERNAME/MQTT_PASSWORD/MQTT_QOS.
 			local host="${MQTT_HOST:-127.0.0.1}"; local port="${MQTT_PORT:-1883}"
-			local user_opt=() pass_opt=() max_opts=()
+			local user_opt=() pass_opt=() max_opts=() qos_opt=()
 			if [[ -n "${MQTT_USERNAME:-}" ]]; then user_opt=(--connect "username=${MQTT_USERNAME}"); fi
 			if [[ -n "${MQTT_PASSWORD:-}" ]]; then pass_opt=(--connect "password=${MQTT_PASSWORD}"); fi
+			if [[ -n "${MQTT_QOS:-}" ]]; then qos_opt=(--connect "qos=${MQTT_QOS}"); fi
 			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
 			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
 			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
-			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
+			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${qos_opt[@]}" "${max_opts[@]}")
 			;;
 		amqp)
 			# Deprecated: use ENGINE=rabbitmq. Keep as alias.
@@ -236,24 +242,32 @@ make_connect_args() {
 			;;
 		rabbitmq)
 			# RabbitMQ over AMQP (native adapter); default
-			local host="${RABBITMQ_HOST:-127.0.0.1}"
-			local port="${RABBITMQ_PORT:-5672}"
-			local user="${RABBITMQ_USER:-guest}"
-			local pass="${RABBITMQ_PASS:-guest}"
-			local vhost="${RABBITMQ_VHOST:-/}"
-			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
-			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			# Check for pre-built URL first, otherwise construct from components
+			local url="${RABBITMQ_URL:-}"
+			if [[ -z "${url}" ]]; then
+				local host="${RABBITMQ_HOST:-127.0.0.1}"
+				local port="${RABBITMQ_PORT:-5672}"
+				local user="${RABBITMQ_USER:-guest}"
+				local pass="${RABBITMQ_PASS:-guest}"
+				local vhost="${RABBITMQ_VHOST:-/}"
+				if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+				url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			fi
 			_out=(--engine rabbitmq --connect "url=${url}")
 			;;
 		rabbitmq-amqp)
 			# Explicit RabbitMQ over AMQP
-			local host="${RABBITMQ_HOST:-127.0.0.1}"
-			local port="${RABBITMQ_PORT:-5672}"
-			local user="${RABBITMQ_USER:-guest}"
-			local pass="${RABBITMQ_PASS:-guest}"
-			local vhost="${RABBITMQ_VHOST:-/}"
-			if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
-			local url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			# Check for pre-built URL first, otherwise construct from components
+			local url="${RABBITMQ_URL:-}"
+			if [[ -z "${url}" ]]; then
+				local host="${RABBITMQ_HOST:-127.0.0.1}"
+				local port="${RABBITMQ_PORT:-5672}"
+				local user="${RABBITMQ_USER:-guest}"
+				local pass="${RABBITMQ_PASS:-guest}"
+				local vhost="${RABBITMQ_VHOST:-/}"
+				if [[ "$vhost" == "/" ]]; then vhost="%2f"; fi
+				url="amqp://${user}:${pass}@${host}:${port}/${vhost}"
+			fi
 			_out=(--engine rabbitmq --connect "url=${url}")
 			;;
 		rabbitmq-mqtt)
@@ -320,7 +334,7 @@ make_connect_args() {
 			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
 			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
-		mqtt-artemis)
+		mqtt-artemis|artemis)
 			local host="${ARTEMIS_HOST:-127.0.0.1}"
 			local port="${ARTEMIS_MQTT_PORT:-1887}"
 			# Defaults from docker-compose.yml: ARTEMIS_USERNAME=admin, ARTEMIS_PASSWORD=admin
@@ -333,6 +347,8 @@ make_connect_args() {
 			if [[ -n "${MQTT_MAX_PACKET:-}" ]]; then max_opts+=(--connect "max_packet=${MQTT_MAX_PACKET}"); fi
 			if [[ -n "${MQTT_MAX_IN:-}" ]]; then max_opts+=(--connect "max_in=${MQTT_MAX_IN}"); fi
 			if [[ -n "${MQTT_MAX_OUT:-}" ]]; then max_opts+=(--connect "max_out=${MQTT_MAX_OUT}"); fi
+			# Artemis requires client_id to be set for durable subscriptions or just good practice
+			# We can use a random one or let the client gen it, but let's ensure we pass credentials correctly.
 			_out=(--engine mqtt --connect "host=${host}" --connect "port=${port}" "${user_opt[@]}" "${pass_opt[@]}" "${max_opts[@]}")
 			;;
 		nats)
@@ -413,16 +429,17 @@ print_status_common() {
 	local last_sub last_pub
 	last_sub=$(tail -n +2 "$sub_file" 2>/dev/null | tail -n1 || true)
 	last_pub=$(tail -n +2 "$pub_file" 2>/dev/null | tail -n1 || true)
-	local spub itpub ttpub rsub itsub p99sub
+	local spub itpub ttpub rsub itsub p99sub conns_pub active_pub conns_sub active_sub
 	if [[ -n "$last_pub" ]]; then
-		IFS=, read -r _ spub _ epub ttpub itpub _ _ _ _ _ _ <<<"$last_pub"
+		IFS=, read -r _ spub _ epub ttpub itpub _ _ _ _ _ _ conns_pub active_pub <<<"$last_pub"
 	fi
 	if [[ -n "$last_sub" ]]; then
-		IFS=, read -r _ _ rsub _ _ itsub _ _ p99sub _ _ _ <<<"$last_sub"
+		IFS=, read -r _ _ rsub _ _ itsub _ _ p99sub _ _ _ conns_sub active_sub <<<"$last_sub"
 	fi
-	printf "[status] PUB sent=%s itps=%s tps=%s | SUB recv=%s itps=%s p99=%.2fms\n" \
-		"${spub:--}" "${itpub:--}" "${ttpub:--}" \
-		"${rsub:--}" "${itsub:--}" "$(awk -v n="${p99sub:-0}" 'BEGIN{printf (n/1e6)}')"
+	printf "[status] PUB sent=%s itps=%s tps=%s conn=%s/%s | SUB recv=%s itps=%s p99=%.2fms conn=%s/%s\n" \
+		"${spub:--}" "${itpub:--}" "${ttpub:--}" "${active_pub:--}" "${conns_pub:--}" \
+		"${rsub:--}" "${itsub:--}" "$(awk -v n="${p99sub:-0}" 'BEGIN{printf (n/1e6)}')" \
+		"${active_sub:--}" "${conns_sub:--}"
 }
 
 # Watch loop until pub exits
@@ -443,14 +460,15 @@ summarize_common() {
 	final_pub=$(tail -n +2 "${pub_csv}" 2>/dev/null | tail -n1 || true)
 	final_sub=$(tail -n +2 "${sub_csv}" 2>/dev/null | tail -n1 || true)
 	if [[ -n "$final_pub" ]]; then
-		IFS=, read -r _ tsent _ terr tt _ _ _ _ _ _ _ <<<"$final_pub"
-		echo "Publisher: sent=${tsent} total_tps=${tt}"
+		IFS=, read -r _ tsent _ terr tt _ _ _ _ _ _ _ conns_pub active_pub <<<"$final_pub"
+		echo "Publisher: sent=${tsent} total_tps=${tt} connections=${conns_pub:-0} active=${active_pub:-0}"
 	fi
 	if [[ -n "$final_sub" ]]; then
-		IFS=, read -r _ _ rcv _ tps _ p50 p95 p99 _ _ _ <<<"$final_sub"
-		printf "Subscriber: recv=%s total_tps=%.2f p50=%.2fms p95=%.2fms p99=%.2fms\n" \
+		IFS=, read -r _ _ rcv _ tps _ p50 p95 p99 _ _ _ conns_sub active_sub <<<"$final_sub"
+		printf "Subscriber: recv=%s total_tps=%.2f p50=%.2fms p95=%.2fms p99=%.2fms connections=%s active=%s\n" \
 			"$rcv" "$tps" "$(awk -v n="$p50" 'BEGIN{printf (n/1e6)}')" \
-			"$(awk -v n="$p95" 'BEGIN{printf (n/1e6)}')" "$(awk -v n="$p99" 'BEGIN{printf (n/1e6)}')"
+			"$(awk -v n="$p95" 'BEGIN{printf (n/1e6)}')" "$(awk -v n="$p99" 'BEGIN{printf (n/1e6)}')" \
+			"${conns_sub:-0}" "${active_sub:-0}"
 	fi
 }
 

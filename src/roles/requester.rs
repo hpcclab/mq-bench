@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use flume;
 use futures::stream::{FuturesUnordered, StreamExt};
 use tokio::time::interval;
+use tracing::{debug, error, info, warn};
 
 pub struct RequesterConfig {
     pub engine: Engine,
@@ -29,34 +30,40 @@ pub struct RequesterConfig {
 }
 
 pub async fn run_requester(config: RequesterConfig) -> Result<()> {
-    println!("Starting requester:");
-    if let Some(ep) = config.connect.params.get("endpoint") {
-        println!("  Endpoint: {}", ep);
-    }
-    println!("  Engine: {:?}", config.engine);
-    println!("  Key expr: {}", config.key_expr);
-    if let Some(q) = config.qps {
-        println!("  QPS: {}", q);
-    } else {
-        println!("  QPS: unlimited (no delay)");
-    }
-    println!("  Concurrency: {}", config.concurrency);
-    println!("  Timeout: {} ms", config.timeout_ms);
-    println!("  Duration: {} s", config.duration_secs);
-
-    // Transport session
-    let transport: Arc<Box<dyn crate::transport::Transport>> = Arc::from(
-        TransportBuilder::connect(config.engine.clone(), config.connect.clone())
-            .await
-            .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?,
+    info!(
+        engine = ?config.engine,
+        key_expr = %config.key_expr,
+        qps = ?config.qps,
+        concurrency = config.concurrency,
+        timeout_ms = config.timeout_ms,
+        duration_secs = config.duration_secs,
+        endpoint = ?config.connect.params.get("endpoint"),
+        "Starting requester"
     );
 
-    // Stats and output
+    // Stats early so we can track connection failures
     let stats = if let Some(s) = &config.shared_stats {
         s.clone()
     } else {
         Arc::new(Stats::new())
     };
+
+    // Transport session with optional retry
+    stats.record_connection_attempt();
+    let transport: Arc<Box<dyn crate::transport::Transport>> = match TransportBuilder::connect_with_retry(
+        config.engine.clone(),
+        config.connect.clone(),
+    )
+    .await
+    {
+        Ok(t) => Arc::from(t),
+        Err(e) => {
+            error!(error = %e, "Transport connect error");
+            stats.record_connection_failure();
+            return Ok(());
+        }
+    };
+
     let mut output = if let Some(ref path) = config.output_file {
         Some(OutputWriter::new_csv(path.clone()).await?)
     } else if config.shared_stats.is_none() {
@@ -95,9 +102,11 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
             loop {
                 interval_timer.tick().await;
                 let snap = stats_clone.snapshot().await;
-                println!(
-                    "Requester stats - Sent: {}, Received: {}, Errors: {}",
-                    snap.sent_count, snap.received_count, snap.error_count
+                debug!(
+                    sent = snap.sent_count,
+                    received = snap.received_count,
+                    errors = snap.error_count,
+                    "Requester stats"
                 );
             }
         }))
@@ -117,7 +126,7 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
     loop {
         // Check duration
         if start.elapsed().as_secs() >= config.duration_secs {
-            println!("Duration limit reached, stopping requester");
+            info!("Duration limit reached, stopping requester");
             break;
         }
 
@@ -143,12 +152,12 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
                             Ok(Some(now))
                         }
                         Ok(Err(e)) => {
-                            eprintln!("Requester query error: {}", e);
+                            warn!(error = %e, "Requester query error");
                             let _ = tx_ev.try_send(Ev::Err);
                             Err(())
                         }
                         Err(_to) => {
-                            eprintln!("Requester timeout");
+                            warn!("Requester timeout");
                             let _ = tx_ev.try_send(Ev::Err);
                             Err(())
                         }
@@ -171,10 +180,12 @@ pub async fn run_requester(config: RequesterConfig) -> Result<()> {
 
     // Final stats
     let final_stats = stats.snapshot().await;
-    println!("\nFinal Requester Statistics:");
-    println!("  Queries sent: {}", total_sent);
-    println!("  Queries completed: {}", total_recv);
-    println!("  Errors: {}", final_stats.error_count);
+    info!(
+        queries_sent = total_sent,
+        queries_completed = total_recv,
+        errors = final_stats.error_count,
+        "Final Requester Statistics"
+    );
     if let Some(ref mut out) = output {
         out.write_snapshot(&final_stats).await?;
     }

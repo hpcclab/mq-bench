@@ -71,9 +71,11 @@ impl Transport for AmqpTransport {
             .create_channel()
             .await
             .map_err(|e| TransportError::Connect(e.to_string()))?;
+        // Use empty string to let RabbitMQ generate a unique queue name (amq.gen-XXX)
+        // This allows multiple subscribers to coexist without RESOURCE_LOCKED errors
         let queue = channel
             .queue_declare(
-                "mq_bench_sub",
+                "",
                 QueueDeclareOptions {
                     durable: false,
                     exclusive: true,
@@ -160,6 +162,12 @@ impl Transport for AmqpTransport {
         Ok(())
     }
     async fn health_check(&self) -> Result<(), TransportError> {
+        Ok(())
+    }
+    async fn force_disconnect(&self) -> Result<(), TransportError> {
+        // AMQP: Transport stores URL; actual connections are created per operation.
+        // This is a no-op since we can't force-close connections we don't hold.
+        // The crash simulation will work by dropping/recreating the transport.
         Ok(())
     }
 }
