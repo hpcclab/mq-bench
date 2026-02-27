@@ -133,7 +133,15 @@ impl Transport for MqttTransport {
             });
         let base = sanitize_client_id_base(base);
         let topic_hash = fnv1a64_bytes(topic.as_bytes());
-        let cid = format!("sub-{}-{:016x}", base, topic_hash);
+        // When no explicit client_id is provided (base == "mqb"), append a UUID so that
+        // multiple subscriber tasks on the same topic each get a unique CID.  Without this,
+        // all N subscribers would share the same CID and the broker would keep kicking each
+        // previous connection, leaving only one subscriber active at a time.
+        let cid = if self.client_id.is_none() {
+            format!("sub-{}-{:016x}-{}", base, topic_hash, uuid::Uuid::new_v4().simple())
+        } else {
+            format!("sub-{}-{:016x}", base, topic_hash)
+        };
         let cid_debug = cid.clone();
         let mut options = MqttOptions::new(cid, self.host.clone(), self.port);
         options.set_keep_alive(self.keep_alive);

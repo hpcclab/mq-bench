@@ -1,0 +1,330 @@
+nohup: ignoring input
+[07:32:50] Appending to existing run: /home/cc/mq-bench/results/fanout_20260227_034216
+[07:32:50] Fanout benchmark (1 pub → N subs) → /home/cc/mq-bench/results/fanout_20260227_034216
+[07:32:50] Current ulimit -n is 1024. Attempting to raise to 1048576...
+[07:32:50] Success: ulimit -n is now 1048576
+[07:32:50] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/fanout_20260227_034216/raw_data/summary.csv | PLOTS_DIR=/home/cc/mq-bench/results/fanout_20260227_034216/plots | RAW_DIR=/home/cc/mq-bench/results/fanout_20260227_034216/raw_data
+[07:32:50] Resolved payload (bytes): 1024
+[07:32:50] Subs list: 500 1000 2000 3000 4000 5000 6000 7000 8000 9000 10000 | pubs=1 | rate=100/s
+[07:32:50] Starting services: mosquitto
+[07:32:50] Cleaning up orphan mq-bench processes...
+[07:32:51] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
+ Container mosquitto Stopping 
+ Container mosquitto Stopped 
+ Container mosquitto Removing 
+ Container mosquitto Removed 
+ Network ubuntu_default Removing 
+ Network ubuntu_default Removed 
+[07:32:52] Waiting 10s for connections to settle...
+[07:33:02] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose up -d mosquitto
+ Network ubuntu_default Creating 
+ Network ubuntu_default Created 
+ Container mosquitto Creating 
+ Container mosquitto Created 
+ Container mosquitto Starting 
+ Container mosquitto Started 
+[07:33:08] Waiting for 192.168.0.245:1883...
+[07:33:09] Port 192.168.0.245:1883 is open.
+[07:33:09] Run: transport=mqtt broker=mosquitto subs=500 payload=1024B rate=100/s
+[07:33:09] Starting remote stats collector on 192.168.0.245 for 140s...
+[run_fanout] Run ID: fanout_20260227_073309_mosquitto_p1024_s500_r100 | ENGINE=mqtt | PUBS=1 SUBS=500 RATE=100 DURATION=120s
+Starting 500 subscribers → bench/topic (aggregated CSV)
+[sub] mqtt → bench/topic (subs=500)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1883 --expr bench/topic --subscribers 500 --csv artifacts/fanout_20260227_073309_mosquitto_p1024_s500_r100/fanout_singlesite/sub_agg.csv 
+       1>artifacts/fanout_20260227_073309_mosquitto_p1024_s500_r100/fanout_singlesite/sub.log 2>&1 &
+Running publisher → bench/topic
+[pub] mqtt → bench/topic (payload=1024, rate=100, dur=120s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1883 --topic-prefix bench/topic --payload 1024 --rate 100 --duration 120 --csv artifacts/fanout_20260227_073309_mosquitto_p1024_s500_r100/fanout_singlesite/pub_0.csv 
+       1>artifacts/fanout_20260227_073309_mosquitto_p1024_s500_r100/fanout_singlesite/pub_0.log 2>&1 &
+[watch] printing status every 1s...
+[status] PUB sent=0 tps=0 (pubs=1) | SUB recv=0 itps=0.00 p99=0.00ms conn=0/0.00,0.00,0,0,0,161,0,0,0,0,0,0
+[status] PUB sent=102 tps=102 (pubs=1) | SUB recv=49883 itps=49928.47 p99=14.90ms conn=39354367/13549665.18,5644870.44,49883,0,0,500,0,0,0,0,0,0
+[status] PUB sent=202 tps=101 (pubs=1) | SUB recv=99867 itps=49984.24 p99=14.34ms conn=39354367/12710242.80,4490530.95,99867,0,0,500,0,0,0,0,0,0
+[status] PUB sent=302 tps=101 (pubs=1) | SUB recv=149851 itps=49982.45 p99=14.10ms conn=39354367/12372371.54,3988415.16,149851,0,0,500,0,0,0,0,0,0
+[status] PUB sent=402 tps=100 (pubs=1) | SUB recv=199862 itps=50011.95 p99=14.01ms conn=39354367/12232921.69,3701809.86,199862,0,0,500,0,0,0,0,0,0
+[status] PUB sent=502 tps=100 (pubs=1) | SUB recv=249871 itps=50009.44 p99=13.93ms conn=39354367/12130745.32,3513152.87,249871,0,0,500,0,0,0,0,0,0
+[status] PUB sent=602 tps=100 (pubs=1) | SUB recv=299818 itps=49946.58 p99=13.92ms conn=39354367/12097882.69,3379560.25,299818,0,0,500,0,0,0,0,0,0
+[status] PUB sent=702 tps=100 (pubs=1) | SUB recv=349901 itps=50083.47 p99=13.93ms conn=39354367/12077554.59,3288682.39,349901,0,0,500,0,0,0,0,0,0
+[status] PUB sent=802 tps=100 (pubs=1) | SUB recv=399806 itps=49903.85 p99=13.90ms conn=39354367/12053367.92,3209193.77,399806,0,0,500,0,0,0,0,0,0
+[status] PUB sent=902 tps=100 (pubs=1) | SUB recv=449859 itps=50052.86 p99=13.91ms conn=39354367/12040210.18,3157316.34,449859,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1002 tps=100 (pubs=1) | SUB recv=499920 itps=50061.66 p99=13.92ms conn=39354367/12032053.44,3114464.53,499920,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1102 tps=100 (pubs=1) | SUB recv=549852 itps=49932.25 p99=13.90ms conn=39354367/12007534.19,3073125.48,549852,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1202 tps=100 (pubs=1) | SUB recv=599898 itps=50046.43 p99=13.88ms conn=39354367/11987711.28,3037838.64,599898,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1302 tps=100 (pubs=1) | SUB recv=649876 itps=49975.34 p99=13.89ms conn=39354367/11980866.04,3014152.44,649876,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1402 tps=100 (pubs=1) | SUB recv=699929 itps=50054.92 p99=13.87ms conn=39354367/11964391.16,2989224.84,699929,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1502 tps=100 (pubs=1) | SUB recv=749869 itps=49941.04 p99=13.88ms conn=39354367/11960917.99,2970995.59,749869,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1602 tps=100 (pubs=1) | SUB recv=799832 itps=49962.59 p99=13.88ms conn=39354367/11956086.14,2952452.54,799832,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1702 tps=100 (pubs=1) | SUB recv=849923 itps=50090.61 p99=13.88ms conn=39354367/11946286.78,2935957.47,849923,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1802 tps=100 (pubs=1) | SUB recv=899900 itps=49977.05 p99=13.88ms conn=39354367/11943445.48,2922436.91,899900,0,0,500,0,0,0,0,0,0
+[status] PUB sent=1902 tps=100 (pubs=1) | SUB recv=949932 itps=50029.66 p99=13.86ms conn=39354367/11917052.86,2913506.54,949932,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2002 tps=100 (pubs=1) | SUB recv=999950 itps=50019.56 p99=13.84ms conn=39354367/11901390.12,2900109.13,999950,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2102 tps=100 (pubs=1) | SUB recv=1049812 itps=49863.62 p99=13.83ms conn=39354367/11879847.55,2892978.90,1049812,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2202 tps=100 (pubs=1) | SUB recv=1099898 itps=50085.70 p99=13.82ms conn=39354367/11871748.09,2880227.23,1099898,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2302 tps=100 (pubs=1) | SUB recv=1149854 itps=49954.20 p99=13.81ms conn=39354367/11867679.50,2869757.31,1149854,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2402 tps=100 (pubs=1) | SUB recv=1200000 itps=50106.66 p99=13.84ms conn=40009727/11922828.02,3071301.16,1200000,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2502 tps=100 (pubs=1) | SUB recv=1250000 itps=50021.22 p99=13.86ms conn=40009727/11936492.52,3054395.41,1250000,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2602 tps=100 (pubs=1) | SUB recv=1300000 itps=49967.99 p99=13.87ms conn=40009727/11947317.39,3035943.17,1300000,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2702 tps=100 (pubs=1) | SUB recv=1350000 itps=50029.87 p99=13.87ms conn=40009727/11958312.16,3018858.12,1350000,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2802 tps=100 (pubs=1) | SUB recv=1400000 itps=49991.30 p99=13.88ms conn=40009727/11964549.61,3005062.84,1400000,0,0,500,0,0,0,0,0,0
+[status] PUB sent=2902 tps=100 (pubs=1) | SUB recv=1450000 itps=49987.71 p99=13.89ms conn=40009727/11972091.41,2994250.04,1450000,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3002 tps=100 (pubs=1) | SUB recv=1499833 itps=49874.51 p99=13.98ms conn=40009727/12065633.11,3157664.16,1499833,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3102 tps=100 (pubs=1) | SUB recv=1549844 itps=50012.30 p99=14.07ms conn=40009727/12160806.01,3315092.38,1549844,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3202 tps=100 (pubs=1) | SUB recv=1599881 itps=49993.48 p99=14.17ms conn=40009727/12249388.00,3449908.50,1599881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3302 tps=100 (pubs=1) | SUB recv=1649858 itps=50020.31 p99=14.26ms conn=40009727/12336713.17,3573564.76,1649858,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3402 tps=100 (pubs=1) | SUB recv=1699881 itps=49993.13 p99=14.35ms conn=40009727/12419190.58,3684284.42,1699881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3502 tps=100 (pubs=1) | SUB recv=1749875 itps=50024.30 p99=14.44ms conn=40009727/12498512.70,3786945.70,1749875,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3602 tps=100 (pubs=1) | SUB recv=1799881 itps=49967.50 p99=14.52ms conn=40009727/12565958.67,3875830.03,1799881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3702 tps=100 (pubs=1) | SUB recv=1849848 itps=50005.77 p99=14.61ms conn=40009727/12631902.36,3958033.36,1849848,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3802 tps=100 (pubs=1) | SUB recv=1899881 itps=50028.68 p99=14.69ms conn=40009727/12691567.90,4031632.54,1899881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=3902 tps=100 (pubs=1) | SUB recv=1949881 itps=49989.69 p99=14.77ms conn=40009727/12750309.34,4100059.79,1949881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4002 tps=100 (pubs=1) | SUB recv=1999860 itps=49992.51 p99=14.84ms conn=40009727/12806777.84,4163520.82,1999860,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4102 tps=100 (pubs=1) | SUB recv=2049881 itps=50013.72 p99=14.93ms conn=40009727/12863964.43,4223147.53,2049881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4202 tps=100 (pubs=1) | SUB recv=2099881 itps=50001.58 p99=15.01ms conn=40009727/12917608.47,4277309.33,2099881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4302 tps=100 (pubs=1) | SUB recv=2149873 itps=49997.08 p99=15.08ms conn=40009727/12970390.82,4329012.49,2149873,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4402 tps=100 (pubs=1) | SUB recv=2199881 itps=49961.63 p99=15.16ms conn=40009727/13020230.50,4377506.06,2199881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4502 tps=100 (pubs=1) | SUB recv=2249881 itps=50037.23 p99=15.23ms conn=40009727/13062234.63,4420977.23,2249881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4602 tps=100 (pubs=1) | SUB recv=2299881 itps=49995.21 p99=15.29ms conn=40009727/13102075.25,4461990.88,2299881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4702 tps=100 (pubs=1) | SUB recv=2349881 itps=49967.93 p99=15.37ms conn=40009727/13144662.12,4501127.22,2349881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4802 tps=100 (pubs=1) | SUB recv=2399874 itps=50040.01 p99=15.43ms conn=40009727/13184317.38,4538506.09,2399874,0,0,500,0,0,0,0,0,0
+[status] PUB sent=4902 tps=100 (pubs=1) | SUB recv=2449881 itps=49968.45 p99=15.50ms conn=40009727/13220895.65,4573571.57,2449881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5002 tps=100 (pubs=1) | SUB recv=2499881 itps=50014.94 p99=15.56ms conn=40009727/13253848.83,4605781.05,2499881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5102 tps=100 (pubs=1) | SUB recv=2549881 itps=49972.59 p99=15.63ms conn=40009727/13288532.55,4636955.28,2549881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5202 tps=100 (pubs=1) | SUB recv=2599881 itps=50021.30 p99=15.70ms conn=40009727/13324956.02,4666631.17,2599881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5302 tps=100 (pubs=1) | SUB recv=2649881 itps=49998.80 p99=15.76ms conn=40009727/13359354.94,4694402.43,2649881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5402 tps=100 (pubs=1) | SUB recv=2699881 itps=49992.84 p99=15.83ms conn=40009727/13388796.55,4720546.31,2699881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5502 tps=100 (pubs=1) | SUB recv=2749881 itps=49996.69 p99=15.88ms conn=40009727/13418671.54,4746403.47,2749881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5602 tps=100 (pubs=1) | SUB recv=2799881 itps=50014.76 p99=15.94ms conn=40009727/13446914.93,4770382.87,2799881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5702 tps=100 (pubs=1) | SUB recv=2849811 itps=49952.34 p99=16.01ms conn=40009727/13476689.79,4792947.20,2849811,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5802 tps=100 (pubs=1) | SUB recv=2899881 itps=50043.76 p99=16.06ms conn=40009727/13505397.83,4814698.10,2899881,0,0,500,0,0,0,0,0,0
+[status] PUB sent=5902 tps=100 (pubs=1) | SUB recv=2949874 itps=50022.53 p99=16.13ms conn=40009727/13539815.77,4832952.63,2949874,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6002 tps=100 (pubs=1) | SUB recv=2999827 itps=49942.90 p99=16.20ms conn=40009727/13583236.52,4849666.15,2999827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6102 tps=100 (pubs=1) | SUB recv=3049780 itps=49964.59 p99=16.28ms conn=40009727/13624414.79,4865186.44,3049780,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6202 tps=100 (pubs=1) | SUB recv=3099767 itps=49983.75 p99=16.35ms conn=40009727/13667239.02,4881991.76,3099767,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6302 tps=100 (pubs=1) | SUB recv=3149774 itps=50007.45 p99=16.42ms conn=40009727/13708678.40,4897650.88,3149774,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6402 tps=100 (pubs=1) | SUB recv=3199827 itps=50045.92 p99=16.51ms conn=40009727/13752367.08,4915934.63,3199827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6502 tps=100 (pubs=1) | SUB recv=3249827 itps=49964.50 p99=16.59ms conn=40009727/13799842.75,4941186.93,3249827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6602 tps=100 (pubs=1) | SUB recv=3299817 itps=50034.75 p99=16.67ms conn=40009727/13832794.73,4957860.13,3299817,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6702 tps=100 (pubs=1) | SUB recv=3349827 itps=49988.89 p99=16.75ms conn=40009727/13863619.92,4973346.41,3349827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6802 tps=100 (pubs=1) | SUB recv=3399827 itps=49986.85 p99=16.84ms conn=40009727/13892752.38,4987918.69,3399827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=6902 tps=100 (pubs=1) | SUB recv=3449827 itps=50027.26 p99=16.92ms conn=40009727/13921893.70,5002252.87,3449827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7002 tps=100 (pubs=1) | SUB recv=3499827 itps=49962.53 p99=17.01ms conn=40009727/13950383.49,5016003.91,3499827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7102 tps=100 (pubs=1) | SUB recv=3549827 itps=50005.30 p99=17.09ms conn=40009727/13975742.27,5028793.60,3549827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7202 tps=100 (pubs=1) | SUB recv=3599827 itps=50007.75 p99=17.19ms conn=40009727/14006167.66,5045497.89,3599827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7302 tps=100 (pubs=1) | SUB recv=3649827 itps=49994.44 p99=17.30ms conn=40009727/14038059.62,5056042.10,3649827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7402 tps=100 (pubs=1) | SUB recv=3699827 itps=49995.97 p99=17.40ms conn=40009727/14069980.11,5065529.65,3699827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7502 tps=100 (pubs=1) | SUB recv=3749827 itps=50018.70 p99=17.48ms conn=40009727/14100936.62,5074588.08,3749827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7602 tps=100 (pubs=1) | SUB recv=3799765 itps=49960.66 p99=17.58ms conn=40009727/14129981.08,5082609.42,3799765,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7702 tps=100 (pubs=1) | SUB recv=3849803 itps=50037.20 p99=17.68ms conn=40009727/14160240.27,5091077.06,3849803,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7802 tps=100 (pubs=1) | SUB recv=3899772 itps=49970.46 p99=17.78ms conn=40009727/14190447.45,5100063.47,3899772,0,0,500,0,0,0,0,0,0
+[status] PUB sent=7902 tps=100 (pubs=1) | SUB recv=3949827 itps=50012.23 p99=17.86ms conn=40009727/14219821.39,5108043.95,3949827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8002 tps=100 (pubs=1) | SUB recv=3999788 itps=49998.15 p99=17.96ms conn=40009727/14246240.92,5114944.90,3999788,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8102 tps=100 (pubs=1) | SUB recv=4049827 itps=50033.48 p99=18.04ms conn=40009727/14274872.86,5122606.55,4049827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8202 tps=100 (pubs=1) | SUB recv=4099827 itps=49962.10 p99=18.14ms conn=40009727/14304920.76,5140216.29,4099827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8302 tps=100 (pubs=1) | SUB recv=4149827 itps=50011.07 p99=18.22ms conn=40009727/14323327.96,5148504.35,4149827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8402 tps=100 (pubs=1) | SUB recv=4199827 itps=50015.72 p99=18.28ms conn=40009727/14340134.30,5156086.65,4199827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8502 tps=100 (pubs=1) | SUB recv=4249827 itps=49999.62 p99=18.35ms conn=40009727/14357009.61,5163559.10,4249827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8702 tps=100 (pubs=1) | SUB recv=4349827 itps=49995.61 p99=18.46ms conn=40009727/14390805.63,5178221.01,4349827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8802 tps=100 (pubs=1) | SUB recv=4399827 itps=49990.56 p99=18.53ms conn=40009727/14405279.39,5184697.27,4399827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=8902 tps=100 (pubs=1) | SUB recv=4449827 itps=49993.47 p99=18.58ms conn=40009727/14422768.33,5191607.57,4449827,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9002 tps=100 (pubs=1) | SUB recv=4499806 itps=50009.97 p99=18.63ms conn=40009727/14432881.89,5197841.76,4499806,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9102 tps=100 (pubs=1) | SUB recv=4549856 itps=50038.08 p99=18.68ms conn=40009727/14442684.71,5203956.70,4549856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9202 tps=100 (pubs=1) | SUB recv=4599856 itps=49999.32 p99=18.71ms conn=40009727/14451839.15,5209817.12,4599856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9302 tps=100 (pubs=1) | SUB recv=4649856 itps=49969.14 p99=18.74ms conn=40009727/14462584.26,5215836.82,4649856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9402 tps=100 (pubs=1) | SUB recv=4699856 itps=50022.64 p99=18.78ms conn=40009727/14471843.65,5221519.31,4699856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9502 tps=100 (pubs=1) | SUB recv=4749856 itps=49980.29 p99=18.81ms conn=40009727/14481059.53,5227013.63,4749856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9602 tps=100 (pubs=1) | SUB recv=4799799 itps=49982.49 p99=18.84ms conn=40009727/14490706.85,5232401.26,4799799,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9702 tps=100 (pubs=1) | SUB recv=4849856 itps=50013.98 p99=18.87ms conn=40009727/14499668.24,5237584.01,4849856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9802 tps=100 (pubs=1) | SUB recv=4899856 itps=50023.71 p99=18.91ms conn=40009727/14506228.49,5242205.13,4899856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=9902 tps=100 (pubs=1) | SUB recv=4949826 itps=49990.04 p99=18.94ms conn=40009727/14511920.70,5246889.69,4949826,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10002 tps=100 (pubs=1) | SUB recv=4999856 itps=50018.42 p99=18.96ms conn=40009727/14517639.97,5251435.24,4999856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10102 tps=100 (pubs=1) | SUB recv=5049856 itps=49985.75 p99=18.99ms conn=40009727/14522355.10,5255709.41,5049856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10202 tps=100 (pubs=1) | SUB recv=5099856 itps=49988.89 p99=19.01ms conn=40009727/14527057.10,5259863.58,5099856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10302 tps=100 (pubs=1) | SUB recv=5149856 itps=50019.98 p99=19.02ms conn=40009727/14531615.51,5263964.94,5149856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10402 tps=100 (pubs=1) | SUB recv=5199856 itps=50006.89 p99=19.05ms conn=40009727/14535919.18,5267840.23,5199856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10502 tps=100 (pubs=1) | SUB recv=5249856 itps=49967.16 p99=19.07ms conn=40009727/14539357.74,5271572.34,5249856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10602 tps=100 (pubs=1) | SUB recv=5299856 itps=50001.72 p99=19.09ms conn=40009727/14543069.58,5275346.13,5299856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10702 tps=100 (pubs=1) | SUB recv=5349856 itps=50012.54 p99=19.10ms conn=40009727/14547164.01,5279022.56,5349856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10802 tps=100 (pubs=1) | SUB recv=5399856 itps=50009.64 p99=19.12ms conn=40009727/14550702.61,5282714.98,5399856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=10902 tps=100 (pubs=1) | SUB recv=5449856 itps=50014.29 p99=19.14ms conn=40009727/14554567.66,5286166.00,5449856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11002 tps=100 (pubs=1) | SUB recv=5499856 itps=49979.55 p99=19.15ms conn=40009727/14558393.37,5289739.93,5499856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11102 tps=100 (pubs=1) | SUB recv=5549856 itps=49988.53 p99=19.17ms conn=40009727/14562162.86,5293051.01,5549856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11202 tps=100 (pubs=1) | SUB recv=5599856 itps=50030.67 p99=19.19ms conn=40009727/14565725.06,5296452.31,5599856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11302 tps=100 (pubs=1) | SUB recv=5649856 itps=49964.39 p99=19.20ms conn=40009727/14568164.71,5299884.39,5649856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11402 tps=100 (pubs=1) | SUB recv=5699856 itps=50030.69 p99=19.22ms conn=40009727/14570624.63,5303204.60,5699856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11502 tps=100 (pubs=1) | SUB recv=5749856 itps=49998.61 p99=19.22ms conn=40009727/14569639.38,5306995.97,5749856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11602 tps=100 (pubs=1) | SUB recv=5799856 itps=49983.96 p99=19.23ms conn=40009727/14571771.29,5310172.65,5799856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11702 tps=100 (pubs=1) | SUB recv=5849856 itps=50001.92 p99=19.25ms conn=40009727/14573613.06,5313608.37,5849856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11802 tps=100 (pubs=1) | SUB recv=5899856 itps=49975.25 p99=19.27ms conn=40009727/14576986.33,5316774.73,5899856,0,0,500,0,0,0,0,0,0
+[status] PUB sent=11902 tps=100 (pubs=1) | SUB recv=5949856 itps=50032.80 p99=19.27ms conn=40009727/14580178.71,5319635.16,5949856,0,0,500,0,0,0,0,0,0
+
+=== Summary (fanout_20260227_073309_mosquitto_p1024_s500_r100) ===
+Publishers: 1 | Subscribers: 500
+=== Summary ===
+Publisher: sent=12002 total_tps=100.02 connections=1 active=1
+Subscriber: recv=5999820 total_tps=50000.79 p50=10.66ms p95=13.62ms p99=19.30ms connections=40009727 active=14586413.38,5322235.37,5999820,0,0,500,0,0,0,0,0,0
+Fanout run complete. Artifacts at artifacts/fanout_20260227_073309_mosquitto_p1024_s500_r100/fanout_singlesite
+Stopping subscribers (120678) and publishers (120847)
+[07:35:10] Steady-state: 52 rows (ignore_start=60s, ignore_end=10s), TPS=49999.65, time_range=1772177649-1772177700
+[07:35:10] Docker stats: 25 rows in steady-state time range
+[07:35:10] Sleeping 65s between runs...
+[07:36:15] Full restarting services: mosquitto
+[07:36:15] Cleaning up orphan mq-bench processes...
+[07:36:16] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
+ Container mosquitto Stopping 
+ Container mosquitto Stopped 
+ Container mosquitto Removing 
+ Container mosquitto Removed 
+ Network ubuntu_default Removing 
+ Network ubuntu_default Removed 
+[07:36:18] Waiting 10s for connections to settle...
+[07:36:28] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose up -d mosquitto
+ Network ubuntu_default Creating 
+ Network ubuntu_default Created 
+ Container mosquitto Creating 
+ Container mosquitto Created 
+ Container mosquitto Starting 
+ Container mosquitto Started 
+[07:36:34] Waiting for 192.168.0.245:1883...
+[07:36:34] Port 192.168.0.245:1883 is open.
+[07:36:34] Run: transport=mqtt broker=mosquitto subs=1000 payload=1024B rate=100/s
+[07:36:34] Starting remote stats collector on 192.168.0.245 for 140s...
+[run_fanout] Run ID: fanout_20260227_073634_mosquitto_p1024_s1000_r100 | ENGINE=mqtt | PUBS=1 SUBS=1000 RATE=100 DURATION=120s
+Starting 1000 subscribers → bench/topic (aggregated CSV)
+[sub] mqtt → bench/topic (subs=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1883 --expr bench/topic --subscribers 1000 --csv artifacts/fanout_20260227_073634_mosquitto_p1024_s1000_r100/fanout_singlesite/sub_agg.csv 
+       1>artifacts/fanout_20260227_073634_mosquitto_p1024_s1000_r100/fanout_singlesite/sub.log 2>&1 &
+Running publisher → bench/topic
+[pub] mqtt → bench/topic (payload=1024, rate=100, dur=120s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1883 --topic-prefix bench/topic --payload 1024 --rate 100 --duration 120 --csv artifacts/fanout_20260227_073634_mosquitto_p1024_s1000_r100/fanout_singlesite/pub_0.csv 
+       1>artifacts/fanout_20260227_073634_mosquitto_p1024_s1000_r100/fanout_singlesite/pub_0.log 2>&1 &
+[watch] printing status every 1s...
+[status] PUB sent=0 tps=0 (pubs=1) | SUB recv=0 itps=0.00 p99=0.00ms conn=0/0.00,0.00,0,0,0,79,0,0,0,0,0,0
+[status] PUB sent=102 tps=102 (pubs=1) | SUB recv=84610 itps=84637.31 p99=129.76ms conn=162529279/103734908.35,30535255.11,84610,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=202 tps=101 (pubs=1) | SUB recv=172591 itps=87981.48 p99=217.45ms conn=282329087/161526049.33,65589470.18,172591,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=302 tps=101 (pubs=1) | SUB recv=270599 itps=98006.49 p99=303.04ms conn=330039295/214236735.54,87630373.48,270600,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=402 tps=100 (pubs=1) | SUB recv=373736 itps=103134.89 p99=294.65ms conn=330039295/232545329.43,80388736.74,373736,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=502 tps=100 (pubs=1) | SUB recv=477516 itps=103782.68 p99=287.05ms conn=330039295/235974446.57,71613492.14,477516,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=602 tps=100 (pubs=1) | SUB recv=581237 itps=103721.48 p99=280.23ms conn=330039295/230826159.52,66055505.92,581237,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=702 tps=100 (pubs=1) | SUB recv=685112 itps=103872.89 p99=274.99ms conn=330039295/221900326.86,64569483.16,685112,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=802 tps=100 (pubs=1) | SUB recv=789409 itps=104297.75 p99=269.75ms conn=330039295/209908910.49,67708742.24,789409,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=902 tps=100 (pubs=1) | SUB recv=893886 itps=104477.98 p99=263.06ms conn=330039295/195594242.35,74957487.37,893886,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1002 tps=100 (pubs=1) | SUB recv=998103 itps=104217.98 p99=255.98ms conn=330039295/179622417.58,85074729.40,998103,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1102 tps=100 (pubs=1) | SUB recv=1099000 itps=100822.73 p99=248.64ms conn=330039295/164552517.98,93919875.06,1099000,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1202 tps=100 (pubs=1) | SUB recv=1199000 itps=100002.81 p99=241.04ms conn=330039295/152094981.13,98952104.05,1199000,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1302 tps=100 (pubs=1) | SUB recv=1299000 itps=100003.98 p99=233.70ms conn=330039295/141506144.91,101895613.89,1299000,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1402 tps=100 (pubs=1) | SUB recv=1399914 itps=100981.63 p99=225.71ms conn=330039295/131866421.39,104076581.37,1399914,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1502 tps=100 (pubs=1) | SUB recv=1499922 itps=100007.49 p99=217.32ms conn=330039295/123419331.33,105399417.26,1499922,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1602 tps=100 (pubs=1) | SUB recv=1599863 itps=99941.66 p99=209.19ms conn=330039295/116028382.13,105997105.67,1599863,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1702 tps=100 (pubs=1) | SUB recv=1699904 itps=100039.89 p99=201.33ms conn=330039295/109509463.71,106086044.12,1699904,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1802 tps=100 (pubs=1) | SUB recv=1799943 itps=100039.75 p99=194.12ms conn=330039295/103706518.76,105836574.32,1799943,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=1902 tps=100 (pubs=1) | SUB recv=1898873 itps=98925.09 p99=189.14ms conn=330039295/99325551.99,104779636.50,1898873,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2002 tps=100 (pubs=1) | SUB recv=1998586 itps=99718.18 p99=183.63ms conn=330039295/95174445.09,103728646.81,1998586,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2102 tps=100 (pubs=1) | SUB recv=2098072 itps=99480.71 p99=176.03ms conn=330039295/91654471.88,102464032.04,2098072,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2202 tps=100 (pubs=1) | SUB recv=2198028 itps=99960.80 p99=167.64ms conn=330039295/88579735.45,101095242.97,2198029,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2302 tps=100 (pubs=1) | SUB recv=2296813 itps=98785.63 p99=160.96ms conn=330039295/86110853.20,99586276.63,2296813,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2402 tps=100 (pubs=1) | SUB recv=2396160 itps=99345.02 p99=154.53ms conn=330039295/84129298.30,97967412.33,2396160,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2502 tps=100 (pubs=1) | SUB recv=2495736 itps=99576.09 p99=146.67ms conn=330039295/82591387.47,96291510.66,2495736,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2602 tps=100 (pubs=1) | SUB recv=2595915 itps=100179.12 p99=138.54ms conn=330039295/81153858.06,94689219.49,2595915,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2702 tps=100 (pubs=1) | SUB recv=2695908 itps=99994.15 p99=130.68ms conn=330039295/79798826.66,93174409.44,2695908,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2802 tps=100 (pubs=1) | SUB recv=2796274 itps=100363.74 p99=123.01ms conn=330039295/78481988.47,91743068.67,2796274,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=2902 tps=100 (pubs=1) | SUB recv=2896287 itps=100013.77 p99=115.15ms conn=330039295/77189924.79,90405250.37,2896287,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3001 tps=100 (pubs=1) | SUB recv=2999244 itps=102917.47 p99=107.09ms conn=330039295/75099695.90,89555963.47,2999244,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3102 tps=100 (pubs=1) | SUB recv=3098478 itps=99267.81 p99=99.48ms conn=330039295/73343910.56,88642297.32,3098478,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3202 tps=100 (pubs=1) | SUB recv=3198394 itps=99916.88 p99=91.55ms conn=330039295/71687616.18,87737526.33,3198394,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3302 tps=100 (pubs=1) | SUB recv=3298504 itps=100113.69 p99=83.10ms conn=330039295/70118371.17,86854657.64,3298504,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3402 tps=100 (pubs=1) | SUB recv=3398507 itps=100003.18 p99=74.97ms conn=330039295/68643885.28,85989800.10,3398507,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3502 tps=100 (pubs=1) | SUB recv=3498447 itps=99938.03 p99=68.42ms conn=330039295/67254208.89,85143752.39,3498447,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3602 tps=100 (pubs=1) | SUB recv=3598516 itps=100071.32 p99=61.41ms conn=330039295/65941617.19,84313960.75,3598516,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3702 tps=100 (pubs=1) | SUB recv=3698534 itps=100018.52 p99=52.79ms conn=330039295/64700797.84,83502861.26,3698534,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3802 tps=100 (pubs=1) | SUB recv=3798504 itps=99970.31 p99=50.00ms conn=330039295/63525414.79,82710606.15,3798504,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=3902 tps=100 (pubs=1) | SUB recv=3898390 itps=99882.49 p99=49.02ms conn=330039295/62409864.36,81937673.44,3898390,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4002 tps=100 (pubs=1) | SUB recv=3998478 itps=100089.82 p99=48.33ms conn=330039295/61353995.09,81177640.35,3998478,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4102 tps=100 (pubs=1) | SUB recv=4098387 itps=99907.82 p99=47.68ms conn=330039295/60356126.81,80434095.96,4098387,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4202 tps=100 (pubs=1) | SUB recv=4198486 itps=100095.29 p99=47.05ms conn=330039295/59402885.02,79707095.18,4198486,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4302 tps=100 (pubs=1) | SUB recv=4298412 itps=99932.52 p99=46.47ms conn=330039295/58494131.37,78998699.28,4298412,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4402 tps=100 (pubs=1) | SUB recv=4398357 itps=99941.43 p99=45.97ms conn=330039295/57626686.82,78306413.23,4398357,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4502 tps=100 (pubs=1) | SUB recv=4498381 itps=100024.69 p99=45.51ms conn=330039295/56798989.29,77628822.94,4498381,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4602 tps=100 (pubs=1) | SUB recv=4598326 itps=99919.58 p99=45.06ms conn=330039295/56008279.33,76967116.19,4598326,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4702 tps=100 (pubs=1) | SUB recv=4698421 itps=100100.99 p99=44.63ms conn=330039295/55249908.31,76319709.45,4698421,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4802 tps=100 (pubs=1) | SUB recv=4798399 itps=99999.76 p99=44.20ms conn=330039295/54524644.32,75687406.58,4798399,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=4902 tps=100 (pubs=1) | SUB recv=4898390 itps=99987.22 p99=43.78ms conn=330039295/53827536.65,75069893.27,4898390,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5002 tps=100 (pubs=1) | SUB recv=4998309 itps=99923.43 p99=43.35ms conn=330039295/53159852.44,74465986.78,4998309,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5102 tps=100 (pubs=1) | SUB recv=5098423 itps=100098.94 p99=42.93ms conn=330039295/52516205.64,73874790.40,5098423,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5202 tps=100 (pubs=1) | SUB recv=5198384 itps=99975.96 p99=42.53ms conn=330039295/51897618.64,73297660.68,5198384,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5302 tps=100 (pubs=1) | SUB recv=5298403 itps=100013.75 p99=42.11ms conn=330039295/51303186.65,72732244.09,5298403,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5402 tps=100 (pubs=1) | SUB recv=5398416 itps=99994.45 p99=41.65ms conn=330039295/50730117.49,72179273.74,5398416,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5502 tps=100 (pubs=1) | SUB recv=5498343 itps=99946.43 p99=41.22ms conn=330039295/50177765.32,71638779.53,5498343,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5602 tps=100 (pubs=1) | SUB recv=5598350 itps=100008.59 p99=40.76ms conn=330039295/49646632.58,71108336.03,5598350,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5702 tps=100 (pubs=1) | SUB recv=5698359 itps=100010.68 p99=40.30ms conn=330039295/49133231.42,70589358.36,5698359,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5802 tps=100 (pubs=1) | SUB recv=5798386 itps=100028.23 p99=39.78ms conn=330039295/48637470.17,70080921.93,5798386,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=5902 tps=100 (pubs=1) | SUB recv=5898354 itps=99951.38 p99=39.22ms conn=330039295/48159262.82,69583031.12,5898354,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6002 tps=100 (pubs=1) | SUB recv=5998707 itps=100368.09 p99=38.57ms conn=330039295/47638485.45,69117097.03,5998707,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6102 tps=100 (pubs=1) | SUB recv=6098680 itps=99959.65 p99=37.85ms conn=330039295/47124000.58,68667089.16,6098680,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6202 tps=100 (pubs=1) | SUB recv=6198125 itps=99416.59 p99=37.32ms conn=330039295/46731001.33,68192423.22,6198125,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6302 tps=100 (pubs=1) | SUB recv=6298140 itps=99962.62 p99=36.54ms conn=330039295/46322774.27,67727933.19,6298140,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6402 tps=100 (pubs=1) | SUB recv=6398187 itps=100049.61 p99=35.49ms conn=330039295/45927914.24,67272176.50,6398187,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6502 tps=100 (pubs=1) | SUB recv=6498176 itps=100030.98 p99=34.08ms conn=330039295/45544573.08,66825847.06,6498176,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6602 tps=100 (pubs=1) | SUB recv=6598195 itps=100024.83 p99=32.57ms conn=330039295/45172989.23,66387808.83,6598195,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6702 tps=100 (pubs=1) | SUB recv=6698228 itps=100005.30 p99=31.01ms conn=330039295/44810150.96,65958788.43,6698228,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6802 tps=100 (pubs=1) | SUB recv=6798136 itps=99953.08 p99=30.00ms conn=330039295/44460320.34,65537617.55,6798136,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=6902 tps=100 (pubs=1) | SUB recv=6898144 itps=99954.98 p99=29.70ms conn=330039295/44121328.85,65123546.28,6898144,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7002 tps=100 (pubs=1) | SUB recv=6998137 itps=99975.88 p99=29.51ms conn=330039295/43792285.39,64717051.27,6998137,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7102 tps=100 (pubs=1) | SUB recv=7098169 itps=100095.03 p99=29.33ms conn=330039295/43470424.92,64318423.67,7098169,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7202 tps=100 (pubs=1) | SUB recv=7198171 itps=99959.38 p99=29.16ms conn=330039295/43160051.11,63926389.39,7198171,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7302 tps=100 (pubs=1) | SUB recv=7298171 itps=100005.21 p99=29.02ms conn=330039295/42854120.52,63542532.24,7298171,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7402 tps=100 (pubs=1) | SUB recv=7398309 itps=100202.88 p99=28.87ms conn=330039295/42557551.43,63164341.71,7398309,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7502 tps=100 (pubs=1) | SUB recv=7498218 itps=99834.76 p99=28.74ms conn=330039295/42267312.73,62794354.46,7498218,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7702 tps=100 (pubs=1) | SUB recv=7698171 itps=100000.22 p99=28.52ms conn=330039295/41710338.28,62072351.85,7698171,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7802 tps=100 (pubs=1) | SUB recv=7798171 itps=100068.80 p99=28.41ms conn=330039295/41443622.86,61719962.80,7798171,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=7902 tps=100 (pubs=1) | SUB recv=7898171 itps=99961.80 p99=28.33ms conn=330039295/41183259.14,61373546.49,7898171,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8002 tps=100 (pubs=1) | SUB recv=7998171 itps=100000.39 p99=28.23ms conn=330039295/40929631.13,61032795.75,7998171,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8102 tps=100 (pubs=1) | SUB recv=8098171 itps=99973.43 p99=28.16ms conn=330039295/40681456.28,60697894.09,8098171,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8202 tps=100 (pubs=1) | SUB recv=8198639 itps=100543.42 p99=28.10ms conn=330039295/40412172.36,60381111.12,8198639,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8302 tps=100 (pubs=1) | SUB recv=8298659 itps=100018.45 p99=28.00ms conn=330039295/40113987.44,60079224.30,8298659,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8402 tps=100 (pubs=1) | SUB recv=8398599 itps=99946.41 p99=27.89ms conn=330039295/39823562.39,59781672.48,8398599,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8502 tps=100 (pubs=1) | SUB recv=8498741 itps=100141.34 p99=27.79ms conn=330039295/39540317.76,59487379.52,8498741,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8602 tps=100 (pubs=1) | SUB recv=8598746 itps=100005.78 p99=27.69ms conn=330039295/39263226.06,59197905.98,8598746,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8702 tps=100 (pubs=1) | SUB recv=8698686 itps=99940.85 p99=27.57ms conn=330039295/38992592.46,58912674.34,8698686,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8802 tps=100 (pubs=1) | SUB recv=8798846 itps=100142.27 p99=27.51ms conn=330039295/38746462.45,58627292.50,8798846,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=8902 tps=100 (pubs=1) | SUB recv=8898756 itps=99927.52 p99=27.41ms conn=330039295/38482830.29,58351947.66,8898756,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9002 tps=100 (pubs=1) | SUB recv=8998725 itps=99966.15 p99=27.30ms conn=330039295/38243759.01,58072868.24,8998725,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9102 tps=100 (pubs=1) | SUB recv=9098676 itps=99952.44 p99=27.20ms conn=330039295/38016722.26,57795226.57,9098676,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9202 tps=100 (pubs=1) | SUB recv=9191575 itps=92900.38 p99=27.21ms conn=330039295/37931486.31,57545437.90,9191575,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9302 tps=100 (pubs=1) | SUB recv=9276083 itps=84508.17 p99=27.48ms conn=330039295/39109039.95,58717827.01,9276083,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9402 tps=100 (pubs=1) | SUB recv=9356292 itps=80208.68 p99=27.74ms conn=449576959/41692295.59,64955830.52,9356292,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9502 tps=100 (pubs=1) | SUB recv=9436076 itps=79783.13 p99=27.98ms conn=652214271/45923413.08,79446628.27,9436076,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9602 tps=100 (pubs=1) | SUB recv=9516074 itps=79999.10 p99=28.23ms conn=853016575/51783777.09,101677397.33,9516074,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9702 tps=100 (pubs=1) | SUB recv=9596838 itps=80761.82 p99=28.51ms conn=1044381695/59266094.84,129900786.84,9596838,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9802 tps=100 (pubs=1) | SUB recv=9677582 itps=80719.03 p99=28.80ms conn=1238368255/68224091.55,162163938.64,9677582,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=9902 tps=100 (pubs=1) | SUB recv=9757958 itps=80401.93 p99=29.13ms conn=1434451967/78580840.15,197540136.58,9757958,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10002 tps=100 (pubs=1) | SUB recv=9838385 itps=80425.94 p99=29.49ms conn=1629487103/90380774.55,235845625.73,9838385,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10102 tps=100 (pubs=1) | SUB recv=9918594 itps=80211.05 p99=29.97ms conn=1827667967/103546527.44,276516476.10,9918594,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10202 tps=100 (pubs=1) | SUB recv=9998807 itps=80212.52 p99=32.44ms conn=2024800255/118098195.89,319465687.23,9998807,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10302 tps=100 (pubs=1) | SUB recv=10079140 itps=80333.59 p99=35.65ms conn=2220883967/134008101.76,364385300.50,10079140,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10402 tps=100 (pubs=1) | SUB recv=10159412 itps=80271.22 p99=37.62ms conn=2420113407/151211288.39,410991128.86,10159412,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10502 tps=100 (pubs=1) | SUB recv=10239732 itps=80318.98 p99=39.19ms conn=2617245695/169697556.19,459173320.80,10239732,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10602 tps=100 (pubs=1) | SUB recv=10320146 itps=80415.31 p99=40.44ms conn=2812280831/189446019.38,508806737.57,10320146,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10702 tps=100 (pubs=1) | SUB recv=10401582 itps=81427.77 p99=41.52ms conn=2998927359/210665285.24,560305135.15,10401582,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10802 tps=100 (pubs=1) | SUB recv=10492867 itps=91294.51 p99=42.66ms conn=3084910591/235223448.92,616390685.34,10492867,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=10902 tps=100 (pubs=1) | SUB recv=10586389 itps=93521.20 p99=43.78ms conn=3149922303/260548111.32,669731080.69,10586389,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11002 tps=100 (pubs=1) | SUB recv=10677468 itps=91077.35 p99=44.92ms conn=3240099839/285540269.34,719248433.45,10677468,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11102 tps=100 (pubs=1) | SUB recv=10766656 itps=89189.43 p99=46.10ms conn=3347054591/310240364.42,765557244.02,10766656,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11202 tps=100 (pubs=1) | SUB recv=10857931 itps=91275.66 p99=47.64ms conn=3437232127/336072147.62,812322284.22,10857931,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11302 tps=100 (pubs=1) | SUB recv=10946366 itps=88434.52 p99=49.45ms conn=3550478335/361383049.51,856273331.40,10946366,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11402 tps=100 (pubs=1) | SUB recv=11026256 itps=79889.51 p99=58.00ms conn=3751804927/385093392.90,897188827.78,11026256,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11502 tps=100 (pubs=1) | SUB recv=11105012 itps=78756.62 p99=72.94ms conn=3961520127/409648022.99,940042325.17,11105012,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11602 tps=100 (pubs=1) | SUB recv=11183575 itps=78562.70 p99=89.85ms conn=4179623935/435300361.90,985147025.31,11183575,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11702 tps=100 (pubs=1) | SUB recv=11263029 itps=79452.75 p99=106.43ms conn=4383047679/462365841.41,1032861048.89,11263029,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11802 tps=100 (pubs=1) | SUB recv=11342921 itps=79894.03 p99=122.81ms conn=4584374271/490632528.23,1082568516.71,11342921,0,0,1000,0,0,0,0,0,0
+[status] PUB sent=11902 tps=100 (pubs=1) | SUB recv=11423035 itps=80114.32 p99=138.80ms conn=4785700863/519971960.86,1133858471.39,11423035,0,0,1000,0,0,0,0,0,0
+
+=== Summary (fanout_20260227_073634_mosquitto_p1024_s1000_r100) ===
+Publishers: 1 | Subscribers: 1000
+=== Summary ===
+Publisher: sent=12002 total_tps=100.02 connections=1 active=1
+Subscriber: recv=11503915 total_tps=95874.86 p50=16.60ms p95=23.36ms p99=155.71ms connections=4974444543 active=550565847.34,1186933227.19,11503915,0,0,1000,0,0,0,0,0,0
+Fanout run complete. Artifacts at artifacts/fanout_20260227_073634_mosquitto_p1024_s1000_r100/fanout_singlesite
+Stopping subscribers (122208) and publishers (122376)
+[07:38:36] Steady-state: 52 rows (ignore_start=60s, ignore_end=10s), TPS=93708.12, time_range=1772177854-1772177905
+[07:38:36] Docker stats: 25 rows in steady-state time range
+[07:38:36] Sleeping 65s between runs...
