@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
 # Multi-topic fanout: single-process multi-publisher over many keys → single wildcard subscriber
-# Cross-router path by default: subscribers on router2 (7448), publishers on router3 (7449)
+# Default: both subs and pubs connect to router1 (7447)
 # Usage: scripts/run_multi_topic_fanout.sh [RUN_ID]
 
 RUN_ID=${1:-${RUN_ID:-run_$(date +%Y%m%d_%H%M%S)}}

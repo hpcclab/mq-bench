@@ -106,6 +106,13 @@ impl Transport for MockTransport {
     async fn health_check(&self) -> Result<(), TransportError> {
         Ok(())
     }
+    async fn force_disconnect(&self) -> Result<(), TransportError> {
+        // Mock transport: clear all subscriptions and queryables to simulate disconnect
+        let mut bus = self.bus.0.lock().unwrap();
+        bus.subs.clear();
+        bus.qrys.clear();
+        Ok(())
+    }
 }
 
 struct MockSub {

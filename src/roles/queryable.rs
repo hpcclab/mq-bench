@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
 use tokio::time::{interval, sleep};
+use tracing::{debug, info, warn};
 
 pub struct QueryableConfig {
     pub engine: Engine,
@@ -25,26 +26,38 @@ pub struct QueryableConfig {
 }
 
 pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
-    println!("Starting queryable:");
-    if let Some(ep) = config.connect.params.get("endpoint") {
-        println!("  Endpoint: {}", ep);
-    }
-    println!("  Engine: {:?}", config.engine);
-    println!("  Prefixes: {:?}", config.serve_prefix);
-    println!("  Reply size: {} bytes", config.reply_size);
-    println!("  Processing delay: {} ms", config.proc_delay_ms);
+    info!(
+        engine = ?config.engine,
+        prefixes = ?config.serve_prefix,
+        reply_size = config.reply_size,
+        proc_delay_ms = config.proc_delay_ms,
+        endpoint = ?config.connect.params.get("endpoint"),
+        "Starting queryable"
+    );
 
-    // Transport session
-    let transport = TransportBuilder::connect(config.engine.clone(), config.connect.clone())
-        .await
-        .map_err(|e| anyhow::Error::msg(format!("transport connect error: {}", e)))?;
-
-    // Stats and output
+    // Stats early so we can track connection failures
     let stats = if let Some(s) = &config.shared_stats {
         s.clone()
     } else {
         Arc::new(Stats::new())
     };
+
+    // Transport session with optional retry
+    stats.record_connection_attempt();
+    let transport = match TransportBuilder::connect_with_retry(
+        config.engine.clone(),
+        config.connect.clone(),
+    )
+    .await
+    {
+        Ok(t) => t,
+        Err(e) => {
+            warn!(error = %e, "Transport connect error");
+            stats.record_connection_failure();
+            return Ok(());
+        }
+    };
+
     let mut output = if let Some(ref path) = config.output_file {
         Some(OutputWriter::new_csv(path.clone()).await?)
     } else if config.shared_stats.is_none() {
@@ -62,9 +75,10 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
             loop {
                 interval_timer.tick().await;
                 let snap = stats_clone.snapshot().await;
-                println!(
-                    "Queryable stats - Served: {}, Errors: {}",
-                    snap.sent_count, snap.error_count
+                debug!(
+                    served = snap.sent_count,
+                    errors = snap.error_count,
+                    "Queryable stats"
                 );
             }
         }))
@@ -95,7 +109,7 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
                         }
                         let payload = Bytes::from(payload_template.clone());
                         if let Err(e) = responder.send(payload).await {
-                            eprintln!("Queryable reply error: {}", e);
+                            warn!(error = %e, "Queryable reply error");
                             stats_worker.record_error().await;
                         } else {
                             stats_worker.record_sent().await;
@@ -108,7 +122,7 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
         _guards.push(guard);
     }
 
-    println!("Queryable(s) registered. Waiting for queries...");
+    info!("Queryable(s) registered. Waiting for queries...");
 
     // Wait for Ctrl+C or optional test timeout
     if let Some(s) = config.test_stop_after_secs {
@@ -118,14 +132,16 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
         }
     } else {
         signal::ctrl_c().await?;
-        println!("Ctrl+C received, stopping queryable");
+        info!("Ctrl+C received, stopping queryable");
     }
 
     // Final stats
     let final_stats = stats.snapshot().await;
-    println!("\nFinal Queryable Statistics:");
-    println!("  Queries served: {}", final_stats.sent_count);
-    println!("  Errors: {}", final_stats.error_count);
+    info!(
+        served = final_stats.sent_count,
+        errors = final_stats.error_count,
+        "Final Queryable Statistics"
+    );
     if let Some(ref mut out) = output {
         out.write_snapshot(&final_stats).await?;
     }

@@ -203,6 +203,12 @@ impl Transport for RedisTransport {
     async fn health_check(&self) -> Result<(), TransportError> {
         Ok(())
     }
+    async fn force_disconnect(&self) -> Result<(), TransportError> {
+        // Redis: Transport stores client; actual connections are created per operation.
+        // This is a no-op since we can't force-close connections we don't hold.
+        // The crash simulation will work by dropping/recreating the transport.
+        Ok(())
+    }
 }
 
 struct RedisPublisher {

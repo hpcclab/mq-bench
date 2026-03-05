@@ -84,10 +84,10 @@ print_status() {
 	last_qry=$(tail -n +2 "$qry_file" 2>/dev/null | tail -n1 || true)
 	local sreq rreq itreq ttqry
 	if [[ -n "$last_req" ]]; then
-		IFS=, read -r _ sreq rreq _ _ itreq _ _ _ _ _ _ <<<"$last_req"
+		IFS=, read -r _ sreq rreq _ _ itreq _ _ _ _ _ _ _ _ <<<"$last_req"
 	fi
 	if [[ -n "$last_qry" ]]; then
-		IFS=, read -r _ _ _ _ ttqry _ _ _ _ _ _ _ <<<"$last_qry"
+		IFS=, read -r _ _ _ _ ttqry _ _ _ _ _ _ _ _ _ <<<"$last_qry"
 	fi
 	printf "[status] REQ sent=%s recv=%s itps=%s | QRY tps=%s\n" \
 		"${sreq:--}" "${rreq:--}" "${itreq:--}" "${ttqry:--}"
@@ -105,11 +105,11 @@ echo "\n=== Summary (${RUN_ID}) ==="
 final_req=$(tail -n +2 "${REQ_CSV}" 2>/dev/null | tail -n1 || true)
 final_qry=$(tail -n +2 "${QRY_CSV}" 2>/dev/null | tail -n1 || true)
 if [[ -n "$final_req" ]]; then
-	IFS=, read -r _ sreq rreq errs ttreq itreq _ _ _ _ _ _ <<<"$final_req"
+	IFS=, read -r _ sreq rreq errs ttreq itreq _ _ _ _ _ _ _ _ <<<"$final_req"
 	echo "Requester: sent=${sreq} recv=${rreq} total_tps=${ttreq} errors=${errs}"
 fi
 if [[ -n "$final_qry" ]]; then
-	IFS=, read -r _ ssent _ errs tt _ _ _ _ _ _ _ <<<"$final_qry"
+	IFS=, read -r _ ssent _ errs tt _ _ _ _ _ _ _ _ _ <<<"$final_qry"
 	echo "Queryable: replies=${ssent} total_tps=${tt} errors=${errs}"
 fi
 

@@ -13,6 +13,17 @@ pub struct Stats {
     pub received_count: AtomicU64,
     pub error_count: AtomicU64,
 
+    // Connection counters
+    pub connections: AtomicU64,
+    pub active_connections: AtomicU64,
+    pub connection_attempts: AtomicU64,
+    pub connection_failures: AtomicU64,
+
+    // Crash/recovery counters
+    pub crashes_injected: AtomicU64,
+    pub reconnects: AtomicU64,
+    pub reconnect_failures: AtomicU64,
+
     // Timing
     start_time: Instant,
     last_snapshot: RwLock<Instant>,
@@ -24,6 +35,12 @@ pub struct Stats {
     // First activity times
     first_sent_time: RwLock<Option<Instant>>,
     first_received_time: RwLock<Option<Instant>>,
+
+    // Duplicate/gap counters (reported by clients with local SequenceTracker)
+    duplicate_count: AtomicU64,
+    gap_count: AtomicU64,
+    // Head loss: messages lost before first received (min_seq > 0)
+    head_loss: AtomicU64,
 }
 
 impl Stats {
@@ -35,12 +52,22 @@ impl Stats {
             sent_count: AtomicU64::new(0),
             received_count: AtomicU64::new(0),
             error_count: AtomicU64::new(0),
+            connections: AtomicU64::new(0),
+            active_connections: AtomicU64::new(0),
+            connection_attempts: AtomicU64::new(0),
+            connection_failures: AtomicU64::new(0),
+            crashes_injected: AtomicU64::new(0),
+            reconnects: AtomicU64::new(0),
+            reconnect_failures: AtomicU64::new(0),
             start_time: now,
             last_snapshot: RwLock::new(now),
             last_sent_count: RwLock::new(0),
             last_received_count: RwLock::new(0),
             first_sent_time: RwLock::new(None),
             first_received_time: RwLock::new(None),
+            duplicate_count: AtomicU64::new(0),
+            gap_count: AtomicU64::new(0),
+            head_loss: AtomicU64::new(0),
         }
     }
 
@@ -71,6 +98,76 @@ impl Stats {
         self.error_count.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Increment connection count (called when publisher/subscriber is created)
+    pub fn increment_connections(&self) {
+        self.connections.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Decrement connection count (called on shutdown)
+    pub fn decrement_connections(&self) {
+        self.connections.fetch_sub(1, Ordering::Relaxed);
+    }
+
+    /// Increment active connection count (called on first successful publish/receive)
+    pub fn increment_active_connections(&self) {
+        self.active_connections.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Decrement active connection count (called on shutdown or error)
+    pub fn decrement_active_connections(&self) {
+        self.active_connections.fetch_sub(1, Ordering::Relaxed);
+    }
+
+    /// Record a connection attempt
+    pub fn record_connection_attempt(&self) {
+        self.connection_attempts.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record a connection failure
+    pub fn record_connection_failure(&self) {
+        self.connection_failures.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record an injected crash (simulated failure)
+    pub fn record_crash_injected(&self) {
+        self.crashes_injected.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record a successful reconnection after crash
+    pub fn record_reconnect(&self) {
+        self.reconnects.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record a failed reconnection attempt
+    pub fn record_reconnect_failure(&self) {
+        self.reconnect_failures.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record duplicates detected by a client's local SequenceTracker
+    pub fn record_duplicates(&self, count: u64) {
+        self.duplicate_count.fetch_add(count, Ordering::Relaxed);
+    }
+
+    /// Record gaps detected by a client's local SequenceTracker
+    pub fn record_gaps(&self, count: u64) {
+        self.gap_count.fetch_add(count, Ordering::Relaxed);
+    }
+
+    /// Set the absolute duplicate count (for periodic updates from SequenceTracker)
+    pub fn set_duplicates(&self, count: u64) {
+        self.duplicate_count.store(count, Ordering::Relaxed);
+    }
+
+    /// Set the absolute gap count (for periodic updates from SequenceTracker)
+    pub fn set_gaps(&self, count: u64) {
+        self.gap_count.store(count, Ordering::Relaxed);
+    }
+
+    /// Set head loss count (messages lost before first received message)
+    pub fn set_head_loss(&self, count: u64) {
+        self.head_loss.store(count, Ordering::Relaxed);
+    }
+
     /// Record a batch of received latencies with minimal locking
     pub async fn record_received_batch(&self, latencies_ns: &[u64]) {
         if latencies_ns.is_empty() {
@@ -79,8 +176,8 @@ impl Stats {
         // Bump received count once
         self.received_count
             .fetch_add(latencies_ns.len() as u64, Ordering::Relaxed);
-        // Set first_received_time if unset
-        {
+        // Set first_received_time if unset (double-checked locking optimization)
+        if self.first_received_time.read().await.is_none() {
             let mut first = self.first_received_time.write().await;
             if first.is_none() {
                 *first = Some(Instant::now());
@@ -99,14 +196,28 @@ impl Stats {
         let sent = self.sent_count.load(Ordering::Relaxed);
         let received = self.received_count.load(Ordering::Relaxed);
         let errors = self.error_count.load(Ordering::Relaxed);
+        let conns = self.connections.load(Ordering::Relaxed);
+        let active_conns = self.active_connections.load(Ordering::Relaxed);
+        let conn_attempts = self.connection_attempts.load(Ordering::Relaxed);
+        let conn_failures = self.connection_failures.load(Ordering::Relaxed);
+        let crashes = self.crashes_injected.load(Ordering::Relaxed);
+        let reconnects = self.reconnects.load(Ordering::Relaxed);
+        let reconnect_failures = self.reconnect_failures.load(Ordering::Relaxed);
+        let duplicates = self.duplicate_count.load(Ordering::Relaxed);
+        let gaps = self.gap_count.load(Ordering::Relaxed);
+        let head_loss = self.head_loss.load(Ordering::Relaxed);
 
         let hist = self.latency_hist.read().await;
+        let p25 = hist.value_at_quantile(0.25);
         let p50 = hist.value_at_quantile(0.5);
+        let p75 = hist.value_at_quantile(0.75);
         let p95 = hist.value_at_quantile(0.95);
         let p99 = hist.value_at_quantile(0.99);
         let min = hist.min();
         let max = hist.max();
         let mean = hist.mean();
+        let stddev = hist.stdev();
+        let sample_count = hist.len();
 
         let total_elapsed = now.duration_since(self.start_time);
         let since_last = {
@@ -155,12 +266,26 @@ impl Stats {
             interval_received_count: interval_received,
             since_first_sent,
             since_first_received,
+            latency_ns_p25: p25,
             latency_ns_p50: p50,
+            latency_ns_p75: p75,
             latency_ns_p95: p95,
             latency_ns_p99: p99,
             latency_ns_min: min,
             latency_ns_max: max,
             latency_ns_mean: mean,
+            latency_ns_stddev: stddev,
+            latency_sample_count: sample_count,
+            connections: conns,
+            active_connections: active_conns,
+            connection_attempts: conn_attempts,
+            connection_failures: conn_failures,
+            crashes_injected: crashes,
+            reconnects,
+            reconnect_failures,
+            duplicate_count: duplicates,
+            gap_count: gaps,
+            head_loss,
         }
     }
 
@@ -170,6 +295,15 @@ impl Stats {
         self.sent_count.store(0, Ordering::Relaxed);
         self.received_count.store(0, Ordering::Relaxed);
         self.error_count.store(0, Ordering::Relaxed);
+        self.connections.store(0, Ordering::Relaxed);
+        self.active_connections.store(0, Ordering::Relaxed);
+        self.connection_attempts.store(0, Ordering::Relaxed);
+        self.connection_failures.store(0, Ordering::Relaxed);
+        self.crashes_injected.store(0, Ordering::Relaxed);
+        self.reconnects.store(0, Ordering::Relaxed);
+        self.reconnect_failures.store(0, Ordering::Relaxed);
+        self.duplicate_count.store(0, Ordering::Relaxed);
+        self.gap_count.store(0, Ordering::Relaxed);
         self.latency_hist.write().await.reset();
         *self.last_snapshot.write().await = Instant::now();
     }
@@ -187,12 +321,26 @@ pub struct StatsSnapshot {
     pub interval_received_count: u64,
     pub since_first_sent: Option<Duration>,
     pub since_first_received: Option<Duration>,
+    pub latency_ns_p25: u64,
     pub latency_ns_p50: u64,
+    pub latency_ns_p75: u64,
     pub latency_ns_p95: u64,
     pub latency_ns_p99: u64,
     pub latency_ns_min: u64,
     pub latency_ns_max: u64,
     pub latency_ns_mean: f64,
+    pub latency_ns_stddev: f64,
+    pub latency_sample_count: u64,
+    pub connections: u64,
+    pub active_connections: u64,
+    pub connection_attempts: u64,
+    pub connection_failures: u64,
+    pub crashes_injected: u64,
+    pub reconnects: u64,
+    pub reconnect_failures: u64,
+    pub duplicate_count: u64,
+    pub gap_count: u64,
+    pub head_loss: u64,
 }
 
 impl StatsSnapshot {
@@ -241,25 +389,38 @@ impl StatsSnapshot {
     /// Convert to CSV row
     pub fn to_csv_row(&self) -> String {
         format!(
-            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{:.2}",
+            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{},{},{}",
             self.timestamp,
             self.sent_count,
             self.received_count,
             self.error_count,
             self.total_throughput(),
             self.interval_throughput(),
+            self.latency_ns_p25,
             self.latency_ns_p50,
+            self.latency_ns_p75,
             self.latency_ns_p95,
             self.latency_ns_p99,
             self.latency_ns_min,
             self.latency_ns_max,
-            self.latency_ns_mean
+            self.latency_ns_mean,
+            self.latency_ns_stddev,
+            self.latency_sample_count,
+            self.connections,
+            self.active_connections,
+            self.connection_attempts,
+            self.connection_failures,
+            self.crashes_injected,
+            self.reconnects,
+            self.reconnect_failures,
+            self.duplicate_count,
+            self.gap_count
         )
     }
 
     /// CSV header
     pub fn csv_header() -> &'static str {
-        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p50,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean"
+        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p25,latency_ns_p50,latency_ns_p75,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean,latency_ns_stddev,latency_sample_count,connections,active_connections,connection_attempts,connection_failures,crashes_injected,reconnects,reconnect_failures,duplicate_count,gap_count"
     }
 }
 
