@@ -36,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out-dir", help="Output directory for plots (default: 'plots' subdirectory in summary's folder)")
     p.add_argument("--only-latency-vs-payload", action="store_true", help="Only generate Latency vs Payload plots")
     p.add_argument("--latex", action="store_true", help="Generate plots optimized for LaTeX double-column papers (smaller size, larger fonts, PDF output)")
+    p.add_argument("--legend", action="store_true", help="Include legend in each plot (omitted by default)")
     return p.parse_args()
 
 
@@ -226,6 +227,52 @@ def dedupe_by_subs(records_list: list) -> list:
     return list(by_subs.values())
 
 
+def add_legend_inline(ax, fig, enabled: bool, ncol: int = 3, loc: str = "upper left",
+                      fontsize: str = "medium", col1_size: int = None) -> None:
+    """Place a de-duplicated legend inside the axes at the given location.
+
+    enabled: if False, skip the legend but still call tight_layout.
+    ncol: number of columns in the legend.
+    loc: legend location string (default 'upper left').
+    fontsize: legend font size (default 'medium').
+    col1_size: if set, renders two separate adjacent legend objects so that
+               col1 has exactly col1_size rows and col2 has only as many rows
+               as there are remaining items (no blank padding).
+    """
+    try:
+        fig.tight_layout()
+    except Exception:
+        pass
+    if not enabled:
+        return
+    handles, labels = ax.get_legend_handles_labels()
+    seen: dict = {}
+    for h, lbl in zip(handles, labels):
+        seen.setdefault(lbl, h)
+    if not seen:
+        return
+    h_list = list(seen.values())
+    l_list = list(seen.keys())
+    if col1_size is not None and len(h_list) > col1_size:
+        h1, l1 = h_list[:col1_size], l_list[:col1_size]
+        h2, l2 = h_list[col1_size:], l_list[col1_size:]
+        # Draw col1 legend, then position col2 legend immediately to its right.
+        leg1 = ax.legend(h1, l1, loc="upper left", ncol=1, frameon=True, fontsize=fontsize)
+        ax.add_artist(leg1)
+        try:
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            bb1 = leg1.get_window_extent(renderer)
+            bb1_ax = bb1.transformed(ax.transAxes.inverted())
+            x2 = bb1_ax.x1 + 0.01
+        except Exception:
+            x2 = 0.40
+        ax.legend(h2, l2, loc="upper left", ncol=1, frameon=True, fontsize=fontsize,
+                  bbox_to_anchor=(x2, 1.0), bbox_transform=ax.transAxes)
+    else:
+        ax.legend(h_list, l_list, loc=loc, ncol=ncol, frameon=True, fontsize=fontsize)
+
+
 def add_legend_top(ax, fig, max_cols: int = 4, reserve_top: float = 0.82, skip_legend: bool = False) -> None:
     """Place a de-duplicated legend at the top of the figure and reserve
     vertical space to avoid overlap with the title.
@@ -269,7 +316,7 @@ def format_pairs_axis(ax, data_xs: list, use_thousands: bool = True) -> None:
     """Format the x-axis for pairs plots.
     
     If use_thousands=True, display values divided by 1000 (e.g., 500->0.5, 1000->1, 2000->2).
-    The caller should update the axis label to include '(×1000)'.
+    The caller should update the axis label to include '(×1,000)'.
     """
     from matplotlib.ticker import FuncFormatter, FixedLocator, NullLocator
     
@@ -326,7 +373,7 @@ def format_throughput_axis(ax, rate=None) -> None:
 
     # Build human-readable annotation
     if divisor == 1_000:
-        annotation = "×1000 msg/s"
+        annotation = "×1,000 msg/s"
     elif divisor == 1_000_000:
         annotation = "×10⁶ msg/s"
     elif divisor == 1_000_000_000:
@@ -530,7 +577,7 @@ def main() -> int:
             format_throughput_axis(ax)
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             throughput_imgs[payload] = os.path.basename(fn)
@@ -589,14 +636,14 @@ def main() -> int:
                 ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
             if not args.latex:
                 ax.set_title(f"Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Throughput vs Pairs")
-            ax.set_xlabel("Pub-Sub Pairs (×1000)")
+            ax.set_xlabel("Pub-Sub Pairs (×1,000)")
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
             ax.set_xscale("log")
             format_pairs_axis(ax, all_xs)
             _rate_per_pub = list(rate_per_pub_set)[0] if len(rate_per_pub_set) == 1 else None
             format_throughput_axis(ax, rate=_rate_per_pub)
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_log{plot_ext}")
             save_fig(fig, fn)
             throughput_pairs_imgs[payload] = os.path.basename(fn)
@@ -609,13 +656,13 @@ def main() -> int:
                 ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
             if not args.latex:
                 ax.set_title(f"Throughput vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else "Throughput vs Pairs")
-            ax.set_xlabel("Pub-Sub Pairs (×1000)")
+            ax.set_xlabel("Pub-Sub Pairs (×1,000)")
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
             # Linear scale - use thousands formatter
             format_pairs_axis(ax, all_xs)
             format_throughput_axis(ax, rate=_rate_per_pub)
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_linear{plot_ext}")
             save_fig(fig, fn)
             throughput_pairs_imgs_linear[payload] = os.path.basename(fn)
@@ -680,7 +727,7 @@ def main() -> int:
                 rate_per_pub_str = f"{sorted(rate_per_pub_set)} msg/s/pub"
             if not args.latex:
                 ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
-            ax.set_xlabel("Pub-Sub Pairs (×1000)")
+            ax.set_xlabel("Pub-Sub Pairs (×1,000)")
             ax.set_ylabel(f"{title_prefix} (ms)")
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
@@ -694,7 +741,7 @@ def main() -> int:
             except Exception:
                 pass
             format_pairs_axis(ax, all_xs)
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             out[payload] = os.path.basename(fn)
@@ -755,14 +802,14 @@ def main() -> int:
                 rate_per_pub_str = f"{sorted(rate_per_pub_set)} msg/s/pub"
             if not args.latex:
                 ax.set_title(f"{title_prefix} vs Pairs ({rate_per_pub_str})" if rate_per_pub_str else f"{title_prefix} vs Pairs")
-            ax.set_xlabel("Pub-Sub Pairs (×1000)")
+            ax.set_xlabel("Pub-Sub Pairs (×1,000)")
             ax.set_ylabel(y_label)
             if y_formatter:
                 y_formatter(ax)
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
             format_pairs_axis(ax, all_xs)
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             out[payload] = os.path.basename(fn)
@@ -808,7 +855,7 @@ def main() -> int:
                 pass
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             p99_imgs[payload] = os.path.basename(fn)
@@ -838,7 +885,7 @@ def main() -> int:
             ax.set_ylabel("Max CPU (%)")
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"max_cpu_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             cpu_imgs[payload] = os.path.basename(fn)
@@ -868,7 +915,7 @@ def main() -> int:
             ax.set_ylabel("Max Memory (%)")
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"max_mem_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             mem_imgs[payload] = os.path.basename(fn)
@@ -953,7 +1000,7 @@ def main() -> int:
 
             ax.xaxis.set_major_formatter(FuncFormatter(log_formatter))
             
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            add_legend_top(ax, fig, skip_legend=not args.legend)
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_payload_rate{rate}{plot_ext}")
             save_fig(fig, fn)
             out[rate] = os.path.basename(fn)
@@ -1028,7 +1075,7 @@ def main() -> int:
                         continue
                     if not args.latex:
                         ax.set_title(f"{title_prefix} vs Subscribers (payload={pl}B)")
-                    ax.set_xlabel("Subscribers (\u00d71000)")
+                    ax.set_xlabel("Subscribers (\u00d71,000)")
                     ax.set_ylabel(y_label)
                     if log_y:
                         try:
@@ -1040,7 +1087,7 @@ def main() -> int:
                     if not args.latex:
                         ax.grid(True, alpha=0.4, linestyle="--")
                     format_pairs_axis(ax, all_xs)
-                    add_legend_top(ax, fig, skip_legend=args.latex)
+                    add_legend_top(ax, fig, skip_legend=not args.legend)
                     yield pl, ax, fig, all_xs, out
                     plt.close(fig)
                 return out
@@ -1081,13 +1128,13 @@ def main() -> int:
                     ax.plot(xs, ys, marker=mk, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
                 if not args.latex:
                     ax.set_title(f"Throughput vs Subscribers (payload={pl}B)")
-                ax.set_xlabel("Subscribers (\u00d71000)")
+                ax.set_xlabel("Subscribers (\u00d71,000)")
                 ax.set_xscale("log")
                 format_pairs_axis(ax, all_xs_subs)
                 format_throughput_axis(ax, rate=_subs_rate)
                 if not args.latex:
                     ax.grid(True, alpha=0.4, linestyle="--")
-                add_legend_top(ax, fig, skip_legend=args.latex)
+                add_legend_inline(ax, fig, enabled=args.legend, fontsize="small", col1_size=5)
                 fn = os.path.join(args.out_dir, f"throughput_vs_subs_payload{pl}_log{plot_ext}")
                 save_fig(fig, fn)
                 throughput_subs_imgs[pl] = os.path.basename(fn)
@@ -1100,12 +1147,12 @@ def main() -> int:
                     ax.plot(xs, ys, marker=mk, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
                 if not args.latex:
                     ax.set_title(f"Throughput vs Subscribers (payload={pl}B)")
-                ax.set_xlabel("Subscribers (\u00d71000)")
+                ax.set_xlabel("Subscribers (\u00d71,000)")
                 format_pairs_axis(ax, all_xs_subs)
                 format_throughput_axis(ax, rate=_subs_rate)
                 if not args.latex:
                     ax.grid(True, alpha=0.4, linestyle="--")
-                add_legend_top(ax, fig, skip_legend=args.latex)
+                add_legend_inline(ax, fig, enabled=args.legend, fontsize="small", col1_size=5)
                 fn = os.path.join(args.out_dir, f"throughput_vs_subs_payload{pl}_linear{plot_ext}")
                 save_fig(fig, fn)
                 throughput_subs_imgs_linear[pl] = os.path.basename(fn)
@@ -1142,7 +1189,7 @@ def main() -> int:
                         continue
                     if not args.latex:
                         ax.set_title(f"{title_prefix} vs Subscribers (payload={pl}B)")
-                    ax.set_xlabel("Subscribers (\u00d71000)")
+                    ax.set_xlabel("Subscribers (\u00d71,000)")
                     ax.set_ylabel(y_label)
                     if log_y:
                         try:
@@ -1154,7 +1201,7 @@ def main() -> int:
                     if not args.latex:
                         ax.grid(True, alpha=0.4, linestyle="--")
                     format_pairs_axis(ax, all_xs)
-                    add_legend_top(ax, fig, skip_legend=args.latex)
+                    add_legend_top(ax, fig, skip_legend=not args.legend)
                     fn = os.path.join(args.out_dir, f"{metric_key}_vs_subs_payload{pl}{plot_ext}")
                     save_fig(fig, fn)
                     out[pl] = os.path.basename(fn)
@@ -1218,11 +1265,19 @@ def main() -> int:
                 ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
             if not args.latex:
                 ax.set_title(f"Throughput vs Fanout (payload={payload}B, rate={rate}/s)")
-            ax.set_xlabel("Fanout (subscribers)")
+            ax.set_xlabel("Subscribers (\u00d71,000)")
+            format_pairs_axis(ax, [x["subs"] for x in rows if math.isfinite(x.get("sub_tps", float("nan")))])
             format_throughput_axis(ax, rate=rate)
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            if args.legend:
+                _h, _l = ax.get_legend_handles_labels()
+                _seen = {}; [_seen.setdefault(_l[i], _h[i]) for i in range(len(_l))]
+                ax.legend(list(_seen.values()), list(_seen.keys()), loc="upper left", ncol=3, frameon=True)
+            try:
+                fig.tight_layout()
+            except Exception:
+                pass
             fn = os.path.join(args.out_dir, f"throughput-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
             save_fig(fig, fn)
             fanout_imgs[(payload, rate)] = os.path.basename(fn)
@@ -1244,11 +1299,19 @@ def main() -> int:
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
             if not args.latex:
                 ax.set_title(f"Max CPU% vs Fanout (payload={payload}B, rate={rate}/s)")
-            ax.set_xlabel("Fanout (subscribers)")
+            ax.set_xlabel("Subscribers (\u00d71,000)")
             ax.set_ylabel("Max CPU (%)")
+            format_pairs_axis(ax, [x["subs"] for x in rows])
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            if args.legend:
+                _h, _l = ax.get_legend_handles_labels()
+                _seen = {}; [_seen.setdefault(_l[i], _h[i]) for i in range(len(_l))]
+                ax.legend(list(_seen.values()), list(_seen.keys()), loc="upper left", ncol=3, frameon=True)
+            try:
+                fig.tight_layout()
+            except Exception:
+                pass
             fn_cpu = os.path.join(args.out_dir, f"max-cpu-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
             save_fig(fig, fn_cpu)
             fanout_cpu_imgs[(payload, rate)] = os.path.basename(fn_cpu)
@@ -1270,11 +1333,19 @@ def main() -> int:
                     ax.plot(xs, ys, marker=m, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=label)
             if not args.latex:
                 ax.set_title(f"Max Memory% vs Fanout (payload={payload}B, rate={rate}/s)")
-            ax.set_xlabel("Fanout (subscribers)")
+            ax.set_xlabel("Subscribers (\u00d71,000)")
             ax.set_ylabel("Max Memory (%)")
+            format_pairs_axis(ax, [x["subs"] for x in rows])
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=args.latex)
+            if args.legend:
+                _h, _l = ax.get_legend_handles_labels()
+                _seen = {}; [_seen.setdefault(_l[i], _h[i]) for i in range(len(_l))]
+                ax.legend(list(_seen.values()), list(_seen.keys()), loc="upper left", ncol=3, frameon=True)
+            try:
+                fig.tight_layout()
+            except Exception:
+                pass
             fn_mem = os.path.join(args.out_dir, f"max-memory-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
             save_fig(fig, fn_mem)
             fanout_mem_imgs[(payload, rate)] = os.path.basename(fn_mem)
