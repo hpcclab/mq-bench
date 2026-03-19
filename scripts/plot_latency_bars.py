@@ -293,7 +293,7 @@ def plot_per_payload_p50_p99(df, transports, out_dir):
             fig.text(0.02, 0.5, 'Latency [ms]', va='center', rotation='vertical', fontsize=16)
             
             # Legend on top axis
-            ax_top.legend(loc='upper right', bbox_to_anchor=(1.0, 1.2), ncol=2, framealpha=0.9)
+            ax_top.legend(loc='upper right', bbox_to_anchor=(1.0, 1.2), ncol=2, framealpha=0.9, fontsize=16)
             
             # Grid
             for ax in [ax_top, ax_bottom]:
@@ -327,7 +327,7 @@ def plot_per_payload_p50_p99(df, transports, out_dir):
             ax.set_ylabel("Latency [ms]")
             
             # Legend - place outside plot area at top right
-            ax.legend(loc='upper right', bbox_to_anchor=(1.0, 1.15), ncol=2, framealpha=0.9)
+            ax.legend(loc='upper right', bbox_to_anchor=(1.0, 1.15), ncol=2, framealpha=0.9, fontsize=16)
             
             # Clean academic styling - minimal grid
             ax.spines['top'].set_visible(False)
@@ -741,8 +741,8 @@ def plot_boxplots_grouped_by_transport(df, out_dir, payload_filter=None, suffix=
         'axes.titlesize': 20,
         'xtick.labelsize': 15,
         'ytick.labelsize': 15,
-        'legend.fontsize': 14,
-        'legend.title_fontsize': 15,
+        'legend.fontsize': 20,
+        'legend.title_fontsize': 21,
     })
     
     # Filter to specified payloads
@@ -909,8 +909,8 @@ def plot_boxplots_grouped_by_transport_log(df, out_dir, payload_filter=None, suf
         'axes.titlesize': 20,
         'xtick.labelsize': 15,
         'ytick.labelsize': 15,
-        'legend.fontsize': 14,
-        'legend.title_fontsize': 15,
+        'legend.fontsize': 20,
+        'legend.title_fontsize': 21,
     })
     
     # Filter to specified payloads
@@ -1649,12 +1649,12 @@ def plot_median_with_error_grouped_by_transport(df, out_dir):
     """
     plt.rcParams.update({
         'font.family': 'serif',
-        'font.size': 20,
-        'axes.labelsize': 20,
-        'axes.titlesize': 20,
-        'xtick.labelsize': 20,
-        'ytick.labelsize': 20,
-        'legend.fontsize': 16,
+        'font.size': 24,
+        'axes.labelsize': 24,
+        'axes.titlesize': 24,
+        'xtick.labelsize': 24,
+        'ytick.labelsize': 24,
+        'legend.fontsize': 24,
     })
     
     payloads = sorted(df["payload"].unique())
@@ -1676,7 +1676,7 @@ def plot_median_with_error_grouped_by_transport(df, out_dir):
     all_colors = []
     
     for t_idx, transport in enumerate(transports):
-        base_pos = t_idx * (n_payloads * bar_width + group_spacing + 0.3)
+        base_pos = t_idx * (n_payloads * bar_width + group_spacing + 0.1)
         
         for p_idx, payload in enumerate(payloads):
             t_df = df[(df["transport"] == transport) & (df["payload"] == payload)]
@@ -1728,7 +1728,7 @@ def plot_median_with_error_grouped_by_transport(df, out_dir):
     # X-axis labels - center of each transport group
     group_centers = []
     for t_idx in range(n_transports):
-        base_pos = t_idx * (n_payloads * bar_width + group_spacing + 0.3)
+        base_pos = t_idx * (n_payloads * bar_width + group_spacing + 0.1)
         center = base_pos + (n_payloads - 1) * (bar_width + 0.02) / 2
         group_centers.append(center)
     
@@ -1744,7 +1744,7 @@ def plot_median_with_error_grouped_by_transport(df, out_dir):
         return name
     
     ax.set_xticklabels([format_transport_label(t) for t in transports],
-                      rotation=0, ha="center")
+                      rotation=45, ha="right")
     
     ax.set_yscale('log')
     ax.set_ylabel("Latency [ms]")
@@ -1763,8 +1763,8 @@ def plot_median_with_error_grouped_by_transport(df, out_dir):
             Patch(facecolor=PAYLOAD_COLORS.get(payload, '#1f77b4'),
                   edgecolor='black', label=label, alpha=0.85)
         )
-    ax.legend(handles=legend_elements, loc='upper center', 
-              bbox_to_anchor=(0.5, 1.12), ncol=n_payloads, framealpha=0.9)
+    ax.legend(handles=legend_elements, loc='upper right',
+              bbox_to_anchor=(1.0, 1.12), ncol=n_payloads, framealpha=0.9, fontsize=24)
     
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -2515,7 +2515,7 @@ def plot_qos_median_with_error(df, out_dir):
     ax.set_ylabel("Latency [ms]")
     
     # Legend above horizontally, no title, smaller font
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=n_qos, framealpha=0.9, fontsize=18)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=n_qos, framealpha=0.9)
     
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
