@@ -1,8 +1,42 @@
-# mq-bench — Messaging transport benchmarking (MQTT + Redis + NATS + Zenoh + RabbitMQ/AMQP)
+# mq-bench — Messaging Transport Benchmarking (MQTT + Redis + NATS + Zenoh + RabbitMQ/AMQP)
 
-A minimal, scriptable benchmarking tool for pub/sub and request/reply with CSV metrics. Built in Rust with Tokio. Ships a Docker Compose stack with MQTT (Mosquitto/EMQX/HiveMQ), Redis, NATS, RabbitMQ, ActiveMQ Artemis, and an optional Zenoh 3-router star.
+Asynchronous messaging is a cornerstone of modern distributed systems, enabling decoupled communication for scalable and resilient applications. Today's message broker ecosystem spans a wide range of designs — from high-throughput streaming platforms to lightweight protocols tailored for edge and IoT environments — yet choosing the right broker remains difficult. Existing evaluations largely focus on throughput and latency on fixed hardware while overlooking CPU and memory footprint under resource constraints, factors that are critical for edge and IoT deployments.
 
-The harness uses a pluggable transport abstraction with adapters for MQTT, Redis, NATS, Zenoh (1.5.1), and RabbitMQ (AMQP via `lapin`). Select an engine via `--engine` and pass connection options via `--connect KEY=VALUE`.
+**mq-bench** is a unified benchmarking framework for evaluating message brokers under identical conditions. It provides a comprehensive, scriptable harness for pub/sub and request/reply across eight broker implementations: Mosquitto, EMQX, HiveMQ, RabbitMQ, ActiveMQ Artemis, NATS Server, Redis (Pub/Sub), and Zenoh Router. The tool scales experiments up to 10,000 concurrent client pairs across multiple VM configurations representative of edge hardware, collecting latency (P50/P95/P99), throughput, CPU, and memory metrics at each scale point.
+
+Built in Rust with Tokio. Ships a Docker Compose stack with MQTT (Mosquitto/EMQX/HiveMQ), Redis, NATS, RabbitMQ, ActiveMQ Artemis, and an optional Zenoh 3-router star. The harness uses a pluggable transport abstraction with adapters for MQTT, Redis, NATS, Zenoh (1.5.1), and RabbitMQ (AMQP via `lapin`). Select an engine via `--engine` and pass connection options via `--connect KEY=VALUE`.
+
+## Publication
+
+The research findings from this project have been accepted at a peer-reviewed venue:
+
+> **Tapajit Chandra Paul, Pawissanutt Lertpongrujikorn, Hai Duc Nguyen, and Mohsen Amini Salehi**, "Benchmarking Message Brokers for IoT Edge Computing: A Comprehensive Performance Study," in *Proceedings of the [26th IEEE International Symposium on Cluster, Cloud, and Internet Computing (CCGrid 2026)](https://ccgrid2026.cdms.westernsydney.edu.au/)*, 2026.
+
+The paper covers latency vs. payload size, throughput and resource utilization under client scaling (1-to-1 topology, three VM configurations), and reliability under network disruptions (QoS evaluation with TCP RST fault injection) for eight message broker implementations. Results and raw data are available in the [`final_results/`](final_results/) directory.
+
+One extended result that could not be completely included in the paper due to space constraints — a detailed fanout topology analysis — is available here:  
+**[Fanout Topology Analysis: Throughput, CPU, and Memory](final_results/fanout_analysis.md)**
+
+## Repository Structure
+
+```
+mq-bench/
+├── src/                  # Rust source — CLI, transport adapters, metrics, roles
+├── tests/                # Integration and smoke tests
+├── scripts/              # Experiment automation scripts (run_baseline.sh, run_fanout.sh, lib.sh, ...)
+├── setup/                # Environment setup scripts and KVM/Docker configuration guides
+├── config/               # Broker configuration files (Zenoh routers, MQTT configs)
+├── final_results/        # All benchmark results, plots, and analysis
+│   ├── latency/          # Latency vs. payload size experiment results
+│   ├── throughput/       # Throughput & resource utilization results (vm12/, vm24/, vm48/, fanout/)
+│   ├── latex/            # LaTeX source for the paper's evaluation section
+│   └── fanout_analysis.md  # Extended fanout topology analysis (see above)
+├── artifacts/            # Raw per-run output artifacts (auto-generated during experiments)
+├── docker-compose.yml    # Broker service stack
+└── Cargo.toml
+```
+
+**[Setup Guide](setup/README.md)** — Instructions for provisioning KVM VMs on bare-metal nodes, configuring macvtap networking, and installing Docker for multi-node benchmark deployments.
 
 ## Features
 - Docker Compose stack: MQTT (Mosquitto/EMQX/HiveMQ), Redis, NATS, RabbitMQ, ActiveMQ Artemis, plus an optional Zenoh 3-router star (router2 → router1 ← router3)
@@ -252,7 +286,3 @@ Minimal steps to introduce a new engine (e.g., "foo"):
 - Docker (optional): add a service to `docker-compose.yml` and bind ports to 127.0.0.1.
 - Docs: list the engine under “Transports (current)” with example connect hints.
 
-Tip: keep topic names in slash style at the CLI; if the backend uses a different pattern (e.g., dots), translate internally inside the adapter.
-
-# mq-bench
-Benchmarking of IoT-based message queuing systems.
