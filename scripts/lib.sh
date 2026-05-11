@@ -163,6 +163,12 @@ start_broker_stats_monitor() {
 				  # Emit CSV-like line (no quotes)
 				  ($ts+","+$cid+","+$name+","+($cpu|round2|tostring)+"%"+","+(human($used))+" / "+(human($ml))+","+($mperc|round2|tostring)+"%"+","+(human($rx))+" / "+(human($tx))+","+(human($rbytes))+" / "+(human($wbytes))+","+($pids|tostring)+","+($used|tostring)+","+($ml|tostring)+","+($mperc|round4|tostring)+","+($rx|tostring)+","+($tx|tostring)+","+($rbytes|tostring)+","+($wbytes|tostring)+","+($cpu|round4|tostring))
 				' <<< "$json")
+				[[ -z "$line" ]] && continue
+				IFS=, read -r _ts _cid _name _cpu _mem_usage _mem_perc _net_io _blk_io _pids mem_used_b mem_limit_b _mem_perc_calc net_rx_b net_tx_b _blk_read_b _blk_write_b cpu_perc_num <<<"$line"
+				# Skip synthetic all-zero rows emitted while Docker tears down stats.
+				if [[ "${mem_limit_b}" == "0" && "${mem_used_b}" == "0" && "${net_rx_b}" == "0" && "${net_tx_b}" == "0" && "${cpu_perc_num}" == "0" ]]; then
+					continue
+				fi
 				# Append line
 				echo "$line"
 			done
@@ -471,4 +477,3 @@ summarize_common() {
 			"${conns_sub:-0}" "${active_sub:-0}"
 	fi
 }
-

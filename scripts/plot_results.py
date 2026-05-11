@@ -9,6 +9,7 @@ Inputs:
 The CSV can be either full or latency-only.
 Full columns:
     transport,payload,rate,run_id,sub_tps,p50_ms,p95_ms,p99_ms,pub_tps,sent,recv,errors,artifacts_dir,max_cpu_perc,max_mem_perc,max_mem_used_bytes
+    plus optional avg_* and network-bandwidth columns when present in the summary CSV.
 Latency-only columns:
     transport,payload,rate,run_id,p50_ms,p95_ms,p99_ms
 
@@ -37,6 +38,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--only-latency-vs-payload", action="store_true", help="Only generate Latency vs Payload plots")
     p.add_argument("--latex", action="store_true", help="Generate plots optimized for LaTeX double-column papers (smaller size, larger fonts, PDF output)")
     p.add_argument("--legend", action="store_true", help="Include legend in each plot (omitted by default)")
+    p.add_argument(
+        "--legend-placement",
+        choices=("auto", "inside", "top"),
+        default="auto",
+        help="Legend placement mode: auto keeps per-plot defaults, inside keeps the legend inside the axes, and top places a horizontal legend above the plot",
+    )
     return p.parse_args()
 
 
@@ -163,6 +170,10 @@ def load_records(csv_path: str):
                     "avg_mem_bytes": float(r.get("avg_mem_used_bytes", "") or float("nan")),
                     "avg_mem_mb": float(r.get("avg_mem_used_bytes", "") or float("nan")) / (1024.0 * 1024.0) if r.get("avg_mem_used_bytes", "") else float("nan"),
                     "max_mem_mb": float(r.get("max_mem_used_bytes", "") or float("nan")) / (1024.0 * 1024.0) if r.get("max_mem_used_bytes", "") else float("nan"),
+                    "max_net_rx_bps": float(r.get("max_net_rx_bps", "") or float("nan")),
+                    "max_net_tx_bps": float(r.get("max_net_tx_bps", "") or float("nan")),
+                    "avg_net_rx_bps": float(r.get("avg_net_rx_bps", "") or float("nan")),
+                    "avg_net_tx_bps": float(r.get("avg_net_tx_bps", "") or float("nan")),
                     "connections": int(r.get("connections", "") or 0),
                     "active_connections": int(r.get("active_connections", "") or 0),
                     "run_id": r.get("run_id", ""),
@@ -312,6 +323,46 @@ def add_legend_top(ax, fig, max_cols: int = 4, reserve_top: float = 0.82, skip_l
     fig.legend(handles2, labels2, loc="upper center", bbox_to_anchor=(0.5, 0.99), ncol=ncol, frameon=False)
 
 
+def add_plot_legend(ax, fig, args, default_mode: str = "top", top_max_cols: int = None,
+                    top_reserve: float = 0.82, inline_loc: str = "upper left",
+                    inline_fontsize: str = "medium", inline_col1_size: int = None) -> None:
+    """Place the legend according to CLI settings.
+
+    default_mode:
+      - "top" uses the top horizontal legend in auto mode
+      - "inside" uses the inline legend in auto mode
+    """
+    if not args.legend:
+        try:
+            fig.tight_layout()
+        except Exception:
+            pass
+        return
+
+    mode = args.legend_placement
+    if mode == "auto":
+        mode = default_mode
+
+    if mode == "top":
+        add_legend_top(
+            ax,
+            fig,
+            max_cols=top_max_cols if top_max_cols is not None else 99,
+            reserve_top=top_reserve,
+            skip_legend=False,
+        )
+        return
+
+    add_legend_inline(
+        ax,
+        fig,
+        enabled=True,
+        loc=inline_loc,
+        fontsize=inline_fontsize,
+        col1_size=inline_col1_size,
+    )
+
+
 def format_pairs_axis(ax, data_xs: list, use_thousands: bool = True) -> None:
     """Format the x-axis for pairs plots.
     
@@ -406,6 +457,51 @@ def format_memory_mb_axis(ax) -> None:
             return f"{val:.1f}"
     
     ax.yaxis.set_major_formatter(FuncFormatter(gb_formatter))
+
+
+def format_bandwidth_axis(ax) -> None:
+    """Format bit/sec values into readable network units."""
+    from matplotlib.ticker import FuncFormatter
+
+    max_val = 0.0
+    for line in ax.get_lines():
+        yd = line.get_ydata()
+        for y in yd:
+            try:
+                yv = float(y)
+            except Exception:
+                continue
+            if math.isfinite(yv) and yv > max_val:
+                max_val = yv
+
+    units = [
+        (1.0, "bps"),
+        (1_000.0, "Kbps"),
+        (1_000_000.0, "Mbps"),
+        (1_000_000_000.0, "Gbps"),
+    ]
+    scale, suffix = units[0]
+    for unit_scale, unit_suffix in units:
+        if max_val >= unit_scale:
+            scale, suffix = unit_scale, unit_suffix
+
+    def bandwidth_formatter(x, pos):
+        if x <= 0:
+            return "0"
+        val = x / scale
+        if val >= 100:
+            return f"{val:.0f}"
+        if val >= 10:
+            return f"{val:.1f}"
+        return f"{val:.2f}"
+
+    ax.yaxis.set_major_formatter(FuncFormatter(bandwidth_formatter))
+    label = ax.get_ylabel()
+    if label and "(" not in label:
+        ax.set_ylabel(f"{label} ({suffix})")
+    # Network labels are longer than the other metric labels, so trim their
+    # font size slightly to keep them inside the figure bounds.
+    ax.yaxis.label.set_size(max(ax.yaxis.label.get_size() * 0.82, 8))
 
 
 def generate_standalone_legend(transports: list, out_dir: str, marker_size: float = 12) -> str:
@@ -577,7 +673,7 @@ def main() -> int:
             format_throughput_axis(ax)
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"throughput_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             throughput_imgs[payload] = os.path.basename(fn)
@@ -643,7 +739,7 @@ def main() -> int:
             format_pairs_axis(ax, all_xs)
             _rate_per_pub = list(rate_per_pub_set)[0] if len(rate_per_pub_set) == 1 else None
             format_throughput_axis(ax, rate=_rate_per_pub)
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_log{plot_ext}")
             save_fig(fig, fn)
             throughput_pairs_imgs[payload] = os.path.basename(fn)
@@ -662,7 +758,7 @@ def main() -> int:
             # Linear scale - use thousands formatter
             format_pairs_axis(ax, all_xs)
             format_throughput_axis(ax, rate=_rate_per_pub)
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"throughput_vs_pairs_payload{payload}_linear{plot_ext}")
             save_fig(fig, fn)
             throughput_pairs_imgs_linear[payload] = os.path.basename(fn)
@@ -741,7 +837,7 @@ def main() -> int:
             except Exception:
                 pass
             format_pairs_axis(ax, all_xs)
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             out[payload] = os.path.basename(fn)
@@ -809,7 +905,7 @@ def main() -> int:
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
             format_pairs_axis(ax, all_xs)
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_pairs_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             out[payload] = os.path.basename(fn)
@@ -855,7 +951,7 @@ def main() -> int:
                 pass
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"p99_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             p99_imgs[payload] = os.path.basename(fn)
@@ -885,7 +981,7 @@ def main() -> int:
             ax.set_ylabel("Max CPU (%)")
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"max_cpu_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             cpu_imgs[payload] = os.path.basename(fn)
@@ -915,7 +1011,7 @@ def main() -> int:
             ax.set_ylabel("Max Memory (%)")
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"max_mem_vs_rate_payload{payload}{plot_ext}")
             save_fig(fig, fn)
             mem_imgs[payload] = os.path.basename(fn)
@@ -1000,7 +1096,7 @@ def main() -> int:
 
             ax.xaxis.set_major_formatter(FuncFormatter(log_formatter))
             
-            add_legend_top(ax, fig, skip_legend=not args.legend)
+            add_plot_legend(ax, fig, args, default_mode="top")
             fn = os.path.join(args.out_dir, f"{metric_key}_vs_payload_rate{rate}{plot_ext}")
             save_fig(fig, fn)
             out[rate] = os.path.basename(fn)
@@ -1031,6 +1127,10 @@ def main() -> int:
     avg_mem_subs_imgs = {}
     avg_cpu_cores_subs_imgs = {}
     avg_mem_mb_subs_imgs = {}
+    max_net_rx_subs_imgs = {}
+    max_net_tx_subs_imgs = {}
+    avg_net_rx_subs_imgs = {}
+    avg_net_tx_subs_imgs = {}
 
     if not args.only_latency_vs_payload:
         by_pt_subs = defaultdict(list)
@@ -1087,7 +1187,7 @@ def main() -> int:
                     if not args.latex:
                         ax.grid(True, alpha=0.4, linestyle="--")
                     format_pairs_axis(ax, all_xs)
-                    add_legend_top(ax, fig, skip_legend=not args.legend)
+                    add_plot_legend(ax, fig, args, default_mode="top")
                     yield pl, ax, fig, all_xs, out
                     plt.close(fig)
                 return out
@@ -1096,7 +1196,7 @@ def main() -> int:
             for pl in subs_payloads:
                 plot_data_subs = {}
                 all_xs_subs = []
-                _subs_rate = None  # per-publisher rate for this payload
+                subs_rates = set()
                 for t in subs_transports:
                     lst = by_pt_subs.get((pl, t), [])
                     if not lst:
@@ -1113,13 +1213,15 @@ def main() -> int:
                     if xs and ys:
                         plot_data_subs[t] = (xs, ys)
                         all_xs_subs.extend(xs)
-                        if _subs_rate is None and lst:
-                            r0 = lst[0].get("rate")
+                        for rec in lst:
+                            r0 = rec.get("rate")
                             if r0 and r0 > 0:
-                                _subs_rate = r0
+                                subs_rates.add(r0)
 
                 if not plot_data_subs:
                     continue
+
+                _subs_rate = next(iter(subs_rates)) if len(subs_rates) == 1 else None
 
                 # Log scale
                 fig, ax = plt.subplots(figsize=figsize)
@@ -1134,7 +1236,14 @@ def main() -> int:
                 format_throughput_axis(ax, rate=_subs_rate)
                 if not args.latex:
                     ax.grid(True, alpha=0.4, linestyle="--")
-                add_legend_inline(ax, fig, enabled=args.legend, fontsize="small", col1_size=5)
+                add_plot_legend(
+                    ax,
+                    fig,
+                    args,
+                    default_mode="inside",
+                    inline_fontsize="small",
+                    inline_col1_size=5,
+                )
                 fn = os.path.join(args.out_dir, f"throughput_vs_subs_payload{pl}_log{plot_ext}")
                 save_fig(fig, fn)
                 throughput_subs_imgs[pl] = os.path.basename(fn)
@@ -1152,7 +1261,14 @@ def main() -> int:
                 format_throughput_axis(ax, rate=_subs_rate)
                 if not args.latex:
                     ax.grid(True, alpha=0.4, linestyle="--")
-                add_legend_inline(ax, fig, enabled=args.legend, fontsize="small", col1_size=5)
+                add_plot_legend(
+                    ax,
+                    fig,
+                    args,
+                    default_mode="inside",
+                    inline_fontsize="small",
+                    inline_col1_size=5,
+                )
                 fn = os.path.join(args.out_dir, f"throughput_vs_subs_payload{pl}_linear{plot_ext}")
                 save_fig(fig, fn)
                 throughput_subs_imgs_linear[pl] = os.path.basename(fn)
@@ -1201,7 +1317,7 @@ def main() -> int:
                     if not args.latex:
                         ax.grid(True, alpha=0.4, linestyle="--")
                     format_pairs_axis(ax, all_xs)
-                    add_legend_top(ax, fig, skip_legend=not args.legend)
+                    add_plot_legend(ax, fig, args, default_mode="top")
                     fn = os.path.join(args.out_dir, f"{metric_key}_vs_subs_payload{pl}{plot_ext}")
                     save_fig(fig, fn)
                     out[pl] = os.path.basename(fn)
@@ -1217,6 +1333,10 @@ def main() -> int:
             avg_mem_subs_imgs = _plot_subs_scalar("avg_mem_perc", "Avg Memory%", "Avg Memory (%)")
             avg_cpu_cores_subs_imgs = _plot_subs_scalar("avg_cpu_cores", "Avg CPU Cores Used", "Avg CPU Cores Used")
             avg_mem_mb_subs_imgs = _plot_subs_scalar("avg_mem_mb", "Avg Memory", "Avg Memory (GB)", y_formatter=format_memory_mb_axis)
+            max_net_rx_subs_imgs = _plot_subs_scalar("max_net_rx_bps", "Peak Receive Bandwidth", "Peak Receive Bandwidth", y_formatter=format_bandwidth_axis)
+            max_net_tx_subs_imgs = _plot_subs_scalar("max_net_tx_bps", "Peak Transmit Bandwidth", "Peak Transmit Bandwidth", y_formatter=format_bandwidth_axis)
+            avg_net_rx_subs_imgs = _plot_subs_scalar("avg_net_rx_bps", "Average Receive Bandwidth", "Average Receive Bandwidth", y_formatter=format_bandwidth_axis)
+            avg_net_tx_subs_imgs = _plot_subs_scalar("avg_net_tx_bps", "Average Transmit Bandwidth", "Average Transmit Bandwidth", y_formatter=format_bandwidth_axis)
 
     # Fanout plots: x = subscriber count, y = delivered throughput, per (payload, rate)
     fanout_rows = []
@@ -1270,14 +1390,7 @@ def main() -> int:
             format_throughput_axis(ax, rate=rate)
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            if args.legend:
-                _h, _l = ax.get_legend_handles_labels()
-                _seen = {}; [_seen.setdefault(_l[i], _h[i]) for i in range(len(_l))]
-                ax.legend(list(_seen.values()), list(_seen.keys()), loc="upper left", ncol=3, frameon=True)
-            try:
-                fig.tight_layout()
-            except Exception:
-                pass
+            add_plot_legend(ax, fig, args, default_mode="inside")
             fn = os.path.join(args.out_dir, f"throughput-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
             save_fig(fig, fn)
             fanout_imgs[(payload, rate)] = os.path.basename(fn)
@@ -1304,14 +1417,7 @@ def main() -> int:
             format_pairs_axis(ax, [x["subs"] for x in rows])
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            if args.legend:
-                _h, _l = ax.get_legend_handles_labels()
-                _seen = {}; [_seen.setdefault(_l[i], _h[i]) for i in range(len(_l))]
-                ax.legend(list(_seen.values()), list(_seen.keys()), loc="upper left", ncol=3, frameon=True)
-            try:
-                fig.tight_layout()
-            except Exception:
-                pass
+            add_plot_legend(ax, fig, args, default_mode="inside")
             fn_cpu = os.path.join(args.out_dir, f"max-cpu-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
             save_fig(fig, fn_cpu)
             fanout_cpu_imgs[(payload, rate)] = os.path.basename(fn_cpu)
@@ -1338,14 +1444,7 @@ def main() -> int:
             format_pairs_axis(ax, [x["subs"] for x in rows])
             if not args.latex:
                 ax.grid(True, alpha=0.4, linestyle="--")
-            if args.legend:
-                _h, _l = ax.get_legend_handles_labels()
-                _seen = {}; [_seen.setdefault(_l[i], _h[i]) for i in range(len(_l))]
-                ax.legend(list(_seen.values()), list(_seen.keys()), loc="upper left", ncol=3, frameon=True)
-            try:
-                fig.tight_layout()
-            except Exception:
-                pass
+            add_plot_legend(ax, fig, args, default_mode="inside")
             fn_mem = os.path.join(args.out_dir, f"max-memory-vs-fanout_payload{payload}_rate{rate}{plot_ext}")
             save_fig(fig, fn_mem)
             fanout_mem_imgs[(payload, rate)] = os.path.basename(fn_mem)
@@ -1454,6 +1553,14 @@ def main() -> int:
                    ('avg_cpu_cores_subs_imgs' in locals() and avg_cpu_cores_subs_imgs) or \
                    ('avg_mem_mb_subs_imgs' in locals() and avg_mem_mb_subs_imgs):
                     f.write("- [Resource Usage vs Subscribers](#resource-usage-vs-subscribers)\n")
+            except Exception:
+                pass
+            try:
+                if ('max_net_rx_subs_imgs' in locals() and max_net_rx_subs_imgs) or \
+                   ('max_net_tx_subs_imgs' in locals() and max_net_tx_subs_imgs) or \
+                   ('avg_net_rx_subs_imgs' in locals() and avg_net_rx_subs_imgs) or \
+                   ('avg_net_tx_subs_imgs' in locals() and avg_net_tx_subs_imgs):
+                    f.write("- [Network Usage vs Subscribers](#network-usage-vs-subscribers)\n")
             except Exception:
                 pass
 
@@ -1772,6 +1879,42 @@ def main() -> int:
                             img = avg_mem_mb_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
                             f.write(f"![avg mem gb vs subs payload {pl}]({img})\n\n")
+            except Exception:
+                pass
+
+            try:
+                have_net_subs = (
+                    ('max_net_rx_subs_imgs' in locals() and max_net_rx_subs_imgs) or
+                    ('max_net_tx_subs_imgs' in locals() and max_net_tx_subs_imgs) or
+                    ('avg_net_rx_subs_imgs' in locals() and avg_net_rx_subs_imgs) or
+                    ('avg_net_tx_subs_imgs' in locals() and avg_net_tx_subs_imgs)
+                )
+                if have_net_subs:
+                    f.write("## Network Usage vs Subscribers\n\n")
+                    if 'max_net_rx_subs_imgs' in locals() and max_net_rx_subs_imgs:
+                        f.write("### Peak Receive Bandwidth\n\n")
+                        for pl in sorted(max_net_rx_subs_imgs.keys()):
+                            img = max_net_rx_subs_imgs[pl]
+                            f.write(f"#### payload={pl}B\n\n")
+                            f.write(f"![max net rx vs subs payload {pl}]({img})\n\n")
+                    if 'max_net_tx_subs_imgs' in locals() and max_net_tx_subs_imgs:
+                        f.write("### Peak Transmit Bandwidth\n\n")
+                        for pl in sorted(max_net_tx_subs_imgs.keys()):
+                            img = max_net_tx_subs_imgs[pl]
+                            f.write(f"#### payload={pl}B\n\n")
+                            f.write(f"![max net tx vs subs payload {pl}]({img})\n\n")
+                    if 'avg_net_rx_subs_imgs' in locals() and avg_net_rx_subs_imgs:
+                        f.write("### Average Receive Bandwidth\n\n")
+                        for pl in sorted(avg_net_rx_subs_imgs.keys()):
+                            img = avg_net_rx_subs_imgs[pl]
+                            f.write(f"#### payload={pl}B\n\n")
+                            f.write(f"![avg net rx vs subs payload {pl}]({img})\n\n")
+                    if 'avg_net_tx_subs_imgs' in locals() and avg_net_tx_subs_imgs:
+                        f.write("### Average Transmit Bandwidth\n\n")
+                        for pl in sorted(avg_net_tx_subs_imgs.keys()):
+                            img = avg_net_tx_subs_imgs[pl]
+                            f.write(f"#### payload={pl}B\n\n")
+                            f.write(f"![avg net tx vs subs payload {pl}]({img})\n\n")
             except Exception:
                 pass
 
