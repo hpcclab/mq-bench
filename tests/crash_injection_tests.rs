@@ -211,6 +211,8 @@ async fn publisher_with_crash_disabled_runs_normally() {
         duration_secs: Some(1),
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config: CrashConfig::default(), // Disabled
@@ -249,6 +251,8 @@ async fn publisher_with_single_crash_reconnects() {
         duration_secs: Some(2), // Run for 2 seconds
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config,
@@ -286,6 +290,8 @@ async fn publisher_without_retry_stops_on_crash() {
         duration_secs: Some(5), // Long duration - but should stop on crash
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config,
@@ -334,6 +340,8 @@ async fn publisher_sequence_preserved_across_reconnect() {
         duration_secs: Some(3), // Run for 3 seconds to ensure crashes happen
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config,
@@ -507,6 +515,8 @@ async fn pubsub_both_crashing_independently() {
         duration_secs: Some(3),
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(pub_stats.clone()),
         disable_internal_snapshot: true,
         crash_config: pub_crash,

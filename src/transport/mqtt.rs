@@ -180,9 +180,10 @@ impl Transport for MqttTransport {
     }
 
     async fn create_publisher(&self, topic: &str) -> Result<Box<dyn Publisher>, TransportError> {
-        // Dedicated client + background poller for publisher
-        // Use a stable, per-topic client_id so broker-side inflight state can be recovered
-        // across reconnects, while still avoiding collisions across many topics.
+        // Dedicated client + background poller for publisher.
+        // If caller provides a base client_id, keep the historical stable per-topic ID.
+        // Otherwise append a UUID so many fan-in publishers can share one topic
+        // without repeatedly disconnecting each other.
         let base = self
             .client_id
             .as_deref()
@@ -193,7 +194,11 @@ impl Transport for MqttTransport {
             });
         let base = sanitize_client_id_base(base);
         let topic_hash = fnv1a64_bytes(topic.as_bytes());
-        let cid = format!("pub-{}-{:016x}", base, topic_hash);
+        let cid = if self.client_id.is_none() {
+            format!("pub-{}-{:016x}-{}", base, topic_hash, uuid::Uuid::new_v4().simple())
+        } else {
+            format!("pub-{}-{:016x}", base, topic_hash)
+        };
         let mut options = MqttOptions::new(cid, self.host.clone(), self.port);
         options.set_keep_alive(self.keep_alive);
         options.set_max_packet_size(self.max_in, self.max_out);

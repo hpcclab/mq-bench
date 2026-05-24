@@ -203,6 +203,11 @@ def load_records(csv_path: str):
                     item["subs"] = int(subs_raw) if subs_raw else None
                 except Exception:
                     item["subs"] = None
+                pubs_raw = r.get("pubs", "")
+                try:
+                    item["pubs"] = int(pubs_raw) if pubs_raw else None
+                except Exception:
+                    item["pubs"] = None
                 recs.append(item)
             except Exception:
                 # Skip malformed rows
@@ -236,6 +241,16 @@ def dedupe_by_subs(records_list: list) -> list:
         if subs is not None:
             by_subs[subs] = r
     return list(by_subs.values())
+
+
+def dedupe_by_axis(records_list: list, axis_key: str) -> list:
+    """Deduplicate records by an x-axis field, keeping the last entry for each value."""
+    by_value = {}
+    for r in records_list:
+        value = r.get(axis_key)
+        if value is not None:
+            by_value[value] = r
+    return list(by_value.values())
 
 
 def add_legend_inline(ax, fig, enabled: bool, ncol: int = 3, loc: str = "upper left",
@@ -1114,8 +1129,8 @@ def main() -> int:
     cpu_vs_payload_imgs = plot_metric_vs_payload("max_cpu", "Max CPU%", "Max CPU (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
     mem_vs_payload_imgs = plot_metric_vs_payload("max_mem_perc", "Max Memory%", "Max Memory (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
 
-    # Throughput / Latency / Resource vs Subscribers (fanout topology with subs column)
-    # Triggered when records have a numeric 'subs' field (from orchestrate_fanout.sh)
+    # Throughput / Latency / Resource vs variable count.
+    # Fanout summaries vary subscribers; fan-in summaries vary publishers.
     throughput_subs_imgs = {}        # payload -> filename (log scale)
     throughput_subs_imgs_linear = {}  # payload -> filename (linear scale)
     latency_subs_imgs_p50 = {}
@@ -1131,68 +1146,31 @@ def main() -> int:
     max_net_tx_subs_imgs = {}
     avg_net_rx_subs_imgs = {}
     avg_net_tx_subs_imgs = {}
+    variable_axis_label = "Subscribers"
+    variable_axis_slug = "subs"
+    variable_axis_anchor = "subscribers"
 
     if not args.only_latency_vs_payload:
+        subs_values = {r.get("subs") for r in records if r.get("subs") is not None}
+        pubs_values = {r.get("pubs") for r in records if r.get("pubs") is not None}
+        use_pub_axis = bool(pubs_values) and len(subs_values) <= 1
+        axis_key = "pubs" if use_pub_axis else "subs"
+        variable_axis_label = "Publishers" if use_pub_axis else "Subscribers"
+        variable_axis_slug = "pubs" if use_pub_axis else "subs"
+        variable_axis_anchor = "publishers" if use_pub_axis else "subscribers"
+        axis_xlabel = f"{variable_axis_label} (\u00d71,000)"
+
         by_pt_subs = defaultdict(list)
         for r in records:
-            if r.get("subs") is None:
+            if r.get(axis_key) is None:
                 continue
             by_pt_subs[(r["payload"], r["transport"])].append(r)
 
         if by_pt_subs:
-            subs_payloads = unique_sorted(r["payload"] for r in records if r.get("subs") is not None)
-            subs_transports = unique_sorted(r["transport"] for r in records if r.get("subs") is not None)
+            subs_payloads = unique_sorted(r["payload"] for r in records if r.get(axis_key) is not None)
+            subs_transports = unique_sorted(r["transport"] for r in records if r.get(axis_key) is not None)
 
-            def _subs_plot_metric(metric_key, title_prefix, y_label, log_y=False, y_formatter=None):
-                """Plot metric vs subscriber count, one figure per payload."""
-                out = {}
-                for pl in subs_payloads:
-                    fig, ax = plt.subplots(figsize=figsize)
-                    all_xs = []
-                    for t in subs_transports:
-                        lst = by_pt_subs.get((pl, t), [])
-                        if not lst:
-                            continue
-                        lst = dedupe_by_subs(lst)
-                        lst = sorted(lst, key=lambda x: (x.get("subs") or 0))
-                        xs, ys = [], []
-                        for x in lst:
-                            subs = x.get("subs")
-                            val = x.get(metric_key)
-                            if subs is None or val is None or not math.isfinite(val):
-                                continue
-                            if log_y and val <= 0:
-                                continue
-                            xs.append(subs)
-                            ys.append(val)
-                        if xs and ys:
-                            mk, ls, lw, clr = style_for(t)
-                            ax.plot(xs, ys, marker=mk, linestyle=ls, linewidth=lw, color=clr,
-                                    markersize=marker_size, label=t)
-                            all_xs.extend(xs)
-                    if not ax.has_data():
-                        plt.close(fig)
-                        continue
-                    if not args.latex:
-                        ax.set_title(f"{title_prefix} vs Subscribers (payload={pl}B)")
-                    ax.set_xlabel("Subscribers (\u00d71,000)")
-                    ax.set_ylabel(y_label)
-                    if log_y:
-                        try:
-                            ax.set_yscale("log")
-                        except Exception:
-                            pass
-                    if y_formatter:
-                        y_formatter(ax)
-                    if not args.latex:
-                        ax.grid(True, alpha=0.4, linestyle="--")
-                    format_pairs_axis(ax, all_xs)
-                    add_plot_legend(ax, fig, args, default_mode="top")
-                    yield pl, ax, fig, all_xs, out
-                    plt.close(fig)
-                return out
-
-            # Throughput vs Subscribers (log + linear)
+            # Throughput vs variable count (log + linear)
             for pl in subs_payloads:
                 plot_data_subs = {}
                 all_xs_subs = []
@@ -1201,15 +1179,12 @@ def main() -> int:
                     lst = by_pt_subs.get((pl, t), [])
                     if not lst:
                         continue
-                    lst = dedupe_by_subs(lst)
-                    lst = sorted(lst, key=lambda x: (x.get("subs") or 0))
-                    xs = [x["subs"] for x in lst if x.get("subs") is not None]
-                    ys = [x["sub_tps"] for x in lst if x.get("subs") is not None and math.isfinite(x.get("sub_tps", float("nan")))]
-                    if len(xs) != len(ys):
-                        pairs_xy = [(x["subs"], x["sub_tps"]) for x in lst
-                                    if x.get("subs") is not None and math.isfinite(x.get("sub_tps", float("nan")))]
-                        xs = [p[0] for p in pairs_xy]
-                        ys = [p[1] for p in pairs_xy]
+                    lst = dedupe_by_axis(lst, axis_key)
+                    lst = sorted(lst, key=lambda x: (x.get(axis_key) or 0))
+                    pairs_xy = [(x[axis_key], x["sub_tps"]) for x in lst
+                                if x.get(axis_key) is not None and math.isfinite(x.get("sub_tps", float("nan")))]
+                    xs = [p[0] for p in pairs_xy]
+                    ys = [p[1] for p in pairs_xy]
                     if xs and ys:
                         plot_data_subs[t] = (xs, ys)
                         all_xs_subs.extend(xs)
@@ -1229,8 +1204,8 @@ def main() -> int:
                     mk, ls, lw, clr = style_for(t)
                     ax.plot(xs, ys, marker=mk, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
                 if not args.latex:
-                    ax.set_title(f"Throughput vs Subscribers (payload={pl}B)")
-                ax.set_xlabel("Subscribers (\u00d71,000)")
+                    ax.set_title(f"Throughput vs {variable_axis_label} (payload={pl}B)")
+                ax.set_xlabel(axis_xlabel)
                 ax.set_xscale("log")
                 format_pairs_axis(ax, all_xs_subs)
                 format_throughput_axis(ax, rate=_subs_rate)
@@ -1244,7 +1219,7 @@ def main() -> int:
                     inline_fontsize="small",
                     inline_col1_size=5,
                 )
-                fn = os.path.join(args.out_dir, f"throughput_vs_subs_payload{pl}_log{plot_ext}")
+                fn = os.path.join(args.out_dir, f"throughput_vs_{variable_axis_slug}_payload{pl}_log{plot_ext}")
                 save_fig(fig, fn)
                 throughput_subs_imgs[pl] = os.path.basename(fn)
                 plt.close(fig)
@@ -1255,8 +1230,8 @@ def main() -> int:
                     mk, ls, lw, clr = style_for(t)
                     ax.plot(xs, ys, marker=mk, linestyle=ls, linewidth=lw, color=clr, markersize=marker_size, label=t)
                 if not args.latex:
-                    ax.set_title(f"Throughput vs Subscribers (payload={pl}B)")
-                ax.set_xlabel("Subscribers (\u00d71,000)")
+                    ax.set_title(f"Throughput vs {variable_axis_label} (payload={pl}B)")
+                ax.set_xlabel(axis_xlabel)
                 format_pairs_axis(ax, all_xs_subs)
                 format_throughput_axis(ax, rate=_subs_rate)
                 if not args.latex:
@@ -1269,7 +1244,7 @@ def main() -> int:
                     inline_fontsize="small",
                     inline_col1_size=5,
                 )
-                fn = os.path.join(args.out_dir, f"throughput_vs_subs_payload{pl}_linear{plot_ext}")
+                fn = os.path.join(args.out_dir, f"throughput_vs_{variable_axis_slug}_payload{pl}_linear{plot_ext}")
                 save_fig(fig, fn)
                 throughput_subs_imgs_linear[pl] = os.path.basename(fn)
                 plt.close(fig)
@@ -1283,17 +1258,17 @@ def main() -> int:
                         lst = by_pt_subs.get((pl, t), [])
                         if not lst:
                             continue
-                        lst = dedupe_by_subs(lst)
-                        lst = sorted(lst, key=lambda x: (x.get("subs") or 0))
+                        lst = dedupe_by_axis(lst, axis_key)
+                        lst = sorted(lst, key=lambda x: (x.get(axis_key) or 0))
                         xs, ys = [], []
                         for x in lst:
-                            subs = x.get("subs")
+                            axis_value = x.get(axis_key)
                             val = x.get(metric_key)
-                            if subs is None or val is None or not math.isfinite(val):
+                            if axis_value is None or val is None or not math.isfinite(val):
                                 continue
                             if log_y and val <= 0:
                                 continue
-                            xs.append(subs)
+                            xs.append(axis_value)
                             ys.append(val)
                         if xs and ys:
                             mk, ls, lw, clr = style_for(t)
@@ -1304,8 +1279,8 @@ def main() -> int:
                         plt.close(fig)
                         continue
                     if not args.latex:
-                        ax.set_title(f"{title_prefix} vs Subscribers (payload={pl}B)")
-                    ax.set_xlabel("Subscribers (\u00d71,000)")
+                        ax.set_title(f"{title_prefix} vs {variable_axis_label} (payload={pl}B)")
+                    ax.set_xlabel(axis_xlabel)
                     ax.set_ylabel(y_label)
                     if log_y:
                         try:
@@ -1318,7 +1293,7 @@ def main() -> int:
                         ax.grid(True, alpha=0.4, linestyle="--")
                     format_pairs_axis(ax, all_xs)
                     add_plot_legend(ax, fig, args, default_mode="top")
-                    fn = os.path.join(args.out_dir, f"{metric_key}_vs_subs_payload{pl}{plot_ext}")
+                    fn = os.path.join(args.out_dir, f"{metric_key}_vs_{variable_axis_slug}_payload{pl}{plot_ext}")
                     save_fig(fig, fn)
                     out[pl] = os.path.basename(fn)
                     plt.close(fig)
@@ -1535,14 +1510,14 @@ def main() -> int:
                 f.write("- [Resource Usage vs Payload](#resource-usage-vs-payload)\n")
             try:
                 if 'throughput_subs_imgs' in locals() and throughput_subs_imgs:
-                    f.write("- [Throughput vs Subscribers](#throughput-vs-subscribers)\n")
+                    f.write(f"- [Throughput vs {variable_axis_label}](#throughput-vs-{variable_axis_anchor})\n")
             except Exception:
                 pass
             try:
                 if ('latency_subs_imgs_p50' in locals() and latency_subs_imgs_p50) or \
                    ('latency_subs_imgs_p95' in locals() and latency_subs_imgs_p95) or \
                    ('latency_subs_imgs_p99' in locals() and latency_subs_imgs_p99):
-                    f.write("- [Latency vs Subscribers](#latency-vs-subscribers)\n")
+                    f.write(f"- [Latency vs {variable_axis_label}](#latency-vs-{variable_axis_anchor})\n")
             except Exception:
                 pass
             try:
@@ -1552,7 +1527,7 @@ def main() -> int:
                    ('avg_mem_subs_imgs' in locals() and avg_mem_subs_imgs) or \
                    ('avg_cpu_cores_subs_imgs' in locals() and avg_cpu_cores_subs_imgs) or \
                    ('avg_mem_mb_subs_imgs' in locals() and avg_mem_mb_subs_imgs):
-                    f.write("- [Resource Usage vs Subscribers](#resource-usage-vs-subscribers)\n")
+                    f.write(f"- [Resource Usage vs {variable_axis_label}](#resource-usage-vs-{variable_axis_anchor})\n")
             except Exception:
                 pass
             try:
@@ -1560,7 +1535,7 @@ def main() -> int:
                    ('max_net_tx_subs_imgs' in locals() and max_net_tx_subs_imgs) or \
                    ('avg_net_rx_subs_imgs' in locals() and avg_net_rx_subs_imgs) or \
                    ('avg_net_tx_subs_imgs' in locals() and avg_net_tx_subs_imgs):
-                    f.write("- [Network Usage vs Subscribers](#network-usage-vs-subscribers)\n")
+                    f.write(f"- [Network Usage vs {variable_axis_label}](#network-usage-vs-{variable_axis_anchor})\n")
             except Exception:
                 pass
 
@@ -1784,7 +1759,7 @@ def main() -> int:
             # Throughput vs Subscribers
             try:
                 if 'throughput_subs_imgs' in locals() and (throughput_subs_imgs or throughput_subs_imgs_linear):
-                    f.write("## Throughput vs Subscribers\n\n")
+                    f.write(f"## Throughput vs {variable_axis_label}\n\n")
                     subs_pls = unique_sorted(
                         list(throughput_subs_imgs.keys()) + list(throughput_subs_imgs_linear.keys())
                     )
@@ -1794,10 +1769,10 @@ def main() -> int:
                         img_lin = throughput_subs_imgs_linear.get(pl)
                         if img_log:
                             f.write("**Log Scale:**\n\n")
-                            f.write(f"![throughput vs subs payload {pl} log]({img_log})\n\n")
+                            f.write(f"![throughput vs {variable_axis_slug} payload {pl} log]({img_log})\n\n")
                         if img_lin:
                             f.write("**Linear Scale:**\n\n")
-                            f.write(f"![throughput vs subs payload {pl} linear]({img_lin})\n\n")
+                            f.write(f"![throughput vs {variable_axis_slug} payload {pl} linear]({img_lin})\n\n")
             except Exception:
                 pass
 
@@ -1809,25 +1784,25 @@ def main() -> int:
                     ('latency_subs_imgs_p99' in locals() and latency_subs_imgs_p99)
                 )
                 if have_lat_subs:
-                    f.write("## Latency vs Subscribers\n\n")
+                    f.write(f"## Latency vs {variable_axis_label}\n\n")
                     if 'latency_subs_imgs_p50' in locals() and latency_subs_imgs_p50:
                         f.write("### P50 latency\n\n")
                         for pl in sorted(latency_subs_imgs_p50.keys()):
                             img = latency_subs_imgs_p50[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![p50 vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![p50 vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'latency_subs_imgs_p95' in locals() and latency_subs_imgs_p95:
                         f.write("### P95 latency\n\n")
                         for pl in sorted(latency_subs_imgs_p95.keys()):
                             img = latency_subs_imgs_p95[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![p95 vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![p95 vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'latency_subs_imgs_p99' in locals() and latency_subs_imgs_p99:
                         f.write("### P99 latency\n\n")
                         for pl in sorted(latency_subs_imgs_p99.keys()):
                             img = latency_subs_imgs_p99[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![p99 vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![p99 vs {variable_axis_slug} payload {pl}]({img})\n\n")
             except Exception:
                 pass
 
@@ -1842,43 +1817,43 @@ def main() -> int:
                     ('avg_mem_mb_subs_imgs' in locals() and avg_mem_mb_subs_imgs)
                 )
                 if have_res_subs:
-                    f.write("## Resource Usage vs Subscribers\n\n")
+                    f.write(f"## Resource Usage vs {variable_axis_label}\n\n")
                     if 'cpu_subs_imgs' in locals() and cpu_subs_imgs:
                         f.write("### Max CPU%\n\n")
                         for pl in sorted(cpu_subs_imgs.keys()):
                             img = cpu_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![max cpu vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![max cpu vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'mem_subs_imgs' in locals() and mem_subs_imgs:
                         f.write("### Max Memory%\n\n")
                         for pl in sorted(mem_subs_imgs.keys()):
                             img = mem_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![max mem vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![max mem vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'avg_cpu_subs_imgs' in locals() and avg_cpu_subs_imgs:
                         f.write("### Avg CPU%\n\n")
                         for pl in sorted(avg_cpu_subs_imgs.keys()):
                             img = avg_cpu_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![avg cpu vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![avg cpu vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'avg_mem_subs_imgs' in locals() and avg_mem_subs_imgs:
                         f.write("### Avg Memory%\n\n")
                         for pl in sorted(avg_mem_subs_imgs.keys()):
                             img = avg_mem_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![avg mem vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![avg mem vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'avg_cpu_cores_subs_imgs' in locals() and avg_cpu_cores_subs_imgs:
                         f.write("### Avg CPU Cores Used\n\n")
                         for pl in sorted(avg_cpu_cores_subs_imgs.keys()):
                             img = avg_cpu_cores_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![avg cpu cores vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![avg cpu cores vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'avg_mem_mb_subs_imgs' in locals() and avg_mem_mb_subs_imgs:
                         f.write("### Avg Memory (GB)\n\n")
                         for pl in sorted(avg_mem_mb_subs_imgs.keys()):
                             img = avg_mem_mb_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![avg mem gb vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![avg mem gb vs {variable_axis_slug} payload {pl}]({img})\n\n")
             except Exception:
                 pass
 
@@ -1890,31 +1865,31 @@ def main() -> int:
                     ('avg_net_tx_subs_imgs' in locals() and avg_net_tx_subs_imgs)
                 )
                 if have_net_subs:
-                    f.write("## Network Usage vs Subscribers\n\n")
+                    f.write(f"## Network Usage vs {variable_axis_label}\n\n")
                     if 'max_net_rx_subs_imgs' in locals() and max_net_rx_subs_imgs:
                         f.write("### Peak Receive Bandwidth\n\n")
                         for pl in sorted(max_net_rx_subs_imgs.keys()):
                             img = max_net_rx_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![max net rx vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![max net rx vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'max_net_tx_subs_imgs' in locals() and max_net_tx_subs_imgs:
                         f.write("### Peak Transmit Bandwidth\n\n")
                         for pl in sorted(max_net_tx_subs_imgs.keys()):
                             img = max_net_tx_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![max net tx vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![max net tx vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'avg_net_rx_subs_imgs' in locals() and avg_net_rx_subs_imgs:
                         f.write("### Average Receive Bandwidth\n\n")
                         for pl in sorted(avg_net_rx_subs_imgs.keys()):
                             img = avg_net_rx_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![avg net rx vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![avg net rx vs {variable_axis_slug} payload {pl}]({img})\n\n")
                     if 'avg_net_tx_subs_imgs' in locals() and avg_net_tx_subs_imgs:
                         f.write("### Average Transmit Bandwidth\n\n")
                         for pl in sorted(avg_net_tx_subs_imgs.keys()):
                             img = avg_net_tx_subs_imgs[pl]
                             f.write(f"#### payload={pl}B\n\n")
-                            f.write(f"![avg net tx vs subs payload {pl}]({img})\n\n")
+                            f.write(f"![avg net tx vs {variable_axis_slug} payload {pl}]({img})\n\n")
             except Exception:
                 pass
 

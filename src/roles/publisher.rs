@@ -21,6 +21,9 @@ pub struct PublisherConfig {
     pub duration_secs: Option<u64>,
     pub output_file: Option<String>,
     pub snapshot_interval_secs: u64,
+    // Sequence allocation support for multi-publisher same-topic runs.
+    pub sequence_start: u64,
+    pub sequence_step: u64,
     // Aggregation support
     pub shared_stats: Option<Arc<Stats>>, // when set, use this shared collector
     pub disable_internal_snapshot: bool,  // when true, do not launch internal snapshot logger
@@ -37,6 +40,8 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
         duration_secs = ?config.duration_secs,
         endpoint = ?config.connect.params.get("endpoint"),
         crash_enabled = config.crash_config.is_enabled(),
+        sequence_start = config.sequence_start,
+        sequence_step = config.sequence_step,
         "Starting publisher"
     );
 
@@ -94,8 +99,11 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     // Initialize crash injector
     let mut crash_injector = CrashInjector::new(config.crash_config.clone());
 
-    // Publishing state (persists across reconnects)
-    let mut sequence = 0u64;
+    // Publishing state (persists across reconnects). Logical publishers in the same
+    // process can use interleaved sequence ranges so subscribers do not treat
+    // same-topic fan-in messages as duplicates.
+    let mut sequence = config.sequence_start;
+    let sequence_step = config.sequence_step.max(1);
     let start_time = std::time::Instant::now();
     let mut rate_controller = config.rate.map(|r| RateController::new(r));
     let mut stopped = false;
@@ -220,7 +228,7 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
             match publisher.publish(bytes).await {
                 Ok(_) => {
                     stats.record_sent().await;
-                    sequence += 1;
+                    sequence = sequence.wrapping_add(sequence_step);
                 }
                 Err(e) => {
                     warn!(error = %e, "Send error");
@@ -251,7 +259,10 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
         if crash_triggered && config.connect.retry_enabled {
             // Sample repair time and wait before reconnecting
             let repair_time = crash_injector.sample_repair_time();
-            info!(repair_secs = repair_time.as_secs_f64(), "Simulating repair delay");
+            info!(
+                repair_secs = repair_time.as_secs_f64(),
+                "Simulating repair delay"
+            );
             tokio::time::sleep(repair_time).await;
 
             // Schedule next crash (deterministic timeline includes the repair downtime)

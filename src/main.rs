@@ -627,6 +627,8 @@ async fn main() -> Result<()> {
                     duration_secs: Some(duration as u64),
                     output_file: None,
                     snapshot_interval_secs: snapshot_interval_secs,
+                    sequence_start: i as u64,
+                    sequence_step: publishers as u64,
                     shared_stats: shared_stats.clone(),
                     disable_internal_snapshot: true,
                     crash_config: crash_cfg,
