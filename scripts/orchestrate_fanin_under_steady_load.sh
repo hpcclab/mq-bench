@@ -23,6 +23,7 @@ set -euo pipefail
 #
 # Output:
 #   results/fanin_steady_load_<ts>/{raw_data,plots}/ with summary.csv.
+#   plots/ contains PNG graphs and plots/latex/ contains LaTeX-ready PDF graphs.
 #
 # Usage examples:
 #   scripts/orchestrate_fanin_under_steady_load.sh
@@ -469,17 +470,116 @@ extract_stats_metrics() {
   local steady_start_ts="$2"
   local steady_end_ts="$3"
   awk -F, -v start_ts="${steady_start_ts}" -v end_ts="${steady_end_ts}" '
-    NR == 1 { next }
+    function parse_percent(s) {
+      gsub(/%/, "", s)
+      return s + 0
+    }
+    function parse_bytes_token(raw, val, unit) {
+      raw = raw ""
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+      if (raw == "" || raw == "-") return 0
+      val = raw + 0
+      unit = raw
+      gsub(/[0-9.]/, "", unit)
+      if (unit == "" || unit == "B") return val
+      if (unit == "kB" || unit == "KB") return val * 1000
+      if (unit == "MB") return val * 1000 * 1000
+      if (unit == "GB") return val * 1000 * 1000 * 1000
+      if (unit == "TB") return val * 1000 * 1000 * 1000 * 1000
+      if (unit == "KiB") return val * 1024
+      if (unit == "MiB") return val * 1024 * 1024
+      if (unit == "GiB") return val * 1024 * 1024 * 1024
+      if (unit == "TiB") return val * 1024 * 1024 * 1024 * 1024
+      return val
+    }
+    function parse_mem_used(mem_usage, parts, used_part, n) {
+      n = split(mem_usage, parts, "/")
+      used_part = (n >= 1 ? parts[1] : "")
+      return parse_bytes_token(used_part)
+    }
+    function parse_mem_total(mem_usage, parts, total_part, n) {
+      n = split(mem_usage, parts, "/")
+      total_part = (n >= 2 ? parts[2] : "")
+      return parse_bytes_token(total_part)
+    }
+    function is_valid_stats_sample(cpu, used_b, tot_b, rx_b, tx_b) {
+      return (tot_b > 0 || used_b > 0 || cpu > 0 || rx_b > 0 || tx_b > 0)
+    }
+    function finish_group(   dt, drx, dtx, rx_rate, tx_rate) {
+      if (group_ts == "") return
+      if (prev_ts != "" && group_ts > prev_ts && have_prev_net && group_has_net) {
+        dt = group_ts - prev_ts
+        drx = group_rx - prev_rx
+        dtx = group_tx - prev_tx
+        # Treat counter resets or container restarts as discontinuities.
+        if (drx < 0 || dtx < 0) {
+          prev_ts = group_ts
+          prev_rx = group_rx
+          prev_tx = group_tx
+          have_prev_net = group_has_net
+          return
+        }
+        rx_rate = (drx * 8.0) / dt
+        tx_rate = (dtx * 8.0) / dt
+        if (rx_rate > max_rx_bps) max_rx_bps = rx_rate
+        if (tx_rate > max_tx_bps) max_tx_bps = tx_rate
+        sum_rx_bps += rx_rate
+        sum_tx_bps += tx_rate
+        net_samples++
+      }
+      prev_ts = group_ts
+      prev_rx = group_rx
+      prev_tx = group_tx
+      have_prev_net = group_has_net
+    }
+    NR == 1 {
+      fmt = "unknown"
+      if (NF >= 17) fmt = "local"
+      else if (NF >= 7 && $3 == "cpu_perc") fmt = "remote_ext"
+      else if (NF == 5 && $3 == "cpu_perc") fmt = "remote_legacy"
+      next
+    }
     {
       ts = $1 + 0
-      if (start_ts > 0 && end_ts > 0 && (ts < start_ts || ts > end_ts)) next
+      if (start_ts > 0 && end_ts > 0) {
+        if (ts < start_ts || ts > end_ts) next
+      }
 
-      cpu = ($17 != "" ? $17 + 0 : $4 + 0)
-      used_b = $10 + 0
-      mem_perc = $12 + 0
-      rx_b = $13 + 0
-      tx_b = $14 + 0
-      if (used_b == 0 && mem_perc == 0 && cpu == 0 && rx_b == 0 && tx_b == 0) next
+      cpu = 0
+      mem_perc = 0
+      used_b = 0
+      tot_b = 0
+      has_net = 0
+      rx_b = 0
+      tx_b = 0
+
+      if (fmt == "local") {
+        cpu = ($17 != "" ? $17 + 0 : parse_percent($4))
+        used_b = $10 + 0
+        tot_b = $11 + 0
+        mem_perc = $12 + 0
+        if (mem_perc == 0 && tot_b > 0) mem_perc = (used_b / tot_b) * 100.0
+        rx_b = $13 + 0
+        tx_b = $14 + 0
+        has_net = 1
+      } else if (fmt == "remote_ext") {
+        cpu = parse_percent($3)
+        mem_perc = parse_percent($4)
+        used_b = parse_mem_used($5)
+        tot_b = parse_mem_total($5)
+        rx_b = $6 + 0
+        tx_b = $7 + 0
+        has_net = 1
+      } else if (fmt == "remote_legacy") {
+        cpu = parse_percent($3)
+        mem_perc = parse_percent($4)
+        used_b = parse_mem_used($5)
+        tot_b = parse_mem_total($5)
+      } else {
+        next
+      }
+
+      if (!is_valid_stats_sample(cpu, used_b, tot_b, rx_b, tx_b)) next
 
       if (cpu > max_cpu) max_cpu = cpu
       if (mem_perc > max_mem_perc) max_mem_perc = mem_perc
@@ -489,32 +589,47 @@ extract_stats_metrics() {
       sum_mem_used += used_b
       samples++
 
-      if (prev_ts != "" && ts > prev_ts) {
-        drx = rx_b - prev_rx
-        dtx = tx_b - prev_tx
-        if (drx >= 0 && dtx >= 0) {
-          rx_rate = (drx * 8.0) / (ts - prev_ts)
-          tx_rate = (dtx * 8.0) / (ts - prev_ts)
-          if (rx_rate > max_rx_bps) max_rx_bps = rx_rate
-          if (tx_rate > max_tx_bps) max_tx_bps = tx_rate
-          sum_rx_bps += rx_rate
-          sum_tx_bps += tx_rate
-          net_samples++
+      if (has_net) {
+        if (group_ts == "") {
+          group_ts = ts
+          group_rx = 0
+          group_tx = 0
+          group_has_net = 0
         }
+        if (ts != group_ts) {
+          finish_group()
+          group_ts = ts
+          group_rx = 0
+          group_tx = 0
+          group_has_net = 0
+        }
+        group_rx += rx_b
+        group_tx += tx_b
+        group_has_net = 1
       }
-      prev_ts = ts
-      prev_rx = rx_b
-      prev_tx = tx_b
     }
     END {
+      finish_group()
       if (samples > 0) {
         avg_cpu = sum_cpu / samples
         avg_mem_perc = sum_mem_perc / samples
         avg_mem_used = sum_mem_used / samples
+      } else {
+        max_cpu = 0
+        max_mem_perc = 0
+        max_mem_used = 0
+        avg_cpu = 0
+        avg_mem_perc = 0
+        avg_mem_used = 0
       }
       if (net_samples > 0) {
         avg_rx_bps = sum_rx_bps / net_samples
         avg_tx_bps = sum_tx_bps / net_samples
+      } else {
+        max_rx_bps = 0
+        max_tx_bps = 0
+        avg_rx_bps = 0
+        avg_tx_bps = 0
       }
       printf "%.6f,%.6f,%.0f,%.6f,%.6f,%.0f,%.6f,%.6f,%.6f,%.6f,%d,%d", max_cpu, max_mem_perc, max_mem_used, avg_cpu, avg_mem_perc, avg_mem_used, max_rx_bps, max_tx_bps, avg_rx_bps, avg_tx_bps, samples, net_samples
     }
@@ -1139,14 +1254,19 @@ main() {
     fi
   done
 
+  local latex_plots_dir="${PLOTS_DIR}/latex"
   log "Plotting results to ${PLOTS_DIR}"
   if [[ "${DRY_RUN}" = 1 ]]; then
     echo "+ python3 ${SCRIPT_DIR}/plot_results.py --summary ${SUMMARY_CSV} --out-dir ${PLOTS_DIR}"
+    echo "+ python3 ${SCRIPT_DIR}/plot_results.py --summary ${SUMMARY_CSV} --out-dir ${latex_plots_dir} --latex"
   else
     python3 "${SCRIPT_DIR}/plot_results.py" --summary "${SUMMARY_CSV}" --out-dir "${PLOTS_DIR}"
+    log "Plotting LaTeX-ready PDF results to ${latex_plots_dir}"
+    python3 "${SCRIPT_DIR}/plot_results.py" --summary "${SUMMARY_CSV}" --out-dir "${latex_plots_dir}" --latex
   fi
 
   log "Done. Summary CSV: ${SUMMARY_CSV}"
+  log "Plots: ${PLOTS_DIR} | LaTeX plots: ${latex_plots_dir}"
 }
 
 main "$@"
