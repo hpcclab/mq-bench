@@ -36,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--summary", required=True, help="Path to summary.csv")
     p.add_argument("--out-dir", help="Output directory for plots (default: 'plots' subdirectory in summary's folder)")
     p.add_argument("--only-latency-vs-payload", action="store_true", help="Only generate Latency vs Payload plots")
+    p.add_argument("--only-variable-axis-plots", action="store_true", help="Only generate plots where the x-axis is the varying subscriber/publisher count")
     p.add_argument("--latex", action="store_true", help="Generate plots optimized for LaTeX double-column papers (smaller size, larger fonts, PDF output)")
     p.add_argument("--legend", action="store_true", help="Include legend in each plot (omitted by default)")
     p.add_argument(
@@ -662,9 +663,11 @@ def main() -> int:
     p50_vs_payload_imgs = {}  # rate -> filename
     p95_vs_payload_imgs = {}  # rate -> filename
     p99_vs_payload_imgs = {}  # rate -> filename
+    cpu_vs_payload_imgs = {}  # rate -> filename
+    mem_vs_payload_imgs = {}  # rate -> filename
 
     # Throughput vs offered rate (skip if latency-only)
-    if not latency_only and not args.only_latency_vs_payload:
+    if not latency_only and not args.only_latency_vs_payload and not args.only_variable_axis_plots:
         for payload in payloads:
             fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
@@ -697,7 +700,7 @@ def main() -> int:
     # Throughput vs Pairs (when run_id includes n<N>)
     # Only meaningful for non-latency-only inputs
     # Generate both log-scale and linear-scale versions
-    if not latency_only and not args.only_latency_vs_payload:
+    if not latency_only and not args.only_latency_vs_payload and not args.only_variable_axis_plots:
         # Group by payload and transport, aggregate by pairs
         by_pt = defaultdict(list)
         for r in records:
@@ -782,7 +785,7 @@ def main() -> int:
     # Latency vs Pairs (when run_id includes n<N>)
     # Generate for any dataset type (latency-only or full), using p50/p95/p99
     # Group by payload and transport, aggregate by pairs
-    if not args.only_latency_vs_payload:
+    if not args.only_latency_vs_payload and not args.only_variable_axis_plots:
         by_pt_lat_pairs = defaultdict(list)
         for r in records:
             if r.get("pairs") is None:
@@ -873,7 +876,7 @@ def main() -> int:
 
     def plot_metric_vs_pairs(metric_key: str, title_prefix: str, y_label: str, y_formatter=None, skip_legend_in_latex: bool = False) -> dict:
         out = {}
-        if args.only_latency_vs_payload:
+        if args.only_latency_vs_payload or args.only_variable_axis_plots:
             return out
         for payload in payloads:
             fig, ax = plt.subplots(figsize=figsize)
@@ -937,7 +940,7 @@ def main() -> int:
         max_mem_mb_pairs_imgs = plot_metric_vs_pairs("max_mem_mb", "Max Memory", "Max Memory (GB)", y_formatter=format_memory_mb_axis, skip_legend_in_latex=True)
 
     # P99 vs offered rate (skip if latency-only; it's rate-based summary)
-    if not latency_only and not args.only_latency_vs_payload:
+    if not latency_only and not args.only_latency_vs_payload and not args.only_variable_axis_plots:
         for payload in payloads:
             fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
@@ -973,7 +976,7 @@ def main() -> int:
             plt.close(fig)
 
     # Max CPU% vs offered rate (skip if latency-only)
-    if not latency_only and not args.only_latency_vs_payload:
+    if not latency_only and not args.only_latency_vs_payload and not args.only_variable_axis_plots:
         for payload in payloads:
             fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
@@ -1003,7 +1006,7 @@ def main() -> int:
             plt.close(fig)
 
     # Max Memory% vs offered rate (skip if latency-only)
-    if not latency_only and not args.only_latency_vs_payload:
+    if not latency_only and not args.only_latency_vs_payload and not args.only_variable_axis_plots:
         for payload in payloads:
             fig, ax = plt.subplots(figsize=figsize)
             for t in transports:
@@ -1119,15 +1122,16 @@ def main() -> int:
         return out
 
     # Use the appropriate dataset for latency vs payload
-    latency_dataset = rate_records
-    # Generate p50/p95/p99 vs payload (per rate)
-    p50_vs_payload_imgs = plot_metric_vs_payload("p50_ms", "P50 latency", "P50 latency (ms)", latency_dataset, log_y=True)
-    p95_vs_payload_imgs = plot_metric_vs_payload("p95_ms", "P95 latency", "P95 latency (ms)", latency_dataset, log_y=True)
-    p99_vs_payload_imgs = plot_metric_vs_payload("p99_ms", "P99 latency", "P99 latency (ms)", latency_dataset, log_y=True)
-    
-    # Generate CPU/Memory vs payload (per rate)
-    cpu_vs_payload_imgs = plot_metric_vs_payload("max_cpu", "Max CPU%", "Max CPU (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
-    mem_vs_payload_imgs = plot_metric_vs_payload("max_mem_perc", "Max Memory%", "Max Memory (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
+    if not args.only_variable_axis_plots:
+        latency_dataset = rate_records
+        # Generate p50/p95/p99 vs payload (per rate)
+        p50_vs_payload_imgs = plot_metric_vs_payload("p50_ms", "P50 latency", "P50 latency (ms)", latency_dataset, log_y=True)
+        p95_vs_payload_imgs = plot_metric_vs_payload("p95_ms", "P95 latency", "P95 latency (ms)", latency_dataset, log_y=True)
+        p99_vs_payload_imgs = plot_metric_vs_payload("p99_ms", "P99 latency", "P99 latency (ms)", latency_dataset, log_y=True)
+        
+        # Generate CPU/Memory vs payload (per rate)
+        cpu_vs_payload_imgs = plot_metric_vs_payload("max_cpu", "Max CPU%", "Max CPU (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
+        mem_vs_payload_imgs = plot_metric_vs_payload("max_mem_perc", "Max Memory%", "Max Memory (%)", latency_dataset, log_y=False, skip_legend_in_latex=True)
 
     # Throughput / Latency / Resource vs variable count.
     # Fanout summaries vary subscribers; fan-in summaries vary publishers.
@@ -1315,7 +1319,7 @@ def main() -> int:
 
     # Fanout plots: x = subscriber count, y = delivered throughput, per (payload, rate)
     fanout_rows = []
-    if not args.only_latency_vs_payload:
+    if not args.only_latency_vs_payload and not args.only_variable_axis_plots:
         subs_pat = re.compile(r"-s(\d+)$")
         for r in records:
             t = r["transport"]

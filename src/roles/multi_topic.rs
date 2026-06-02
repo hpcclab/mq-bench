@@ -39,7 +39,7 @@ pub struct MultiTopicConfig {
     pub duration_secs: u64,
     pub snapshot_interval_secs: u64,
     pub share_transport: bool, // when true, reuse one transport for all publishers
-    pub ramp_up_secs: f64, // total ramp-up time in seconds (0 = no delay)
+    pub ramp_up_secs: f64,     // total ramp-up time in seconds (0 = no delay)
     // Aggregation support
     pub shared_stats: Option<Arc<Stats>>, // when set, aggregate externally
     pub disable_internal_snapshot: bool,
@@ -170,12 +170,12 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                 return Ok(());
             }
         };
-        
+
         // Optimization: For high publisher counts (e.g. >1000), spawning one task per publisher
         // with its own RateController (timer) creates massive scheduling overhead.
         // Instead, we use a single task to drive all publishers in a round-robin fashion
         // if a rate is specified. If no rate (max speed), we still use per-pub tasks but without timers.
-        
+
         let mut pub_handles = Vec::with_capacity(pubs as usize);
         for i in 0..pubs {
             let (t, r, s, k) = map_index(
@@ -202,7 +202,7 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
             // Use a reasonable number of shards (e.g. 32) to allow concurrency without spawning per-pub tasks
             let num_shards = 32.min(pubs as usize).max(1);
             let rate_per_shard = total_rate / (num_shards as f64);
-            
+
             info!(
                 num_shards = num_shards,
                 pubs = pubs,
@@ -210,7 +210,7 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                 rate_per_shard = %format!("{:.2}", rate_per_shard),
                 "[multi_topic] optimizing driver tasks"
             );
-            
+
             // Distribute pub_handles into shards
             let mut pub_iter = pub_handles.into_iter();
             let chunk_size = (pubs as usize + num_shards - 1) / num_shards;
@@ -222,13 +222,15 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                         shard_pubs.push(p);
                     }
                 }
-                if shard_pubs.is_empty() { break; }
-                
+                if shard_pubs.is_empty() {
+                    break;
+                }
+
                 let stats_p = stats.clone();
                 let payload_size = config.payload_size;
                 let stop_flag = stop.clone();
                 let shard_size = shard_pubs.len();
-                
+
                 handles.push(tokio::spawn(async move {
                     let mut rc = RateController::new(rate_per_shard);
                     // Per-topic sequence numbers (not global across topics).
@@ -237,17 +239,17 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                     let num_pubs = shard_pubs.len();
                     let mut seqs: Vec<u64> = vec![0u64; num_pubs];
                     let mut is_active = false;
-                    
+
                     loop {
                         if stop_flag.load(Ordering::Relaxed) {
                             break;
                         }
                         rc.wait_for_next().await;
-                        
+
                         let seq = seqs[pub_idx];
                         let payload = generate_payload(seq, payload_size);
                         let bytes = Bytes::from(payload);
-                        
+
                         // Round-robin publish within shard
                         if let Some(ph) = shard_pubs.get(pub_idx) {
                             match ph.publish(bytes).await {
@@ -273,7 +275,7 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                         seqs[pub_idx] = seqs[pub_idx].wrapping_add(1);
                         pub_idx = (pub_idx + 1) % num_pubs;
                     }
-                    
+
                     // Track connection shutdown for all pubs in shard
                     if is_active {
                         for _ in 0..shard_size {
@@ -283,7 +285,7 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                     for _ in 0..shard_size {
                         stats_p.decrement_connections();
                     }
-                    
+
                     for ph in shard_pubs {
                         let _ = ph.shutdown().await;
                     }
@@ -352,7 +354,7 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
         );
         return Ok(());
     }
-    
+
     // Per-key transport mode with crash injection support
     // Early exit for shared transport mode if crash injection enabled
     if config.share_transport {
@@ -443,35 +445,38 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
                 let mut is_active = false;
                 let mut crash_injector = CrashInjector::new(crash_cfg);
                 if stagger_secs > 0.0 {
-                    crash_injector.apply_phase_offset(Duration::from_secs_f64(stagger_secs * (i as f64)));
+                    crash_injector
+                        .apply_phase_offset(Duration::from_secs_f64(stagger_secs * (i as f64)));
                 }
 
                 // Connect loop
                 let mut transport: Option<Box<dyn Transport>> = None;
                 let mut pub_handle: Option<Box<dyn crate::transport::Publisher>> = None;
 
-                while !stop_flag.load(Ordering::Relaxed) && start.elapsed().as_secs() < duration_secs {
+                while !stop_flag.load(Ordering::Relaxed)
+                    && start.elapsed().as_secs() < duration_secs
+                {
                     // Ensure connected
                     if transport.is_none() || pub_handle.is_none() {
                         stats_p.record_connection_attempt();
-                        match TransportBuilder::connect_with_retry(engine.clone(), connect.clone()).await {
-                            Ok(t) => {
-                                match t.create_publisher(&key).await {
-                                    Ok(p) => {
-                                        stats_p.increment_connections();
-                                        transport = Some(t);
-                                        pub_handle = Some(p);
-                                        is_active = false;
-                                    }
-                                    Err(e) => {
-                                        warn!(key = %key, error = %e, "Create publisher error");
-                                        stats_p.record_connection_failure();
-                                        let _ = t.shutdown().await;
-                                        tokio::time::sleep(Duration::from_millis(250)).await;
-                                        continue;
-                                    }
+                        match TransportBuilder::connect_with_retry(engine.clone(), connect.clone())
+                            .await
+                        {
+                            Ok(t) => match t.create_publisher(&key).await {
+                                Ok(p) => {
+                                    stats_p.increment_connections();
+                                    transport = Some(t);
+                                    pub_handle = Some(p);
+                                    is_active = false;
                                 }
-                            }
+                                Err(e) => {
+                                    warn!(key = %key, error = %e, "Create publisher error");
+                                    stats_p.record_connection_failure();
+                                    let _ = t.shutdown().await;
+                                    tokio::time::sleep(Duration::from_millis(250)).await;
+                                    continue;
+                                }
+                            },
                             Err(e) => {
                                 warn!(key = %key, error = %e, "Transport connect error");
                                 stats_p.record_connection_failure();
@@ -691,12 +696,9 @@ pub async fn run_multi_topic(config: MultiTopicConfig) -> Result<()> {
         // Crash cleanup: signal all tasks to stop
         info!("[multi_topic] Stopping {} publisher tasks", handles.len());
         stop.store(true, Ordering::Relaxed);
-        
+
         // Wait for all tasks to exit (with timeout)
-        let _ = tokio::time::timeout(
-            Duration::from_secs(2),
-            join_all(handles)
-        ).await;
+        let _ = tokio::time::timeout(Duration::from_secs(2), join_all(handles)).await;
 
         // Exit if duration exceeded
         if start_time.elapsed().as_secs() >= config.duration_secs {
@@ -751,7 +753,7 @@ pub struct MultiTopicSubConfig {
     pub duration_secs: u64,
     pub snapshot_interval_secs: u64,
     pub share_transport: bool, // when true, reuse one transport for all subscriptions
-    pub ramp_up_secs: f64, // total ramp-up time in seconds (0 = no delay)
+    pub ramp_up_secs: f64,     // total ramp-up time in seconds (0 = no delay)
     // Aggregation support
     pub shared_stats: Option<Arc<Stats>>, // when set, aggregate externally
     pub disable_internal_snapshot: bool,
@@ -826,7 +828,7 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
     // that as an error to avoid silently inflating "loss".
     let (tx, rx) = flume::bounded::<(u32, u64, [u8; 24])>(1_000_000);
     let stats_worker = stats.clone();
-    
+
     // Spawn multiple stats workers to parallelize histogram recording if needed
     // But histogram is protected by RwLock, so single writer is better.
     // However, we can optimize the batch size and loop.
@@ -835,9 +837,8 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
     tokio::spawn(async move {
         let mut buf = Vec::with_capacity(4096);
         let mut lats = Vec::with_capacity(4096);
-        let mut seq_trackers: Vec<SequenceTracker> = (0..subs_usize)
-            .map(|_| SequenceTracker::new())
-            .collect();
+        let mut seq_trackers: Vec<SequenceTracker> =
+            (0..subs_usize).map(|_| SequenceTracker::new()).collect();
         let mut batch_counter: u64 = 0;
         loop {
             let first = match rx.recv_async().await {
@@ -1073,17 +1074,22 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
             handles.push(tokio::spawn(async move {
                 let mut crash_injector = CrashInjector::new(crash_cfg);
                 if stagger_secs > 0.0 {
-                    crash_injector.apply_phase_offset(Duration::from_secs_f64(stagger_secs * (i as f64)));
+                    crash_injector
+                        .apply_phase_offset(Duration::from_secs_f64(stagger_secs * (i as f64)));
                 }
 
                 let mut transport: Option<Box<dyn Transport>> = None;
                 let mut sub: Option<Box<dyn crate::transport::Subscription>> = None;
 
-                while !stop_flag.load(Ordering::Relaxed) && start.elapsed().as_secs() < duration_secs {
+                while !stop_flag.load(Ordering::Relaxed)
+                    && start.elapsed().as_secs() < duration_secs
+                {
                     // Ensure connected + subscribed
                     if transport.is_none() || sub.is_none() {
                         stats_cb.record_connection_attempt();
-                        match TransportBuilder::connect_with_retry(engine.clone(), connect.clone()).await {
+                        match TransportBuilder::connect_with_retry(engine.clone(), connect.clone())
+                            .await
+                        {
                             Ok(t) => {
                                 let handler_tx2 = handler_tx.clone();
                                 let stats_cb2 = stats_cb.clone();
@@ -1097,10 +1103,16 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
                                             if bytes.len() >= 24 {
                                                 hdr.copy_from_slice(&bytes[..24]);
                                                 let recv = now_unix_ns_estimate();
-                                                if handler_tx2.try_send((topic_idx, recv, hdr)).is_err() {
-                                                    stats_cb2.error_count.fetch_add(1, Ordering::Relaxed);
+                                                if handler_tx2
+                                                    .try_send((topic_idx, recv, hdr))
+                                                    .is_err()
+                                                {
+                                                    stats_cb2
+                                                        .error_count
+                                                        .fetch_add(1, Ordering::Relaxed);
                                                 }
-                                                if !first_received_cb2.swap(true, Ordering::Relaxed) {
+                                                if !first_received_cb2.swap(true, Ordering::Relaxed)
+                                                {
                                                     stats_cb2.increment_active_connections();
                                                 }
                                             }
@@ -1206,9 +1218,12 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
         }
 
         // Hold both the subscription and its own transport to keep the client alive
-        let mut clients: Vec<(Box<dyn crate::transport::Subscription>, Box<dyn Transport>, Arc<AtomicBool>)> =
-            Vec::with_capacity(subs as usize);
-        
+        let mut clients: Vec<(
+            Box<dyn crate::transport::Subscription>,
+            Box<dyn Transport>,
+            Arc<AtomicBool>,
+        )> = Vec::with_capacity(subs as usize);
+
         // Create all subscriptions
         for i in 0..subs {
             // Apply ramp-up delay between connections (skip first, reset on reconnect)
@@ -1315,7 +1330,10 @@ pub async fn run_multi_topic_sub(config: MultiTopicSubConfig) -> Result<()> {
         //
         // This is EXPECTED BEHAVIOR for hard crash simulation.
         // To avoid this: increase MTTR > session expiry, or use graceful shutdown.
-        info!("[multi_topic_sub] Cleaning up {} subscriptions", clients.len());
+        info!(
+            "[multi_topic_sub] Cleaning up {} subscriptions",
+            clients.len()
+        );
         for (sub, transport, first_received) in &clients {
             let _ = sub.force_disconnect().await;
             let _ = transport.force_disconnect().await;

@@ -123,14 +123,11 @@ impl Transport for MqttTransport {
         // Use a stable, per-topic client_id so broker-side session state (clean_session=false)
         // can be recovered across reconnects, while still avoiding collisions across many topics.
         let topic = map_expr(expr);
-        let base = self
-            .client_id
-            .as_deref()
-            .unwrap_or_else(|| {
-                // If no base client_id is provided, fall back to a process-unique value.
-                // Multi-topic roles are expected to provide a base id (derived from run-id).
-                "mqb"
-            });
+        let base = self.client_id.as_deref().unwrap_or_else(|| {
+            // If no base client_id is provided, fall back to a process-unique value.
+            // Multi-topic roles are expected to provide a base id (derived from run-id).
+            "mqb"
+        });
         let base = sanitize_client_id_base(base);
         let topic_hash = fnv1a64_bytes(topic.as_bytes());
         // When no explicit client_id is provided (base == "mqb"), append a UUID so that
@@ -138,7 +135,12 @@ impl Transport for MqttTransport {
         // all N subscribers would share the same CID and the broker would keep kicking each
         // previous connection, leaving only one subscriber active at a time.
         let cid = if self.client_id.is_none() {
-            format!("sub-{}-{:016x}-{}", base, topic_hash, uuid::Uuid::new_v4().simple())
+            format!(
+                "sub-{}-{:016x}-{}",
+                base,
+                topic_hash,
+                uuid::Uuid::new_v4().simple()
+            )
         } else {
             format!("sub-{}-{:016x}", base, topic_hash)
         };
@@ -159,6 +161,7 @@ impl Transport for MqttTransport {
             .map_err(|e| TransportError::Subscribe(e.to_string()))?;
         let handler = std::sync::Arc::new(handler);
         let handle: JoinHandle<()> = tokio::spawn(async move {
+            let _client = client;
             loop {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Incoming::Publish(p))) => {
@@ -168,13 +171,11 @@ impl Transport for MqttTransport {
                     }
                     Ok(_) => {}
                     Err(e) => {
-                        tracing::warn!(client_id = %cid_debug, error = %e, "MQTT subscription eventloop error, exiting");
-                        break;
+                        tracing::warn!(client_id = %cid_debug, error = %e, "MQTT subscription eventloop error; continuing poll loop");
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
             }
-            // drop client on exit
-            drop(client);
         });
         Ok(Box::new(MqttSubscription { handle }))
     }
@@ -184,18 +185,20 @@ impl Transport for MqttTransport {
         // If caller provides a base client_id, keep the historical stable per-topic ID.
         // Otherwise append a UUID so many fan-in publishers can share one topic
         // without repeatedly disconnecting each other.
-        let base = self
-            .client_id
-            .as_deref()
-            .unwrap_or_else(|| {
-                // If no base client_id is provided, fall back to a process-unique value.
-                // Multi-topic roles are expected to provide a base id (derived from run-id).
-                "mqb"
-            });
+        let base = self.client_id.as_deref().unwrap_or_else(|| {
+            // If no base client_id is provided, fall back to a process-unique value.
+            // Multi-topic roles are expected to provide a base id (derived from run-id).
+            "mqb"
+        });
         let base = sanitize_client_id_base(base);
         let topic_hash = fnv1a64_bytes(topic.as_bytes());
         let cid = if self.client_id.is_none() {
-            format!("pub-{}-{:016x}-{}", base, topic_hash, uuid::Uuid::new_v4().simple())
+            format!(
+                "pub-{}-{:016x}-{}",
+                base,
+                topic_hash,
+                uuid::Uuid::new_v4().simple()
+            )
         } else {
             format!("pub-{}-{:016x}", base, topic_hash)
         };

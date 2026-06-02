@@ -44,19 +44,17 @@ pub async fn run_queryable(config: QueryableConfig) -> Result<()> {
 
     // Transport session with optional retry
     stats.record_connection_attempt();
-    let transport = match TransportBuilder::connect_with_retry(
-        config.engine.clone(),
-        config.connect.clone(),
-    )
-    .await
-    {
-        Ok(t) => t,
-        Err(e) => {
-            warn!(error = %e, "Transport connect error");
-            stats.record_connection_failure();
-            return Ok(());
-        }
-    };
+    let transport =
+        match TransportBuilder::connect_with_retry(config.engine.clone(), config.connect.clone())
+            .await
+        {
+            Ok(t) => t,
+            Err(e) => {
+                warn!(error = %e, "Transport connect error");
+                stats.record_connection_failure();
+                return Ok(());
+            }
+        };
 
     let mut output = if let Some(ref path) = config.output_file {
         Some(OutputWriter::new_csv(path.clone()).await?)

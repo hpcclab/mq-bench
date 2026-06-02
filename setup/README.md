@@ -187,6 +187,72 @@ sudo setup/kvm-create-delete.sh \
 
 The `-H` flag attempts DHCP with a 12-second timeout. If no lease is obtained, the script continues with a warning.
 
+### Raise File Descriptor Limits for Broker VMs
+
+For fan-out experiments with thousands of subscribers, both the benchmark client and the broker VM need a high open-file limit. Each subscriber connection consumes file descriptors, and a low default limit can cause errors such as `Too many open files`.
+
+Run these commands inside the VM after it has been created:
+
+```console
+$ ssh ubuntu@192.168.0.251
+
+$ sudo tee /etc/security/limits.d/99-mq-bench-nofile.conf >/dev/null <<'EOF'
+* soft nofile 300000
+* hard nofile 300000
+root soft nofile 300000
+root hard nofile 300000
+EOF
+
+$ grep -q pam_limits.so /etc/pam.d/common-session || \
+  echo 'session required pam_limits.so' | sudo tee -a /etc/pam.d/common-session
+
+$ grep -q pam_limits.so /etc/pam.d/common-session-noninteractive || \
+  echo 'session required pam_limits.so' | sudo tee -a /etc/pam.d/common-session-noninteractive
+
+$ sudo mkdir -p /etc/systemd/system.conf.d /etc/systemd/user.conf.d
+
+$ sudo tee /etc/systemd/system.conf.d/99-mq-bench-nofile.conf >/dev/null <<'EOF'
+[Manager]
+DefaultLimitNOFILE=300000
+EOF
+
+$ sudo tee /etc/systemd/user.conf.d/99-mq-bench-nofile.conf >/dev/null <<'EOF'
+[Manager]
+DefaultLimitNOFILE=300000
+EOF
+
+$ sudo reboot
+```
+
+After reconnecting to the VM, verify the login-session limit:
+
+```console
+$ ssh ubuntu@192.168.0.251
+$ ulimit -n
+```
+
+If the VM runs broker containers, also make sure each broker service in `docker-compose.yml` has a container `nofile` limit:
+
+```yaml
+ulimits:
+  nofile:
+    soft: 300000
+    hard: 300000
+```
+
+Recreate the containers so Docker applies the limit:
+
+```console
+$ cd /home/ubuntu/mq-bench
+$ docker compose down redis router1
+$ docker compose up -d redis router1
+
+$ docker exec redis sh -c 'ulimit -n'
+$ docker exec router1 sh -c 'ulimit -n'
+```
+
+Run the same permanent limit setup on the machine that launches `mq-bench` as well. The subscriber process can hit the file descriptor limit before the broker does.
+
 ## After Creation
 
 ### 1. Verify VM Status

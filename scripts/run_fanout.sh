@@ -3,6 +3,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib.sh"
 
+profile_duration_secs() {
+	local profile="$1"
+	awk -v spec="${profile}" '
+		BEGIN {
+			n = split(spec, phases, ",")
+			if (n < 1) exit 1
+			for (i = 1; i <= n; i++) {
+				m = split(phases[i], parts, ":")
+				if (m != 3 || parts[2] !~ /^[0-9]+$/ || parts[2] <= 0) exit 1
+				total += parts[2]
+			}
+			print total
+		}
+	'
+}
+
 # Fanout scenario: M publishers → N subscribers.
 # Now supports multiple transports via ENGINE env var: zenoh|mqtt|redis|nats
 # Usage: scripts/run_fanout.sh [RUN_ID] [SUBS=4] [RATE=10000] [DURATION=30]
@@ -10,6 +26,7 @@ source "${SCRIPT_DIR}/lib.sh"
 #   ENGINE=zenoh (default) | mqtt | redis | nats
 #   PUBS=1              Number of publishers (default: 1)
 #   SUBS=4              Number of subscribers (default: 4)
+#   RATE_PROFILE=...    Optional per-publisher phases name:duration:rate, overrides RATE per publisher
 #   For zenoh:   ENDPOINT_SUB=tcp/127.0.0.1:7447  ENDPOINT_PUB=tcp/127.0.0.1:7447  [optional] ZENOH_MODE=
 #   For mqtt:    MQTT_HOST=127.0.0.1  MQTT_PORT=1883
 #   For redis:   REDIS_URL=redis://127.0.0.1:6379
@@ -17,11 +34,20 @@ source "${SCRIPT_DIR}/lib.sh"
 
 RUN_ID=${1:-${RUN_ID:-run_$(date +%Y%m%d_%H%M%S)}}
 SUBS=${2:-${SUBS:-4}}
+DURATION_WAS_SET=0
+if [[ -n "${DURATION:-}" ]]; then DURATION_WAS_SET=1; fi
 def PUBS     "${PUBS:-1}"
 def RATE     "${RATE:-10000}"
 def DURATION "${DURATION:-30}"
 def PAYLOAD  "${PAYLOAD:-1024}"
 def SNAPSHOT "${SNAPSHOT:-5}"
+RATE_PROFILE="${RATE_PROFILE:-}"
+if [[ -n "${RATE_PROFILE}" && ${DURATION_WAS_SET} -eq 0 ]]; then
+	if ! DURATION="$(profile_duration_secs "${RATE_PROFILE}")"; then
+		echo "[run_fanout] Invalid RATE_PROFILE: ${RATE_PROFILE}" >&2
+		exit 2
+	fi
+fi
 ENGINE="${ENGINE:-zenoh}"
 
 ART_DIR="artifacts/${RUN_ID}/fanout_singlesite"
@@ -34,7 +60,11 @@ REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 KEY="${KEY:-bench/topic}"
 ZENOH_MODE="${ZENOH_MODE:-}"
 
-echo "[run_fanout] Run ID: ${RUN_ID} | ENGINE=${ENGINE} | PUBS=${PUBS} SUBS=${SUBS} RATE=${RATE} DURATION=${DURATION}s"
+if [[ -n "${RATE_PROFILE}" ]]; then
+	echo "[run_fanout] Run ID: ${RUN_ID} | ENGINE=${ENGINE} | PUBS=${PUBS} SUBS=${SUBS} RATE_PROFILE=${RATE_PROFILE} DURATION=${DURATION}s"
+else
+	echo "[run_fanout] Run ID: ${RUN_ID} | ENGINE=${ENGINE} | PUBS=${PUBS} SUBS=${SUBS} RATE=${RATE} DURATION=${DURATION}s"
+fi
 mkdir -p "${ART_DIR}"
 
 build_release_if_needed "${BIN}"
@@ -64,8 +94,11 @@ start_sub SUB_PID "${KEY}" "${SUBS}" "${SUB_CSV}" "${ART_DIR}/sub.log"
 
 sleep 1
 
-# Calculate per-publisher rate
-if (( PUBS > 1 )); then
+# Calculate per-publisher rate for steady mode. RATE_PROFILE already uses per-publisher rates.
+if [[ -n "${RATE_PROFILE}" ]]; then
+	PUB_RATE=0
+	echo "Running ${PUBS} publishers → ${KEY} (profile=${RATE_PROFILE})"
+elif (( PUBS > 1 )); then
 	PUB_RATE=$(( RATE / PUBS ))
 	echo "Running ${PUBS} publishers → ${KEY} (total_rate=${RATE}, per_pub_rate=${PUB_RATE})"
 else
@@ -73,18 +106,13 @@ else
 	echo "Running publisher → ${KEY}"
 fi
 
-# Start multiple publishers
-for (( p=0; p<PUBS; p++ )); do
-	PUB_CSVS+=("${ART_DIR}/pub_${p}.csv")
-	PUB_LOGS+=("${ART_DIR}/pub_${p}.log")
-	local_pid=0
-	start_pub local_pid "${KEY}" "${PAYLOAD}" "${PUB_RATE}" "${DURATION}" "${PUB_CSVS[$p]}" "${PUB_LOGS[$p]}"
-	PUB_PIDS+=("${local_pid}")
-	# Small stagger to avoid thundering herd on broker
-	if (( PUBS > 1 && p < PUBS - 1 )); then
-		sleep 0.1
-	fi
-done
+# Start one aggregate publisher process. The mq-bench multi-publisher path assigns
+# interleaved sequence ranges, avoiding duplicate sequence IDs across publishers.
+PUB_CSVS+=("${ART_DIR}/pub_0.csv")
+PUB_LOGS+=("${ART_DIR}/pub_0.log")
+local_pid=0
+start_pub local_pid "${KEY}" "${PAYLOAD}" "${PUB_RATE}" "${DURATION}" "${PUB_CSVS[0]}" "${PUB_LOGS[0]}" "${PUBS}"
+PUB_PIDS+=("${local_pid}")
 
 print_status() {
 	local sub_file="$1"

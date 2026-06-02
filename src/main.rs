@@ -4,6 +4,7 @@ use futures::future::join_all;
 use mq_bench::crash::CrashConfig;
 use mq_bench::metrics::stats::Stats;
 use mq_bench::output::OutputWriter;
+use mq_bench::rate::RateProfile;
 use mq_bench::roles::multi_topic::{
     KeyMappingMode, MultiTopicConfig, MultiTopicSubConfig, run_multi_topic, run_multi_topic_sub,
 };
@@ -75,6 +76,10 @@ enum Commands {
         /// Rate per publisher (msg/s). If omitted or <= 0, runs at max speed (no delay)
         #[arg(long, alias = "qps", allow_hyphen_values = true)]
         rate: Option<i32>,
+
+        /// Comma-separated phases as name:duration_secs:rate_per_publisher. Overrides --rate.
+        #[arg(long)]
+        rate_profile: Option<String>,
 
         /// Duration in seconds
         #[arg(long, default_value = "60")]
@@ -545,6 +550,7 @@ async fn main() -> Result<()> {
             publishers,
             payload,
             rate,
+            rate_profile,
             duration,
             qos,
             csv,
@@ -565,6 +571,19 @@ async fn main() -> Result<()> {
                     conn.params.insert("endpoint".into(), ep.clone());
                 }
             }
+            let parsed_rate_profile = if let Some(spec) = rate_profile.as_deref() {
+                Some(
+                    RateProfile::parse(spec)
+                        .map_err(|e| anyhow::anyhow!("invalid --rate-profile: {e}"))?,
+                )
+            } else {
+                None
+            };
+            let publisher_duration_secs = parsed_rate_profile
+                .as_ref()
+                .map(|profile| profile.total_duration_secs())
+                .unwrap_or(duration as u64);
+
             // Wire retry options
             conn.retry_enabled = enable_retry;
             conn.retry_count = retry_count;
@@ -620,11 +639,16 @@ async fn main() -> Result<()> {
                     connect: conn.clone(),
                     key_expr,
                     payload_size: payload as usize,
-                    rate: match rate {
-                        Some(v) if v > 0 => Some(v as f64),
-                        _ => None,
+                    rate: if parsed_rate_profile.is_some() {
+                        None
+                    } else {
+                        match rate {
+                            Some(v) if v > 0 => Some(v as f64),
+                            _ => None,
+                        }
                     },
-                    duration_secs: Some(duration as u64),
+                    rate_profile: parsed_rate_profile.clone(),
+                    duration_secs: Some(publisher_duration_secs),
                     output_file: None,
                     snapshot_interval_secs: snapshot_interval_secs,
                     sequence_start: i as u64,

@@ -41,7 +41,7 @@ Interpretation:
 Add a publisher CLI option:
 
 ```text
---rate-profile "warmup:60:10,baseline:60:10,burst:20:30,elevated:60:15,recovery:60:10"
+--rate-profile "warmup:60:10,baseline:60:10,burst:60:30,elevated:60:15,recovery:60:10"
 ```
 
 Behavior:
@@ -86,7 +86,7 @@ PAYLOAD_TOKEN="1024"
 QOS=0
 SNAPSHOT=1
 RUN_ID_PREFIX="fanout_bursty"
-RATE_PROFILE="warmup:60:10,baseline:60:10,burst:20:30,elevated:60:15,recovery:60:10"
+RATE_PROFILE="warmup:60:10,baseline:60:10,burst:60:30,elevated:60:15,recovery:60:10"
 ```
 
 Output layout:

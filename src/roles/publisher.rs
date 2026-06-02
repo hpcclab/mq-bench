@@ -2,7 +2,7 @@ use crate::crash::{CrashConfig, CrashInjector};
 use crate::metrics::stats::Stats;
 use crate::output::OutputWriter;
 use crate::payload::generate_payload;
-use crate::rate::RateController;
+use crate::rate::{RateController, RateProfile};
 use crate::transport::{ConnectOptions, Engine, Transport, TransportBuilder, TransportError};
 use anyhow::Result;
 use bytes::Bytes;
@@ -18,6 +18,7 @@ pub struct PublisherConfig {
     pub key_expr: String,
     pub payload_size: usize,
     pub rate: Option<f64>,
+    pub rate_profile: Option<RateProfile>,
     pub duration_secs: Option<u64>,
     pub output_file: Option<String>,
     pub snapshot_interval_secs: u64,
@@ -37,6 +38,7 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
         key = %config.key_expr,
         payload_size = config.payload_size,
         rate = ?config.rate,
+        rate_profile = ?config.rate_profile,
         duration_secs = ?config.duration_secs,
         endpoint = ?config.connect.params.get("endpoint"),
         crash_enabled = config.crash_config.is_enabled(),
@@ -105,13 +107,23 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
     let mut sequence = config.sequence_start;
     let sequence_step = config.sequence_step.max(1);
     let start_time = std::time::Instant::now();
-    let mut rate_controller = config.rate.map(|r| RateController::new(r));
+    let effective_duration_secs = config
+        .rate_profile
+        .as_ref()
+        .map(|profile| profile.total_duration_secs())
+        .or(config.duration_secs);
+    let mut active_profile_phase: Option<usize> = None;
+    let mut rate_controller = if config.rate_profile.is_some() {
+        None
+    } else {
+        config.rate.map(RateController::new)
+    };
     let mut stopped = false;
 
     // Outer loop: handles reconnection after crashes
     'reconnect: while !stopped {
         // Check duration limit before connecting
-        if let Some(duration) = config.duration_secs {
+        if let Some(duration) = effective_duration_secs {
             if start_time.elapsed().as_secs() >= duration {
                 info!("Duration limit reached, stopping publisher");
                 break;
@@ -151,11 +163,34 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
         // Inner publishing loop
         let crash_triggered = loop {
             // Check duration limit
-            if let Some(duration) = config.duration_secs {
+            if let Some(duration) = effective_duration_secs {
                 if start_time.elapsed().as_secs() >= duration {
                     info!("Duration limit reached, stopping publisher");
                     stopped = true;
                     break false;
+                }
+            }
+
+            if let Some(profile) = &config.rate_profile {
+                let elapsed = start_time.elapsed();
+                match profile.phase_at_elapsed(elapsed) {
+                    Some((phase_idx, phase)) => {
+                        if active_profile_phase != Some(phase_idx) {
+                            info!(
+                                phase = %phase.name,
+                                rate = phase.rate_per_sec,
+                                elapsed_secs = elapsed.as_secs_f64(),
+                                "Publisher rate profile phase entered"
+                            );
+                            active_profile_phase = Some(phase_idx);
+                            rate_controller = Some(RateController::new(phase.rate_per_sec));
+                        }
+                    }
+                    None => {
+                        info!("Rate profile complete, stopping publisher");
+                        stopped = true;
+                        break false;
+                    }
                 }
             }
 

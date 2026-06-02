@@ -205,6 +205,8 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
                 break;
             }
         };
+        stats.increment_connections();
+        stats.increment_active_connections();
         info!(key = %config.key_expr, "Subscribed to key expression");
 
         // Inner loop: wait for crash timer, ctrl+c, or test timeout
@@ -247,7 +249,9 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
                 Duration::MAX
             };
 
-            let wait_time = time_to_crash.min(remaining_test_time).min(Duration::from_secs(1));
+            let wait_time = time_to_crash
+                .min(remaining_test_time)
+                .min(Duration::from_secs(1));
 
             tokio::select! {
                 _ = tokio::time::sleep(wait_time) => {
@@ -278,10 +282,16 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
             let _ = transport.shutdown().await;
         }
 
+        stats.decrement_active_connections();
+        stats.decrement_connections();
+
         if crash_triggered && config.connect.retry_enabled {
             // Sample repair time and wait before reconnecting
             let repair_time = crash_injector.sample_repair_time();
-            info!(repair_secs = repair_time.as_secs_f64(), "Simulating repair delay");
+            info!(
+                repair_secs = repair_time.as_secs_f64(),
+                "Simulating repair delay"
+            );
             tokio::time::sleep(repair_time).await;
 
             // Schedule next crash (deterministic timeline includes the repair downtime)

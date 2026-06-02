@@ -144,7 +144,7 @@ mod tests {
         tracker.record(1);
         tracker.record(5); // gap of 3 (missing 2,3,4)
         assert_eq!(tracker.gap_count(), 3);
-        
+
         tracker.record(3); // fill one gap
         assert_eq!(tracker.gap_count(), 2);
     }

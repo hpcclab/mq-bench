@@ -399,7 +399,7 @@ start_sub() {
 }
 
 # Start publisher. Sets PID into out var name.
-# Args: OUT_PID_VAR  topic_prefix  payload  rate  duration  csv_path  log_path
+# Args: OUT_PID_VAR  topic_prefix  payload  rate  duration  csv_path  log_path [publishers]
 start_pub() {
 	local -n _outpid="${1:?out pid var}"; shift
 	local topic="${1:?topic}"; shift
@@ -408,17 +408,25 @@ start_pub() {
 	local duration="${1:?duration}"; shift
 	local csv="${1:?csv}"; shift
 	local log="${1:?log}"; shift
+	local publishers="${1:-1}"
 	local BIN="${BIN:-./target/release/mq-bench}"
 	local SNAPSHOT="${SNAPSHOT:-5}"
 	local args=()
 	make_connect_args pub args
 	local rate_flag=()
-	if [[ -n "${rate}" ]] && (( rate > 0 )); then rate_flag=(--rate "${rate}"); fi
-	echo "[pub] ${ENGINE:-zenoh} → ${topic} (payload=${payload}, rate=${rate:-max}, dur=${duration}s)"
+	local profile="${RATE_PROFILE:-}"
+	if [[ -n "${profile}" ]]; then
+		rate_flag=(--rate-profile "${profile}")
+		echo "[pub] ${ENGINE:-zenoh} → ${topic} (payload=${payload}, profile=${profile}, dur=${duration}s)"
+	else
+		if [[ -n "${rate}" ]] && (( rate > 0 )); then rate_flag=(--rate "${rate}"); fi
+		echo "[pub] ${ENGINE:-zenoh} → ${topic} (payload=${payload}, rate=${rate:-max}, dur=${duration}s)"
+	fi
 	local -a CMD=(
 		"${BIN}" --snapshot-interval "${SNAPSHOT}" pub
 		"${args[@]}"
 		--topic-prefix "${topic}"
+		--publishers "${publishers}"
 		--payload "${payload}"
 		"${rate_flag[@]}"
 		--duration "${duration}"

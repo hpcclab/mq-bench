@@ -1257,12 +1257,14 @@ main() {
   local latex_plots_dir="${PLOTS_DIR}/latex"
   log "Plotting results to ${PLOTS_DIR}"
   if [[ "${DRY_RUN}" = 1 ]]; then
-    echo "+ python3 ${SCRIPT_DIR}/plot_results.py --summary ${SUMMARY_CSV} --out-dir ${PLOTS_DIR}"
-    echo "+ python3 ${SCRIPT_DIR}/plot_results.py --summary ${SUMMARY_CSV} --out-dir ${latex_plots_dir} --latex"
+    echo "+ rm -rf ${PLOTS_DIR} ${latex_plots_dir}"
+    echo "+ python3 ${SCRIPT_DIR}/plot_results.py --summary ${SUMMARY_CSV} --out-dir ${PLOTS_DIR} --only-variable-axis-plots"
+    echo "+ python3 ${SCRIPT_DIR}/plot_results.py --summary ${SUMMARY_CSV} --out-dir ${latex_plots_dir} --latex --only-variable-axis-plots"
   else
-    python3 "${SCRIPT_DIR}/plot_results.py" --summary "${SUMMARY_CSV}" --out-dir "${PLOTS_DIR}"
+    rm -rf "${PLOTS_DIR}" "${latex_plots_dir}"
+    python3 "${SCRIPT_DIR}/plot_results.py" --summary "${SUMMARY_CSV}" --out-dir "${PLOTS_DIR}" --only-variable-axis-plots
     log "Plotting LaTeX-ready PDF results to ${latex_plots_dir}"
-    python3 "${SCRIPT_DIR}/plot_results.py" --summary "${SUMMARY_CSV}" --out-dir "${latex_plots_dir}" --latex
+    python3 "${SCRIPT_DIR}/plot_results.py" --summary "${SUMMARY_CSV}" --out-dir "${latex_plots_dir}" --latex --only-variable-axis-plots
   fi
 
   log "Done. Summary CSV: ${SUMMARY_CSV}"
