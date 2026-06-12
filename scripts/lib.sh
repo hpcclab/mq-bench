@@ -383,14 +383,16 @@ start_sub() {
 	local log="${1:?log}"; shift
 	local BIN="${BIN:-./target/release/mq-bench}"
 	local SNAPSHOT="${SNAPSHOT:-5}"
+	local SUB_RAMP_UP_SECS="${SUB_RAMP_UP_SECS:-0}"
 	local args=()
 	make_connect_args sub args
-	echo "[sub] ${ENGINE:-zenoh} → ${expr} (subs=${subs})"
+	echo "[sub] ${ENGINE:-zenoh} → ${expr} (subs=${subs}, ramp_up=${SUB_RAMP_UP_SECS}s)"
 	local -a CMD=(
 		"${BIN}" --snapshot-interval "${SNAPSHOT}" sub
 		"${args[@]}"
 		--expr "${expr}"
 		--subscribers "${subs}"
+		--ramp-up-secs "${SUB_RAMP_UP_SECS}"
 		--csv "${csv}"
 	)
 	print_cmd "${CMD[@]}" && echo "       1>$(printf %q "${log}") 2>&1 &"

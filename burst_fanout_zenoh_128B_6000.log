@@ -1,0 +1,802 @@
+nohup: ignoring input
+[20:54:56] Fan-out bursty-load benchmark -> /home/cc/mq-bench/results/fanout_bursty_load_20260612_205456
+[20:54:56] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/raw_data/summary_by_phase.csv | PLOTS_DIR=/home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/plots | RAW_DIR=/home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/raw_data
+[20:54:56] Resolved payload=64B subs=1000 pubs=10 duration=180s profile=baseline:60:20,burst:60:6000,recovery:60:20
+[20:54:56] Inter-run cooldown: 120s (use --cooldown-sec N or --interval-sec N to override)
+Controlled fan-out configuration:
+Total subscribers: 1000
+Subscribers per publisher/topic: 100
+Publishers/topics: 10
+Effective fan-out ratio: 1:100
+Expected delivery target per phase:
+  baseline:60s rate 20 msg/s/pub -> 20,000 delivered msg/s
+  burst:60s rate 6,000 msg/s/pub -> 6,000,000 delivered msg/s
+  recovery:60s rate 20 msg/s/pub -> 20,000 delivered msg/s
+[20:54:58] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
+[20:55:09] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose up -d router1
+ Network ubuntu_default Creating 
+ Network ubuntu_default Created 
+ Container router1 Creating 
+ Container router1 Created 
+ Container router1 Starting 
+ Container router1 Started 
+[20:55:16] Waiting for 192.168.0.245:7447...
+[20:55:16] Port 192.168.0.245:7447 is open.
+[20:55:18] Starting remote stats collector on ubuntu@192.168.0.245 for 255s...
+[20:55:18] Run: transport=zenoh subs=1000 pubs=10 payload=64B profile=baseline:60:20,burst:60:6000,recovery:60:20
+[run_fanout] Run ID: fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty | ENGINE=zenoh | PUBS=10 SUBS=1000 SUB_RAMP_UP_SECS=60 RATE_PROFILE=baseline:60:20,burst:60:6000,recovery:60:20 DURATION=180s
+[monitor] Capturing docker stats for: router1 → artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/docker_stats.csv
+[monitor] Skipping unknown container 'router1'
+[monitor] No valid containers found to monitor
+Starting 1000 subscribers across 10 controlled fan-out topics (100 per topic, 20 client process(es) per topic)
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_0.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_1.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_2.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_3.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_4.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_5.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_6.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_7.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_8.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_9.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_10.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_11.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_12.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_13.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_14.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_15.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_16.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_17.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_18.log 2>&1 &
+[sub] zenoh → topic_0 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_0 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_0_19.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_0.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_1.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_2.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_3.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_4.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_5.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_6.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_7.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_8.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_9.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_10.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_11.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_12.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_13.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_14.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_15.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_16.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_17.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_18.log 2>&1 &
+[sub] zenoh → topic_1 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_1 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_1_19.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_0.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_1.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_2.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_3.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_4.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_5.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_6.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_7.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_8.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_9.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_10.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_11.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_12.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_13.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_14.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_15.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_16.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_17.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_18.log 2>&1 &
+[sub] zenoh → topic_2 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_2 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_2_19.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_0.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_1.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_2.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_3.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_4.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_5.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_6.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_7.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_8.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_9.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_10.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_11.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_12.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_13.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_14.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_15.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_16.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_17.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_18.log 2>&1 &
+[sub] zenoh → topic_3 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_3 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_3_19.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_0.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_1.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_2.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_3.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_4.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_5.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_6.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_7.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_8.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_9.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_10.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_11.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_12.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_13.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_14.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_15.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_16.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_17.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_18.log 2>&1 &
+[sub] zenoh → topic_4 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_4 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_4_19.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_0.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_1.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_2.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_3.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_4.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_5.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_6.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_7.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_8.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_9.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_10.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_11.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_12.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_13.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_14.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_15.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_16.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_17.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_18.log 2>&1 &
+[sub] zenoh → topic_5 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_5 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_5_19.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_0.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_1.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_2.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_3.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_4.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_5.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_6.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_7.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_8.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_9.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_10.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_11.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_12.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_13.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_14.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_15.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_16.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_17.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_18.log 2>&1 &
+[sub] zenoh → topic_6 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_6 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_6_19.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_0.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_1.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_2.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_3.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_4.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_5.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_6.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_7.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_8.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_9.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_10.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_11.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_12.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_13.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_14.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_15.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_16.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_17.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_18.log 2>&1 &
+[sub] zenoh → topic_7 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_7 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_7_19.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_0.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_1.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_2.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_3.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_4.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_5.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_6.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_7.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_8.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_9.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_10.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_11.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_12.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_13.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_14.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_15.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_16.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_17.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_18.log 2>&1 &
+[sub] zenoh → topic_8 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_8 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_8_19.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_0.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_1.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_2.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_3.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_4.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_5.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_6.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_7.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_8.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_9.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_10.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_10.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_11.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_11.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_12.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_12.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_13.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_13.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_14.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_14.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_15.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_15.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_16.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_16.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_17.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_17.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_18.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_18.log 2>&1 &
+[sub] zenoh → topic_9 (subs=5, ramp_up=60s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine zenoh --endpoint tcp/192.168.0.245:7447 --expr topic_9 --subscribers 5 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_19.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/sub_9_19.log 2>&1 &
+[sub] Waiting 60s for subscriber ramp-up before starting publishers
+Running 10 controlled publishers across 10 topics (profile=baseline:60:20,burst:60:6000,recovery:60:20)
+[pub] zenoh → topic_0 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_0 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_0.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_0.log 2>&1 &
+[pub] zenoh → topic_1 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_1 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_1.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_1.log 2>&1 &
+[pub] zenoh → topic_2 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_2 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_2.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_2.log 2>&1 &
+[pub] zenoh → topic_3 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_3 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_3.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_3.log 2>&1 &
+[pub] zenoh → topic_4 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_4 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_4.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_4.log 2>&1 &
+[pub] zenoh → topic_5 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_5 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_5.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_5.log 2>&1 &
+[pub] zenoh → topic_6 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_6 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_6.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_6.log 2>&1 &
+[pub] zenoh → topic_7 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_7 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_7.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_7.log 2>&1 &
+[pub] zenoh → topic_8 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_8 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_8.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_8.log 2>&1 &
+[pub] zenoh → topic_9 (payload=64, profile=baseline:60:20,burst:60:6000,recovery:60:20, dur=180s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine zenoh --endpoint tcp/192.168.0.245:7447 --topic-prefix topic_9 --publishers 1 --payload 64 --rate-profile baseline:60:20\,burst:60:6000\,recovery:60:20 --duration 180 --csv artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_9.csv 
+       1>artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite/pub_9.log 2>&1 &
+[watch] printing status every 1s...
+[status] PUB sent=0 tps=0 (pubs=10) | SUB recv=0 itps=0 p99=0.00ms conn=0/0,0,0,1000,1000,1000,0,0,0,0,0,0,0,0,0,0,0
+[status] PUB sent=210 tps=210 (pubs=10) | SUB recv=15535 itps=9953.89 p99=3.45ms conn=9601023/2853749.84,1462191.77,15535,1000,1000,1000,0,0,0,0,0,0,2599975.53,5769816.19,7149204.47,2820871.90,9954
+[status] PUB sent=410 tps=205 (pubs=10) | SUB recv=43637 itps=19402.09 p99=2.99ms conn=9601023/2407642.98,1154274.24,43637,1000,1000,1000,0,0,0,0,0,0,2203469.77,3413014.01,3833800.96,2213890.04,19402
+[status] PUB sent=810 tps=203 (pubs=10) | SUB recv=71536 itps=7302.11 p99=2.91ms conn=9601023/2339004.49,1072395.90,71536,1000,1000,1000,0,0,0,0,0,0,2159957.46,3269538.73,3333024.48,2099974.08,7302
+[status] PUB sent=1010 tps=202 (pubs=10) | SUB recv=92935 itps=8697.42 p99=2.88ms conn=9601023/2305693.34,1024944.51,92935,1000,1000,1000,0,0,0,0,0,0,2132991.59,3195137.30,3690295.10,2128400.36,8698
+[status] PUB sent=1210 tps=202 (pubs=10) | SUB recv=118934 itps=14699.65 p99=2.87ms conn=9601023/2300417.86,984339.48,118934,1000,1000,1000,0,0,0,0,0,0,2284718.21,3377741.06,3508536.07,2269180.29,14699
+[status] PUB sent=1410 tps=202 (pubs=10) | SUB recv=147533 itps=3299.89 p99=2.85ms conn=9601023/2277538.12,960565.43,147533,1000,1000,1000,0,0,0,0,0,0,2194617.18,3162731.61,3477130.64,2165221.20,3300
+[status] PUB sent=1810 tps=201 (pubs=10) | SUB recv=172933 itps=8704.74 p99=2.83ms conn=9601023/2262357.51,943502.32,172933,1000,1000,1000,0,0,0,0,0,0,2102143.96,3137610.29,3369295.43,2079002.13,8705
+[status] PUB sent=2010 tps=201 (pubs=10) | SUB recv=195733 itps=11499.61 p99=2.84ms conn=9601023/2268054.13,934317.04,195733,1000,1000,1000,0,0,0,0,0,0,2387347.38,3541904.84,3608753.10,2339821.81,11499
+[status] PUB sent=2210 tps=201 (pubs=10) | SUB recv=225138 itps=899.99 p99=2.83ms conn=9601023/2253149.16,921611.80,225138,1000,1000,1000,0,0,0,0,0,0,2464198.11,3299554.56,3363270.11,2319280.78,900
+[status] PUB sent=2610 tps=201 (pubs=10) | SUB recv=252937 itps=8702.69 p99=2.81ms conn=9601023/2238257.38,910327.40,252937,1000,1000,1000,0,0,0,0,0,0,2083670.49,3094194.22,3439143.60,2071692.39,8702
+[status] PUB sent=2810 tps=201 (pubs=10) | SUB recv=274236 itps=9999.57 p99=2.82ms conn=9601023/2246758.53,914108.96,274236,1000,1000,1000,0,0,0,0,0,0,2305409.25,3500989.05,4488829.57,2317732.15,10000
+[status] PUB sent=3010 tps=201 (pubs=10) | SUB recv=303930 itps=19696.36 p99=2.82ms conn=9601023/2243171.47,909559.75,303930,1000,1000,1000,0,0,0,0,0,0,2253405.36,3535832.63,3837839.01,2268232.98,19696
+[status] PUB sent=3410 tps=201 (pubs=10) | SUB recv=332937 itps=8700.62 p99=2.82ms conn=9601023/2237118.00,906356.07,332937,1000,1000,1000,0,0,0,0,0,0,2066769.70,3227300.53,3364264.91,2036925.99,8701
+[status] PUB sent=3610 tps=201 (pubs=10) | SUB recv=353636 itps=9398.75 p99=2.83ms conn=9601023/2242006.21,904117.52,353636,1000,1000,1000,0,0,0,0,0,0,2316495.53,3453938.25,3632712.59,2283009.18,9399
+[status] PUB sent=3810 tps=201 (pubs=10) | SUB recv=384333 itps=100 p99=2.83ms conn=9601023/2242693.26,900019.32,384333,1000,1000,1000,0,0,0,0,0,0,2641919,3235839,5062655,2608888.32,100
+[status] PUB sent=4210 tps=200 (pubs=10) | SUB recv=412933 itps=8701.92 p99=2.84ms conn=9601023/2242915.12,897174.11,412933,1000,1000,1000,0,0,0,0,0,0,2193553.15,3341508.93,3555737.92,2173869.04,8702
+[status] PUB sent=4410 tps=200 (pubs=10) | SUB recv=434332 itps=10098.96 p99=2.84ms conn=9601023/2248172.93,895562.23,434332,1000,1000,1000,0,0,0,0,0,0,2393052.83,3538101.61,3868825.53,2367393.04,10099
+[status] PUB sent=4610 tps=200 (pubs=10) | SUB recv=465131 itps=900.24 p99=2.85ms conn=9601023/2249531.81,892605.05,465131,1000,1000,1000,0,0,0,0,0,0,2621780.33,3511408.78,3575579.44,2466128.07,900
+[status] PUB sent=5010 tps=200 (pubs=10) | SUB recv=492930 itps=8698.57 p99=2.85ms conn=9601023/2248021.71,890599.65,492930,1000,1000,1000,0,0,0,0,0,0,2182851.29,3282628.94,3585828.29,2157257.40,8699
+[status] PUB sent=5210 tps=200 (pubs=10) | SUB recv=516132 itps=11899.69 p99=2.85ms conn=9601023/2253233.20,889294.88,516132,1000,1000,1000,0,0,0,0,0,0,2417981.39,3606449.55,3702869.05,2385470.63,11900
+[status] PUB sent=5410 tps=200 (pubs=10) | SUB recv=547134 itps=2899.88 p99=2.85ms conn=9601023/2247933.00,886535.87,547134,1000,1000,1000,0,0,0,0,0,0,2197010.07,3180665.17,3331419.87,2141483.48,2900
+[status] PUB sent=5810 tps=200 (pubs=10) | SUB recv=572919 itps=8691.37 p99=2.85ms conn=9601023/2247963.94,887574.63,572919,1000,1000,1000,0,0,0,0,0,0,2178133.01,3301424.01,4252950.36,2194538.10,8691
+[status] PUB sent=6010 tps=200 (pubs=10) | SUB recv=599131 itps=14912.81 p99=2.85ms conn=9601023/2252198.53,889663.26,599131,1000,1000,1000,0,0,0,0,0,0,2342233.96,3477797.44,4228221.96,2354013.76,14913
+[status] PUB sent=6410 tps=200 (pubs=10) | SUB recv=630832 itps=6599.23 p99=2.85ms conn=9601023/2250697.03,887784.17,630832,1000,1000,1000,0,0,0,0,0,0,2161982.51,3229558.76,3293175.86,2122700.56,6599
+[status] PUB sent=6610 tps=200 (pubs=10) | SUB recv=652934 itps=8700.45 p99=2.85ms conn=9601023/2250611.30,886479.32,652934,1000,1000,1000,0,0,0,0,0,0,2152017.44,3209479.56,3353602.18,2127497.89,8701
+[status] PUB sent=6810 tps=200 (pubs=10) | SUB recv=683635 itps=19402.47 p99=2.85ms conn=9601023/2252736.38,884928.81,683635,1000,1000,1000,0,0,0,0,0,0,2279404.48,3472105.88,3609634.62,2272678.25,19403
+[status] PUB sent=7210 tps=200 (pubs=10) | SUB recv=712934 itps=8699.76 p99=2.86ms conn=9601023/2252463.73,883672.14,712934,1000,1000,1000,0,0,0,0,0,0,2185473.47,3273531.85,3418470.93,2163264.99,8700
+[status] PUB sent=7410 tps=200 (pubs=10) | SUB recv=737338 itps=13103.96 p99=2.86ms conn=9601023/2254851.75,882682.18,737338,1000,1000,1000,0,0,0,0,0,0,2335352.83,3485435.09,3683472.35,2311645.04,13104
+[status] PUB sent=7810 tps=200 (pubs=10) | SUB recv=769636 itps=5399.10 p99=2.85ms conn=9601023/2250650.33,879601.34,769636,1000,1000,1000,0,0,0,0,0,0,2118822.47,3150749.32,3183822.68,2092506.56,5399
+[status] PUB sent=8010 tps=200 (pubs=10) | SUB recv=792933 itps=8699.01 p99=2.85ms conn=9601023/2247958.58,877406.10,792933,1000,1000,1000,0,0,0,0,0,0,2106317.44,3116650.30,3166526.48,2070484.43,8699
+[status] PUB sent=8210 tps=200 (pubs=10) | SUB recv=823633 itps=19398.39 p99=2.85ms conn=9601023/2247920.72,875850.57,823633,1000,1000,1000,0,0,0,0,0,0,2221636.21,3338817.57,3658414.31,2225032.35,19398
+[status] PUB sent=8610 tps=200 (pubs=10) | SUB recv=852933 itps=8697.60 p99=2.84ms conn=9601023/2244642.34,874025.24,852933,1000,1000,1000,0,0,0,0,0,0,2115001.66,3144344.87,3703388.59,2110896.68,8698
+[status] PUB sent=8810 tps=200 (pubs=10) | SUB recv=878432 itps=14200.39 p99=2.84ms conn=9601023/2245051.11,872449.56,878432,1000,1000,1000,0,0,0,0,0,0,2257653.19,3383538.02,3522116.52,2243235.97,14200
+[status] PUB sent=9210 tps=200 (pubs=10) | SUB recv=911530 itps=7298.26 p99=2.84ms conn=9601023/2241738.56,870262.55,911530,1000,1000,1000,0,0,0,0,0,0,2157902.77,3158399.46,3428386.92,2131689.66,7298
+[status] PUB sent=9410 tps=200 (pubs=10) | SUB recv=934035 itps=9804.56 p99=2.84ms conn=9601023/2241468.41,869386.42,934035,1000,1000,1000,0,0,0,0,0,0,2253697.36,3319067.59,3727473.04,2233498.80,9805
+[status] PUB sent=9810 tps=200 (pubs=10) | SUB recv=968136 itps=3900.15 p99=2.84ms conn=9601023/2239671.36,868157.90,968136,1000,1000,1000,0,0,0,0,0,0,2216053.15,3284098.28,3652265.67,2214968.32,3900
+[status] PUB sent=10010 tps=200 (pubs=10) | SUB recv=992931 itps=8699.68 p99=2.84ms conn=9601023/2238916.57,867497.90,992931,1000,1000,1000,0,0,0,0,0,0,2197249.94,3287792.29,3365204.33,2161444.33,8700
+[status] PUB sent=10210 tps=200 (pubs=10) | SUB recv=1025131 itps=900.03 p99=2.84ms conn=9601023/2241044.22,867121.63,1025131,1000,1000,1000,0,0,0,0,0,0,2562615.89,3463849.67,3521648.78,2413555.34,900
+[status] PUB sent=10610 tps=200 (pubs=10) | SUB recv=1052933 itps=8698.18 p99=2.84ms conn=9601023/2240630.26,866623.19,1052933,1000,1000,1000,0,0,0,0,0,0,2194333.40,3280093.04,3330464.46,2160867.73,8698
+[status] PUB sent=10810 tps=200 (pubs=10) | SUB recv=1082538 itps=18303.94 p99=2.84ms conn=9601023/2242990.79,866463.15,1082538,1000,1000,1000,0,0,0,0,0,0,2278238.55,3488235.98,3636026.52,2282007.49,18304
+[status] PUB sent=11210 tps=200 (pubs=10) | SUB recv=1112932 itps=8698.17 p99=2.84ms conn=9601023/2241399.95,865954.53,1112932,1000,1000,1000,0,0,0,0,0,0,2164230.30,3252562.76,3325025.66,2129327.84,8698
+[status] PUB sent=11410 tps=200 (pubs=10) | SUB recv=1140636 itps=16400.62 p99=2.84ms conn=9601023/2242935.03,865750.72,1140636,1000,1000,1000,0,0,0,0,0,0,2276144.09,3491124.99,3581684.28,2260804.79,16401
+[status] PUB sent=11810 tps=200 (pubs=10) | SUB recv=1172934 itps=8702.23 p99=2.84ms conn=9601023/2241451.67,865232.59,1172934,1000,1000,1000,0,0,0,0,0,0,2160795.62,3250907.17,3352220.57,2123206.66,8702
+[status] PUB sent=12010 tps=200 (pubs=10) | SUB recv=1509193 itps=324941.58 p99=40.67ms conn=256901119/23503512.39,25573673.35,1509193,1000,1000,1000,0,0,0,0,0,0,100815130.10,168491377.70,176861958.37,100985659.42,324958
+[status] PUB sent=132030 tps=2130 (pubs=10) | SUB recv=7274664 itps=1623437.84 p99=386.39ms conn=847249407/233549710.51,177411293.48,7274664,1000,1000,1000,0,0,0,0,0,0,368331241.27,538275668.00,555919443.76,365687592.33,1623470
+[status] PUB sent=192030 tps=3048 (pubs=10) | SUB recv=12763882 itps=3297096.78 p99=667.61ms conn=1903165439/435141016.08,285778275.98,12763882,1000,1000,1000,0,0,0,0,0,0,744438065.98,916348487.74,941468047.98,753910354.81,3296949
+[status] PUB sent=312030 tps=4801 (pubs=10) | SUB recv=19793564 itps=1858767.68 p99=1032.01ms conn=2237661183/700506142.88,424062216.48,19793564,1000,1000,1000,0,0,0,0,0,0,1274600582.85,1393725754.49,1413272182.49,1276158720.72,1858861
+[status] PUB sent=372030 tps=5637 (pubs=10) | SUB recv=25355137 itps=3415644.81 p99=1360.97ms conn=3072327679/924168938.09,562491258.71,25355137,1000,1000,1000,0,0,0,0,0,0,1881071628.42,2069747445.19,2091156236.33,1891173979.60,3415605
+[status] PUB sent=492030 tps=7236 (pubs=10) | SUB recv=30215081 itps=1260629.96 p99=1623.55ms conn=3865051135/1118022576.17,724232713.08,30215077,1000,1000,1000,0,0,0,0,0,0,2568843469.13,2794739124.37,2818495003.35,2568270903.14,1260674
+[status] PUB sent=612030 tps=8743 (pubs=10) | SUB recv=36142165 itps=314147.51 p99=2125.14ms conn=5037359103/1386290243.70,917619918.17,36142165,1000,1000,1000,0,0,0,0,0,0,2889513655.16,3107258660.73,3128512612.39,2917927614.42,314144
+[status] PUB sent=672030 tps=9465 (pubs=10) | SUB recv=40799090 itps=1707588.62 p99=2523.83ms conn=5700059135/1625399714.64,1101019999.11,40799090,1000,1000,1000,0,0,0,0,0,0,3838099833.43,4053061982.02,4074593515.94,3850597153.07,1707425
+[status] PUB sent=792030 tps=10850 (pubs=10) | SUB recv=47362716 itps=851493.21 p99=3093.77ms conn=6899630079/1927602315.87,1301179148.58,47362715,1000,1000,1000,0,0,0,0,0,0,4439653875.81,4519345600.08,4539618725.44,4410354564.45,851404
+[status] PUB sent=852030 tps=11514 (pubs=10) | SUB recv=51315765 itps=1331525.70 p99=3397.82ms conn=7356809215/2099914536.40,1417604452.89,51315766,1000,1000,1000,0,0,0,0,0,0,5218200338.47,5430040565.74,5442344857.32,5250915969.58,1331481
+[status] PUB sent=972030 tps=12790 (pubs=10) | SUB recv=59507345 itps=2325611.87 p99=3986.71ms conn=8640266239/2572952785.92,1737409353.31,59507345,1000,1000,1000,0,0,0,0,0,0,6030757404.40,6112683814.89,6133395935.22,6016657666.11,2325481
+[status] PUB sent=1032030 tps=13403 (pubs=10) | SUB recv=65937902 itps=3278041.82 p99=4444.93ms conn=8640266239/2851820468.41,1866617273.37,65937902,1000,1000,1000,0,0,0,0,0,0,5484599503.77,5648876233.87,5675746223.09,5477804396.44,3278211
+[status] PUB sent=1152030 tps=14583 (pubs=10) | SUB recv=74673839 itps=2308061.81 p99=5290.45ms conn=8640266239/3217671955.77,2010270968.84,74673833,1000,1000,1000,0,0,0,0,0,0,6315217593.80,6415494067.05,6438161789.66,6319199772.16,2308011
+[status] PUB sent=1272030 tps=15704 (pubs=10) | SUB recv=83016689 itps=164101.69 p99=5458.09ms conn=8782872575/3481025602.26,2068102378.14,83016688,1000,1000,1000,0,0,0,0,0,0,5399205132.99,5549622474.06,5574230015,5404520450.74,164126
+[status] PUB sent=1332030 tps=16245 (pubs=10) | SUB recv=89326126 itps=1877055.77 p99=5590.85ms conn=8782872575/3661728841.31,2086613041.31,89326121,1000,1000,1000,0,0,0,0,0,0,6178128849.32,6325760116.96,6348613677.42,6184232711.65,1876982
+[status] PUB sent=1452030 tps=17286 (pubs=10) | SUB recv=97217231 itps=1541299.71 p99=5721.89ms conn=9168748543/3862894044.69,2116394856.03,97217230,1000,1000,1000,0,0,0,0,0,0,6735517863.72,6926209971.25,6947843584.06,6742137360.06,1541273
+[status] PUB sent=1512030 tps=17789 (pubs=10) | SUB recv=102872355 itps=3033647.13 p99=5785.70ms conn=9915334655/4020647064.14,2158911484.22,102872356,1000,1000,1000,0,0,0,0,0,0,7037955465.99,7174260996.88,7199573248.10,7016631364.45,3033760
+[status] PUB sent=1632030 tps=18759 (pubs=10) | SUB recv=109470945 itps=1685042.13 p99=5956.76ms conn=9915334655/4212892511.60,2219008130.01,109470944,1000,1000,1000,0,0,0,0,0,0,7831304638.50,7971213306.91,7992917423.77,7820224988.01,1684914
+[status] PUB sent=1752030 tps=19686 (pubs=10) | SUB recv=116938707 itps=912237.47 p99=6118.09ms conn=10343153663/4422362358.78,2299088589.12,116938707,1000,1000,1000,0,0,0,0,0,0,8317818397.38,8483305260.76,8506273942.50,8303778445.38,912329
+[status] PUB sent=1812030 tps=20134 (pubs=10) | SUB recv=122146571 itps=2375631.39 p99=6319.51ms conn=11022630911/4589229979.55,2369950810.60,122146570,1000,1000,1000,0,0,0,0,0,0,8852093039.62,9043712611.10,9062673085.50,8851903972.71,2375597
+[status] PUB sent=1932030 tps=21001 (pubs=10) | SUB recv=129502238 itps=1533751.62 p99=6628.48ms conn=11123294207/4803734918.61,2471057930.33,129502238,1000,1000,1000,0,0,0,0,0,0,9115752731.13,9400898088.44,9419070071.40,9136064648.38,1533796
+[status] PUB sent=2052030 tps=21830 (pubs=10) | SUB recv=136321880 itps=192355.61 p99=6847.10ms conn=11123294207/4993163761.92,2545702267.56,136321880,1000,1000,1000,0,0,0,0,0,0,8010542867.69,8128561151,8157921279,8022426766.36,192361
+[status] PUB sent=2112030 tps=22232 (pubs=10) | SUB recv=141802866 itps=1831524.35 p99=7083.80ms conn=11123294207/5147672726.83,2608691761.61,141802865,1000,1000,1000,0,0,0,0,0,0,9747477279.18,9947528638.49,9971286743.37,9757933925.73,1831468
+[status] PUB sent=2232030 tps=23011 (pubs=10) | SUB recv=150032792 itps=1840156.61 p99=7434.86ms conn=11190403071/5369896843.16,2694104260.00,150032792,1000,1000,1000,0,0,0,0,0,0,9757844363.51,9914502563.84,9935827659.56,9746915586.37,1840140
+[status] PUB sent=2352030 tps=23758 (pubs=10) | SUB recv=156509898 itps=166480.82 p99=7701.66ms conn=11190403071/5531219839.30,2759139809.69,156509897,1000,1000,1000,0,0,0,0,0,0,9769052081.99,9932152139.06,9954841603.36,9750635543.68,166447
+[status] PUB sent=2412030 tps=24121 (pubs=10) | SUB recv=162282105 itps=1691242.28 p99=7936.23ms conn=11198791679/5677016408.57,2807961710.31,162282105,1000,1000,1000,0,0,0,0,0,0,9948339759.36,10066279527.79,10085680729.69,9894898214.26,1691335
+[status] PUB sent=2532030 tps=24824 (pubs=10) | SUB recv=170248962 itps=1756830.58 p99=8226.56ms conn=11324620799/5853750810.68,2851604908.76,170248962,1000,1000,1000,0,0,0,0,0,0,9564871467.48,9882730340.35,9904758875.19,9625157296.71,1756980
+[status] PUB sent=2652030 tps=25501 (pubs=10) | SUB recv=176571221 itps=99484.56 p99=8420.85ms conn=11358175231/5988576150.43,2895344478.79,176571221,1000,1000,1000,0,0,0,0,0,0,9307160575,9378463743,9405726719,9302357065.15,99500
+[status] PUB sent=2712030 tps=25829 (pubs=10) | SUB recv=182560859 itps=1954888.94 p99=8553.61ms conn=11416895487/6104561170.19,2916481539.83,182560859,1000,1000,1000,0,0,0,0,0,0,9360910951.76,9679562514.20,9705563457.54,9385951513.58,1954859
+[status] PUB sent=2832030 tps=26468 (pubs=10) | SUB recv=190854641 itps=1628853.19 p99=8675.64ms conn=11450449919/6254962590.18,2960330474.45,190854634,1000,1000,1000,0,0,0,0,0,0,9663860104.01,9832298185.26,9851708692.48,9611173690.27,1628798
+[status] PUB sent=2952030 tps=27083 (pubs=10) | SUB recv=197399575 itps=478784.29 p99=8747.06ms conn=11651776511/6365082156.28,2980057470.80,197399571,1000,1000,1000,0,0,0,0,0,0,9330204632.33,9601405778.16,9620503868.07,9196775025.76,478820
+[status] PUB sent=3012030 tps=27382 (pubs=10) | SUB recv=203720030 itps=2743090.68 p99=8810.52ms conn=12096372735/6467782553.70,2988850560.95,203720030,1000,1000,1000,0,0,0,0,0,0,9777686090.24,9998829862.64,10021567547.98,9728750690.94,2743198
+[status] PUB sent=3132030 tps=27965 (pubs=10) | SUB recv=211091773 itps=1880365.44 p99=8873.94ms conn=12096372735/6583740845.64,3025288372.39,211091773,1000,1000,1000,0,0,0,0,0,0,9656685792.34,10047144773.19,10082970763.78,9644151192.22,1880283
+[status] PUB sent=3252030 tps=28527 (pubs=10) | SUB recv=218984774 itps=1807765.58 p99=8995.20ms conn=12096372735/6702683068.00,3038393514.21,218984774,1000,1000,1000,0,0,0,0,0,0,9663690529.66,9898735746.76,9929641165.42,9649576161.95,1807918
+[status] PUB sent=3372030 tps=29070 (pubs=10) | SUB recv=225661157 itps=128762.57 p99=9101.35ms conn=12096372735/6801617502.93,3055838842.25,225661149,1000,1000,1000,0,0,0,0,0,0,10863247359,11023829283.57,11048995107.57,10695633093.24,128730
+[status] PUB sent=3432030 tps=29334 (pubs=10) | SUB recv=232205321 itps=2727546.86 p99=9152.08ms conn=12096372735/6885310026.72,3055076636.97,232205321,1000,1000,1000,0,0,0,0,0,0,9645906621.72,10051769888.12,10080200038.77,9621291443.09,2727708
+[status] PUB sent=3552030 tps=29849 (pubs=10) | SUB recv=239497728 itps=1816243.69 p99=9378.11ms conn=12113149951/6976140845.58,3065140486.00,239497728,1000,1000,1000,0,0,0,0,0,0,9756870247.29,9877587625.76,9898915822.45,9625597521.66,1816063
+[status] PUB sent=3612250 tps=29854 (pubs=10) | SUB recv=249634723 itps=2029225.14 p99=9534.45ms conn=12448694271/7093701919.61,3060221819.91,249634723,1000,1000,1000,0,0,0,0,0,0,9464931193.59,9773988841.27,9790176285.65,9470118483.92,2029222
+[status] PUB sent=3612650 tps=29372 (pubs=10) | SUB recv=258444279 itps=669738.25 p99=9605.50ms conn=12448694271/7175838849.94,3044885208.46,258444281,1000,1000,1000,0,0,0,0,0,0,10034357551.95,10152796772.77,10175042024.17,10016707935.35,669722
+[status] PUB sent=3613050 tps=28905 (pubs=10) | SUB recv=266099961 itps=3230246.95 p99=9621.42ms conn=12448694271/7228593775.95,3017971897.78,266099961,1000,1000,1000,0,0,0,0,0,0,8851553539.85,9060365990.18,9086765421.40,8869439054.91,3230282
+[status] PUB sent=3613250 tps=28677 (pubs=10) | SUB recv=275248720 itps=2366226.26 p99=9585.76ms conn=12448694271/7276169026.19,2981349612.50,275248720,1000,1000,1000,0,0,0,0,0,0,8514915572.27,8655518222.93,8688273414.36,8425852031.07,2366476
+[status] PUB sent=3613650 tps=28232 (pubs=10) | SUB recv=283763941 itps=1266668.41 p99=9590.96ms conn=12448694271/7312385588.08,2947125159.52,283763941,1000,1000,1000,0,0,0,0,0,0,8078210836.27,8365034217.68,8386884031.05,8093339106.51,1266825
+[status] PUB sent=3614050 tps=27801 (pubs=10) | SUB recv=287630475 itps=226944.64 p99=9589.42ms conn=12448694271/7330618639.04,2935689659.18,287630475,1000,1000,1000,0,0,0,0,0,0,8986030104.09,9081170194.27,9087426833.04,8493750608.80,226952
+[status] PUB sent=3614450 tps=27382 (pubs=10) | SUB recv=287734692 itps=19399.20 p99=9589.56ms conn=12448694271/7330205567.63,2936387042.83,287734692,1000,1000,1000,0,0,0,0,0,0,2281102.39,3594973.36,4855897.16,2335962.82,19399
+[status] PUB sent=3614650 tps=27178 (pubs=10) | SUB recv=287765393 itps=10103.54 p99=9589.56ms conn=12448694271/7329423766.23,2937280478.26,287765393,1000,1000,1000,0,0,0,0,0,0,2319948.49,3524055.62,4432695.84,2331114.21,10103
+[status] PUB sent=3615050 tps=26778 (pubs=10) | SUB recv=287803989 itps=8697.70 p99=9589.56ms conn=12448694271/7328441155.84,2938412957.63,287803989,1000,1000,1000,0,0,0,0,0,0,2198066.21,3309627.28,4402471.91,2202088.01,8698
+[status] PUB sent=3615450 tps=26390 (pubs=10) | SUB recv=287843988 itps=8699.50 p99=9589.53ms conn=12448694271/7327423111.58,2939582445.13,287843988,1000,1000,1000,0,0,0,0,0,0,2171641.94,3268078.05,3404510.87,2141598.90,8700
+[status] PUB sent=3615850 tps=26014 (pubs=10) | SUB recv=287879391 itps=4100.06 p99=9589.44ms conn=12448694271/7326522278.67,2940609708.33,287879391,1000,1000,1000,0,0,0,0,0,0,2177361.92,3773994.96,5882258.11,2306997.32,4100
+[status] PUB sent=3616250 tps=25647 (pubs=10) | SUB recv=287912986 itps=17695.10 p99=9589.37ms conn=12448694271/7325667657.59,2941598755.26,287912986,1000,1000,1000,0,0,0,0,0,0,2346553.13,3604140.00,4008525.27,2355201.56,17695
+[status] PUB sent=3616490 tps=25433 (pubs=10) | SUB recv=287946190 itps=10901.82 p99=9589.30ms conn=12448694271/7324823182.26,2942563900.19,287946190,1000,1000,1000,0,0,0,0,0,0,2325371.22,3619118.76,4118564.76,2323835.59,10902
+[status] PUB sent=3616850 tps=25117 (pubs=10) | SUB recv=287983992 itps=8700.67 p99=9589.24ms conn=12448694271/7323861984.72,2943665489.69,287983992,1000,1000,1000,0,0,0,0,0,0,2120822.92,3238770.60,3390150.54,2084852.39,8701
+[status] PUB sent=3617250 tps=24776 (pubs=10) | SUB recv=288023992 itps=8699.23 p99=9589.20ms conn=12448694271/7322845180.36,2944829194.47,288023992,1000,1000,1000,0,0,0,0,0,0,2165686.61,3296269.71,3796122.03,2153173.78,8699
+[status] PUB sent=3617650 tps=24444 (pubs=10) | SUB recv=288063592 itps=8305.16 p99=9589.10ms conn=12448694271/7321838824.02,2945979029.37,288063592,1000,1000,1000,0,0,0,0,0,0,2153243.64,3297430.90,4572983.01,2172300.78,8305
+[status] PUB sent=3618050 tps=24121 (pubs=10) | SUB recv=288097392 itps=2099.76 p99=9589.04ms conn=12448694271/7320980081.76,2946952638.14,288097392,1000,1000,1000,0,0,0,0,0,0,2353443.57,3388756.33,3460338.81,2244732.83,2100
+[status] PUB sent=3618450 tps=23806 (pubs=10) | SUB recv=288132391 itps=17101.11 p99=9588.97ms conn=12448694271/7320091092.03,2947975455.32,288132391,1000,1000,1000,0,0,0,0,0,0,2302800.75,3536609.37,3763079.42,2301200.95,17101
+[status] PUB sent=3618850 tps=23499 (pubs=10) | SUB recv=288166693 itps=11400.01 p99=9588.92ms conn=12448694271/7319220012.52,2948977664.28,288166693,1000,1000,1000,0,0,0,0,0,0,2381130.54,3528220.64,3797946.73,2358766.32,11400
+[status] PUB sent=3619050 tps=23349 (pubs=10) | SUB recv=288203990 itps=8699.64 p99=9588.83ms conn=12448694271/7318273097.45,2950049700.85,288203990,1000,1000,1000,0,0,0,0,0,0,2078984.09,3347623.92,3904110.42,2073372.41,8699
+[status] PUB sent=3619450 tps=23054 (pubs=10) | SUB recv=288243989 itps=8696.98 p99=9588.76ms conn=12448694271/7317257870.06,2951206253.26,288243989,1000,1000,1000,0,0,0,0,0,0,2079841.55,3236670.26,3413511.30,2057182.28,8697
+[status] PUB sent=3619850 tps=22767 (pubs=10) | SUB recv=288283993 itps=8700.77 p99=9588.72ms conn=12448694271/7316242798.33,2952361690.17,288283993,1000,1000,1000,0,0,0,0,0,0,2111044.73,3216922.36,3537097.19,2094335.38,8701
+[status] PUB sent=3620250 tps=22486 (pubs=10) | SUB recv=288323191 itps=7902.85 p99=9588.68ms conn=12448694271/7315248446.22,2953490827.56,288323191,1000,1000,1000,0,0,0,0,0,0,2163375.02,3239165.09,3324007.43,2116436.14,7903
+[status] PUB sent=3620650 tps=22213 (pubs=10) | SUB recv=288358595 itps=3300.24 p99=9588.59ms conn=12448694271/7314350571.60,2954504082.85,288358595,1000,1000,1000,0,0,0,0,0,0,2237268.33,3237390.52,3286046.03,2179183.44,3300
+[status] PUB sent=3621050 tps=21946 (pubs=10) | SUB recv=288394289 itps=18994.89 p99=9588.55ms conn=12448694271/7313445570.45,2955545495.76,288394289,1000,1000,1000,0,0,0,0,0,0,2278411.67,3510539.79,3711406.06,2292429.46,18995
+[status] PUB sent=3621450 tps=21686 (pubs=10) | SUB recv=288431690 itps=16397.89 p99=9588.37ms conn=12448694271/7312497532.58,2956611283.47,288431690,1000,1000,1000,0,0,0,0,0,0,2334204.94,3590843.15,4188811.57,2346882.77,16398
+[status] PUB sent=3621850 tps=21431 (pubs=10) | SUB recv=288466493 itps=11198.32 p99=9588.19ms conn=12448694271/7311615568.18,2957620978.93,288466493,1000,1000,1000,0,0,0,0,0,0,2436334.68,3618222.07,3885884.77,2423723.54,11198
+[status] PUB sent=3622250 tps=21183 (pubs=10) | SUB recv=288503993 itps=8701.75 p99=9588.03ms conn=12448694271/7310665481.31,2958693270.52,288503993,1000,1000,1000,0,0,0,0,0,0,2171000.45,3230310.27,3285813.40,2134562.13,8701
+[status] PUB sent=3622450 tps=21061 (pubs=10) | SUB recv=288543994 itps=8704.57 p99=9587.99ms conn=12448694271/7309652318.24,2959840310.45,288543994,1000,1000,1000,0,0,0,0,0,0,2167128.49,3289994.19,3494210.49,2146384.51,8705
+[status] PUB sent=3622850 tps=20821 (pubs=10) | SUB recv=288583995 itps=8697.36 p99=9587.67ms conn=12448694271/7308639433.42,2960986184.69,288583995,1000,1000,1000,0,0,0,0,0,0,2115341.30,3193123.67,3289549.20,2088950.82,8698
+[status] PUB sent=3623250 tps=20587 (pubs=10) | SUB recv=288623991 itps=8699.36 p99=9587.43ms conn=12448694271/7307626951.26,2962130625.36,288623991,1000,1000,1000,0,0,0,0,0,0,2103243.92,3151986.11,3241583.05,2075548.12,8700
+[status] PUB sent=3623650 tps=20358 (pubs=10) | SUB recv=288663992 itps=8699.66 p99=9587.08ms conn=12448694271/7306614625.05,2963273972.49,288663992,1000,1000,1000,0,0,0,0,0,0,2157041.40,3278659.83,3668613.96,2155159.82,8699
+[status] PUB sent=3624050 tps=20134 (pubs=10) | SUB recv=288703994 itps=8700.42 p99=9586.99ms conn=12448694271/7305602556.23,2964416110.83,288703994,1000,1000,1000,0,0,0,0,0,0,2130028.45,3200985.58,3398728.55,2111975.51,8701
+
+=== Summary (fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty) ===
+Publishers: 10 | Subscribers: 1000
+=== Summary ===
+Publisher: sent=3624050 total_tps=20133.9 connections=10 active=10
+Subscriber: recv=288713100 total_tps=1590071.54 p50=5803.39ms p95=7982.96ms p99=9586.95ms connections=12448694271 active=7305372213.93,2964674823.15,288713100,1000,1000,1000,0,0,0,0,0,0,0,0,0,0,0
+Fanout run complete. Artifacts at artifacts/fanout_bursty_20260612_205518_zenoh_p64_s1000_u10_bursty/fanout_singlesite
+Stopping subscribers (1280230 1280259 1280355 1280523 1280729 1280911 1281097 1281281 1281437 1281605 1281790 1281968 1282138 1282303 1282484 1282650 1282830 1283021 1283194 1283363 1283568 1283708 1283883 1284052 1284226 1284415 1284576 1284755 1284913 1285073 1285266 1285435 1285595 1285765 1285941 1286106 1286280 1286463 1286640 1286806 1287023 1287170 1287330 1287501 1287671 1287847 1288008 1288203 1288371 1288536 1288708 1288910 1289079 1289234 1289402 1289586 1289784 1289943 1290102 1290275 1290475 1290661 1290807 1290973 1291145 1291325 1291492 1291668 1291853 1292014 1292176 1292349 1292519 1292704 1292896 1293066 1293215 1293399 1293577 1293742 1293953 1294098 1294252 1294411 1294583 1294750 1294922 1295120 1295309 1295487 1295668 1295855 1295995 1296173 1296343 1296520 1296703 1296855 1297017 1297205 1297396 1297580 1297734 1297896 1298077 1298244 1298431 1298615 1298771 1298937 1299104 1299281 1299456 1299636 1299794 1299985 1300154 1300326 1300494 1300688 1300863 1301011 1301175 1301359 1301533 1301718 1301899 1302072 1302232 1302393 1302559 1302744 1302933 1303092 1303284 1303462 1303632 1303788 1303941 1304121 1304346 1304500 1304644 1304817 1304998 1305179 1305346 1305511 1305678 1305851 1306056 1306223 1306382 1306549 1306743 1306907 1307067 1307255 1307417 1307602 1307793 1307967 1308121 1308308 1308473 1308634 1308802 1308994 1309160 1309323 1309495 1309668 1309867 1310027 1310190 1310381 1310544 1310716 1310884 1311073 1311279 1311422 1311583 1311755 1311925 1312092 1312277 1312437 1312619 1312784 1312965 1313137 1313311 1313492 1313660 1313821 1313984 1314192 1314365 1314518) and publishers (1314859 1314968 1315094 1315256 1315454 1315612 1315803 1315975 1316134 1316334)
+[20:59:23] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
+ Container router1 Stopping 
+ Container router1 Stopped 
+ Container router1 Removing 
+ Container router1 Removed 
+ Network ubuntu_default Removing 
+ Network ubuntu_default Removed 
+[20:59:37] Cooldown after zenoh: cleaning clients and waiting 120s for broker/network state to settle
+[21:01:37] Wrote phase-rate summary: /home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/phase-rate-summary.md
+[21:01:37] Plotting bursty fan-out results to /home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/plots
+[plot] LaTeX mode enabled: PDF + PNG output, 300 DPI
+[plot] Wrote plot points: /home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/raw_data/plot_points.csv
+[plot] Auto/selected plot tuning: throughput window=5, marker_every=4; latency window=3, marker_every=4; resource window=5, marker_every=3
+[plot] Wrote plots to /home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/plots
+[plot] Wrote gallery: /home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/plots/README.md
+[21:01:43] Done. Phase summary CSV: /home/cc/mq-bench/results/fanout_bursty_load_20260612_205456/raw_data/summary_by_phase.csv

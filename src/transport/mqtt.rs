@@ -166,7 +166,7 @@ impl Transport for MqttTransport {
                 match eventloop.poll().await {
                     Ok(Event::Incoming(Incoming::Publish(p))) => {
                         (handler)(TransportMessage {
-                            payload: Payload::from_bytes(Bytes::from(p.payload.to_vec())),
+                            payload: Payload::from_bytes(p.payload),
                         });
                     }
                     Ok(_) => {}

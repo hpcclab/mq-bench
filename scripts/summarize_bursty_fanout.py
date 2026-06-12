@@ -12,7 +12,8 @@ from typing import Dict, Iterable, List, Tuple
 HEADER = [
     "transport", "host", "port", "payload", "subs", "pubs", "phase",
     "phase_start_s", "phase_end_s", "rate_per_pub", "rate", "delivery_rate",
-    "run_id", "sub_tps", "p50_ms", "p95_ms", "p99_ms", "avg_latency_ms", "pub_tps", "sent",
+    "run_id", "sub_tps", "p25_ms", "p50_ms", "p75_ms", "p95_ms", "p99_ms",
+    "min_ms", "max_ms", "avg_latency_ms", "pub_tps", "sent",
     "recv", "errors", "loss_pct", "artifacts_dir", "max_cpu_perc",
     "max_mem_perc", "max_mem_used_bytes", "avg_cpu_perc", "avg_mem_perc",
     "avg_mem_used_bytes", "max_net_rx_bps", "max_net_tx_bps", "avg_net_rx_bps",
@@ -29,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--payload", required=True, type=int)
     p.add_argument("--subs", required=True, type=int)
     p.add_argument("--pubs", required=True, type=int)
+    p.add_argument("--subs-per-pub", type=int, default=None)
     p.add_argument("--profile", required=True)
     p.add_argument("--run-id", required=True)
     p.add_argument("--artifacts-dir", required=True)
@@ -122,6 +124,19 @@ def weighted_latency_ms(rows: List[Dict[str, str]], start_abs: float, end_abs: f
         return f"{(sum(fallback_values) / len(fallback_values)) / 1_000_000.0:.3f}"
     return ""
 
+
+
+def latency_extreme_ms(rows: List[Dict[str, str]], start_abs: float, end_abs: float, metric: str) -> str:
+    key = f"latency_ns_{metric}"
+    values = [
+        fnum(row, key, 0.0)
+        for row in rows
+        if start_abs < timestamp(row) <= end_abs and fnum(row, key, 0.0) > 0
+    ]
+    if not values:
+        return ""
+    value = min(values) if metric == "min" else max(values)
+    return f"{value / 1_000_000.0:.3f}"
 
 
 def mean_latency_ms(rows: List[Dict[str, str]], start_abs: float, end_abs: float) -> str:
@@ -253,6 +268,9 @@ def fmt_float(value: float) -> str:
 def main() -> int:
     args = parse_args()
     phases = parse_profile(args.profile)
+    fanout_subs = args.subs_per_pub if args.subs_per_pub is not None else args.subs
+    if fanout_subs <= 0:
+        raise SystemExit("--subs-per-pub must be positive")
     art_dir = args.artifacts_dir
     sub_rows = read_rows(os.path.join(art_dir, "sub_agg.csv"))
     pub_files = sorted(glob.glob(os.path.join(art_dir, "pub_*.csv")))
@@ -282,7 +300,7 @@ def main() -> int:
             pub_errors = sum(counter_delta(rows, "error_count", start_abs, end_abs) for rows in pub_rows_by_file)
             recv = counter_delta(sub_rows, "received_count", start_abs, end_abs)
             sub_errors = counter_delta(sub_rows, "error_count", start_abs, end_abs)
-            expected_recv = sent * args.subs
+            expected_recv = sent * fanout_subs
             loss_pct = ((expected_recv - recv) / expected_recv * 100.0) if expected_recv > 0 else 0.0
             stats = aggregate_stats(stats_rows, start_abs, end_abs)
 
@@ -298,12 +316,16 @@ def main() -> int:
                 "phase_end_s": f"{phase['end']:.0f}",
                 "rate_per_pub": f"{phase['rate']:.2f}".rstrip('0').rstrip('.'),
                 "rate": f"{phase['rate'] * args.pubs:.2f}".rstrip('0').rstrip('.'),
-                "delivery_rate": f"{phase['rate'] * args.pubs * args.subs:.2f}".rstrip('0').rstrip('.'),
+                "delivery_rate": f"{phase['rate'] * args.pubs * fanout_subs:.2f}".rstrip('0').rstrip('.'),
                 "run_id": args.run_id,
                 "sub_tps": fmt_float(recv / duration),
+                "p25_ms": weighted_latency_ms(sub_rows, start_abs, end_abs, "p25"),
                 "p50_ms": weighted_latency_ms(sub_rows, start_abs, end_abs, "p50"),
+                "p75_ms": weighted_latency_ms(sub_rows, start_abs, end_abs, "p75"),
                 "p95_ms": weighted_latency_ms(sub_rows, start_abs, end_abs, "p95"),
                 "p99_ms": weighted_latency_ms(sub_rows, start_abs, end_abs, "p99"),
+                "min_ms": latency_extreme_ms(sub_rows, start_abs, end_abs, "min"),
+                "max_ms": latency_extreme_ms(sub_rows, start_abs, end_abs, "max"),
                 "avg_latency_ms": mean_latency_ms(sub_rows, start_abs, end_abs),
                 "pub_tps": fmt_float(sent / duration),
                 "sent": f"{sent:.0f}",

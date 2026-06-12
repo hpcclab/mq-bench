@@ -4,8 +4,12 @@ set -euo pipefail
 # Orchestrate Experiment 3: Bursty Fan-Out Under Dynamic Traffic.
 #
 # Topology:
-#   P publishers -> S subscribers
-#   All publishers publish to the same topic; all subscribers subscribe to it.
+#   Controlled fan-out: P independent publisher/topic groups.
+#   Each publisher publishes to its own topic, and each topic has SUBS_PER_PUB
+#   subscribers. Use --sub-procs-per-topic to split each topic's subscribers
+#   across multiple client processes when the subscriber harness is the bottleneck.
+#   This differs from broadcast fan-out, where one shared topic
+#   causes every subscriber to receive every published message.
 #
 # Default traffic profile, per publisher:
 #   warmup:60:10,baseline:60:10,burst:60:30,elevated:60:15,recovery:60:10
@@ -27,7 +31,9 @@ source "${SCRIPT_DIR}/lib.sh"
 
 SUBS=1000
 SUBS_PER_PUB=100
+SUB_PROCS_PER_TOPIC=${SUB_PROCS_PER_TOPIC:-1}
 PUBLISHERS=""
+NUM_PUBS=0
 PAYLOAD_TOKEN="1024"
 SNAPSHOT=1
 QOS=0
@@ -45,6 +51,7 @@ SSH_TARGET=""
 REMOTE_DIR="~/mq-bench"
 APPEND_LATEST=0
 SUMMARY_OVERRIDE="${SUMMARY_OVERRIDE:-}"
+SUB_RAMP_UP_SECS="${SUB_RAMP_UP_SECS:-}"
 
 MQTT_BROKERS="mosquitto:127.0.0.1:1883 emqx:127.0.0.1:1884 hivemq:127.0.0.1:1885 rabbitmq:127.0.0.1:1886 artemis:127.0.0.1:1887"
 DEFAULT_MQTT_BROKERS="${MQTT_BROKERS}"
@@ -104,9 +111,10 @@ profile_duration_secs() {
 
 write_phase_rate_summary() {
   local out="${BENCH_DIR}/phase-rate-summary.md"
-  local pubs subs payload profile
+  local pubs subs subs_per_pub payload profile
   pubs="$(calc_pubs_for_subs)"
   subs="${SUBS}"
+  subs_per_pub="${SUBS_PER_PUB}"
   payload="${PAYLOAD_BYTES}"
   profile="${RATE_PROFILE}"
 
@@ -115,14 +123,14 @@ write_phase_rate_summary() {
     return 0
   fi
 
-  python3 - "${out}" "${profile}" "${subs}" "${pubs}" "${payload}" <<'PY'
+  python3 - "${out}" "${profile}" "${subs}" "${pubs}" "${subs_per_pub}" "${payload}" <<'PY'
 import sys
 
-out, profile, subs_s, pubs_s, payload_s = sys.argv[1:]
+out, profile, subs_s, pubs_s, subs_per_pub_s, payload_s = sys.argv[1:]
 subs = int(subs_s)
 pubs = int(pubs_s)
+subs_per_pub = int(subs_per_pub_s)
 payload = int(payload_s)
-subs_per_pub = (subs + pubs - 1) // pubs if pubs else 0
 
 def fmt_rate(value):
     if abs(value) >= 1_000_000:
@@ -139,7 +147,7 @@ for item in profile.split(","):
     phase, duration_s, rate_s = parts
     rate_per_pub = float(rate_s)
     total_pub_rate = rate_per_pub * pubs
-    fanout_target = total_pub_rate * subs
+    fanout_target = total_pub_rate * subs_per_pub
     rows.append((phase, duration_s, rate_per_pub, total_pub_rate, fanout_target))
 
 with open(out, "w", encoding="utf-8") as fh:
@@ -148,12 +156,12 @@ with open(out, "w", encoding="utf-8") as fh:
     fh.write("## Run Setup\n\n")
     fh.write(f"- Subscribers: `{subs}`\n")
     fh.write(f"- Publishers: `{pubs}`\n")
-    fh.write(f"- Subscribers per publisher: `{subs_per_pub}`\n")
+    fh.write(f"- Subscribers per publisher/topic: `{subs_per_pub}`\n")
     fh.write(f"- Payload: `{payload} bytes`\n\n")
     fh.write("## Rate Definitions\n\n")
     fh.write("```text\n")
     fh.write("total publish rate = rate_per_publisher * publishers\n")
-    fh.write("fan-out delivery target = total publish rate * subscribers\n")
+    fh.write("controlled fan-out delivery target = total publish rate * subscribers_per_publisher\n")
     fh.write("```\n\n")
     fh.write("## Phase Message Rates\n\n")
     fh.write("| Phase | Duration | Rate per publisher | Total publish rate | Fan-out delivery target |\n")
@@ -168,10 +176,77 @@ PY
 }
 
 calc_pubs_for_subs() {
-  if [[ -n "${PUBLISHERS}" ]]; then echo "${PUBLISHERS}"; return 0; fi
-  local pubs=$(( (SUBS + SUBS_PER_PUB - 1) / SUBS_PER_PUB ))
-  if (( pubs < 1 )); then pubs=1; fi
-  echo "${pubs}"
+  if (( NUM_PUBS > 0 )); then
+    echo "${NUM_PUBS}"
+    return 0
+  fi
+  if [[ "${SUBS}" =~ ^[0-9]+$ && "${SUBS_PER_PUB}" =~ ^[0-9]+$ ]] && (( SUBS_PER_PUB > 0 )); then
+    echo $(( SUBS / SUBS_PER_PUB ))
+  else
+    echo 0
+  fi
+}
+
+validate_controlled_fanout() {
+  if [[ ! "${SUBS}" =~ ^[0-9]+$ ]] || (( SUBS <= 0 )); then
+    echo "[error] Invalid --subs: ${SUBS}" >&2
+    exit 2
+  fi
+  if [[ ! "${SUBS_PER_PUB}" =~ ^[0-9]+$ ]] || (( SUBS_PER_PUB <= 0 )); then
+    echo "[error] Invalid --subs-per-pub: ${SUBS_PER_PUB}" >&2
+    exit 2
+  fi
+  if (( SUBS % SUBS_PER_PUB != 0 )); then
+    echo "ERROR: --subs must be divisible by --subs-per-pub for controlled fan-out" >&2
+    exit 1
+  fi
+
+  NUM_PUBS=$(( SUBS / SUBS_PER_PUB ))
+  if [[ -n "${PUBLISHERS}" ]]; then
+    if [[ ! "${PUBLISHERS}" =~ ^[0-9]+$ ]] || (( PUBLISHERS <= 0 )); then
+      echo "[error] Invalid --publishers: ${PUBLISHERS}" >&2
+      exit 2
+    fi
+    if (( PUBLISHERS != NUM_PUBS )); then
+      echo "[error] --publishers is derived from --subs / --subs-per-pub for controlled fan-out; expected ${NUM_PUBS}, got ${PUBLISHERS}" >&2
+      exit 2
+    fi
+  fi
+}
+
+print_controlled_fanout_summary() {
+  echo "Controlled fan-out configuration:"
+  echo "Total subscribers: ${SUBS}"
+  echo "Subscribers per publisher/topic: ${SUBS_PER_PUB}"
+  echo "Publishers/topics: ${NUM_PUBS}"
+  echo "Effective fan-out ratio: 1:${SUBS_PER_PUB}"
+  echo "Expected delivery target per phase:"
+  python3 - "${RATE_PROFILE}" "${NUM_PUBS}" "${SUBS_PER_PUB}" <<'PY'
+import sys
+
+profile, pubs_s, subs_per_pub_s = sys.argv[1:]
+pubs = int(pubs_s)
+subs_per_pub = int(subs_per_pub_s)
+
+def fmt(value):
+    if abs(value - round(value)) < 1e-9:
+        return f"{int(round(value)):,}"
+    return f"{value:,.2f}"
+
+for item in profile.split(','):
+    parts = item.split(':')
+    if len(parts) != 3:
+        continue
+    phase, duration_s, rate_s = parts
+    rate = float(rate_s)
+    target = pubs * rate * subs_per_pub
+    print(f"  {phase}:{duration_s}s rate {fmt(rate)} msg/s/pub -> {fmt(target)} delivered msg/s")
+PY
+}
+
+calc_sub_ramp_up_secs() {
+  if [[ -n "${SUB_RAMP_UP_SECS}" ]]; then echo "${SUB_RAMP_UP_SECS}"; return 0; fi
+  if (( SUBS >= 2000 )); then echo 60; else echo 0; fi
 }
 
 get_services() {
@@ -362,7 +437,7 @@ copy_run_raw_data() {
 summarize_run() {
   local transport="$1" host="$2" port="$3" payload="$4" subs="$5" pubs="$6" rid="$7" art_dir="$8"
   if [[ "${DRY_RUN}" = 1 ]]; then
-    echo "+ python3 ${SCRIPT_DIR}/summarize_bursty_fanout.py --out ${SUMMARY_CSV} --transport ${transport} --host ${host} --port ${port} --payload ${payload} --subs ${subs} --pubs ${pubs} --profile ${RATE_PROFILE} --run-id ${rid} --artifacts-dir ${art_dir}"
+    echo "+ python3 ${SCRIPT_DIR}/summarize_bursty_fanout.py --out ${SUMMARY_CSV} --transport ${transport} --host ${host} --port ${port} --payload ${payload} --subs ${subs} --pubs ${pubs} --subs-per-pub ${SUBS_PER_PUB} --profile ${RATE_PROFILE} --run-id ${rid} --artifacts-dir ${art_dir}"
     return 0
   fi
   python3 "${SCRIPT_DIR}/summarize_bursty_fanout.py" \
@@ -373,6 +448,7 @@ summarize_run() {
     --payload "${payload}" \
     --subs "${subs}" \
     --pubs "${pubs}" \
+    --subs-per-pub "${SUBS_PER_PUB}" \
     --profile "${RATE_PROFILE}" \
     --run-id "${rid}" \
     --artifacts-dir "${art_dir}"
@@ -380,10 +456,13 @@ summarize_run() {
 
 run_single_execution() {
   local transport="$1" broker_name="${2:-}" broker_host="${3:-}" broker_port="${4:-}"
-  local pubs payload host_env monitor_env summary_transport summary_host summary_port rid_suffix rid art_dir env_common stats_container stats_pid stats_csv stats_duration remote_stats_target
+  local pubs payload sub_ramp_up_secs sub_ramp_duration_secs host_env monitor_env summary_transport summary_host summary_port rid_suffix rid art_dir env_common stats_container stats_pid stats_csv stats_duration remote_stats_target
   cleanup_processes
   pubs="$(calc_pubs_for_subs)"
   payload="${PAYLOAD_BYTES}"
+  sub_ramp_up_secs="$(calc_sub_ramp_up_secs)"
+  sub_ramp_duration_secs="${sub_ramp_up_secs%%.*}"
+  if [[ ! "${sub_ramp_duration_secs}" =~ ^[0-9]+$ ]]; then sub_ramp_duration_secs=0; fi
   summary_transport="${transport}"
   summary_host="${broker_host:-${HOST:-127.0.0.1}}"
   summary_port="${broker_port:-}"
@@ -411,14 +490,14 @@ run_single_execution() {
 
   local profile_q
   profile_q=$(printf '%q' "${RATE_PROFILE}")
-  env_common="PUBS=${pubs} SUBS=${SUBS} RATE_PROFILE=${profile_q} PAYLOAD=${payload} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT}"
+  env_common="PUBS=${pubs} SUBS=${SUBS} SUBS_PER_PUB=${SUBS_PER_PUB} SUB_PROCS_PER_TOPIC=${SUB_PROCS_PER_TOPIC} CONTROLLED_FANOUT=1 SUB_RAMP_UP_SECS=${sub_ramp_up_secs} RATE_PROFILE=${profile_q} PAYLOAD=${payload} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT}"
   host_env=""
   monitor_env=""
   if ! is_remote_host "${summary_host}" && [[ -n "${stats_container}" ]]; then monitor_env="MONITOR_CONTAINERS=${stats_container}"; fi
 
   stats_pid=0
   stats_csv="${art_dir}/docker_stats.csv"
-  stats_duration=$(( DURATION + 15 ))
+  stats_duration=$(( DURATION + sub_ramp_duration_secs + 15 ))
   if [[ "${DRY_RUN}" != 1 ]] && is_remote_host "${summary_host}"; then
     remote_stats_target="$(get_remote_stats_target "${summary_host}")"
     log "Starting remote stats collector on ${remote_stats_target} for ${stats_duration}s..."
@@ -472,6 +551,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --subs) shift; SUBS=${1:-1000} ;;
     --subs-per-pub) shift; SUBS_PER_PUB=${1:-100} ;;
+    --sub-procs-per-topic) shift; SUB_PROCS_PER_TOPIC=${1:-1} ;;
     --publishers) shift; PUBLISHERS=${1:-} ;;
     --payload) shift; PAYLOAD_TOKEN=${1:-1024} ;;
     --rate-profile) shift; RATE_PROFILE=${1:-} ;;
@@ -507,6 +587,7 @@ PAYLOAD_BYTES="$(to_bytes "${PAYLOAD_TOKEN}")"
 if [[ ! "${PAYLOAD_BYTES}" =~ ^[0-9]+$ ]]; then echo "[error] Invalid --payload: ${PAYLOAD_TOKEN}" >&2; exit 2; fi
 if [[ -z "${RATE_PROFILE}" ]]; then echo "[error] --rate-profile cannot be empty" >&2; exit 2; fi
 if ! DURATION="$(profile_duration_secs "${RATE_PROFILE}")"; then echo "[error] Invalid --rate-profile: ${RATE_PROFILE}" >&2; exit 2; fi
+validate_controlled_fanout
 
 resolve_named_brokers "${MQTT_BROKERS}" "${DEFAULT_MQTT_BROKERS}" MQTT_BROKERS_ARR
 resolve_named_brokers "${AMQP_BROKERS}" "${DEFAULT_AMQP_BROKERS}" AMQP_BROKERS_ARR
@@ -518,6 +599,7 @@ log "Fan-out bursty-load benchmark -> ${BENCH_DIR}"
 log "Resolved: SUMMARY_CSV=${SUMMARY_CSV} | PLOTS_DIR=${PLOTS_DIR} | RAW_DIR=${RAW_DIR}"
 log "Resolved payload=${PAYLOAD_BYTES}B subs=${SUBS} pubs=$(calc_pubs_for_subs) duration=${DURATION}s profile=${RATE_PROFILE}"
 log "Inter-run cooldown: ${INTERVAL_SEC}s (use --cooldown-sec N or --interval-sec N to override)"
+print_controlled_fanout_summary
 
 if [[ ${START_SERVICES} -eq 1 && ${SEQUENTIAL} -eq 0 ]]; then
   if [[ -n "${HOST}" && "${HOST}" != "127.0.0.1" && "${HOST}" != "localhost" ]]; then

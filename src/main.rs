@@ -333,6 +333,10 @@ enum Commands {
         #[arg(long, default_value = "1")]
         subscribers: u32,
 
+        /// Total ramp-up time in seconds to spread subscriber connection creation
+        #[arg(long, default_value = "0")]
+        ramp_up_secs: f64,
+
         /// QoS level (0,1,2). Mapped per engine; for zenoh: 0=best effort, 1/2=reliable
         #[arg(long, default_value_t = 0u8)]
         qos: u8,
@@ -903,6 +907,7 @@ async fn main() -> Result<()> {
             expr,
             subscribers,
             qos,
+            ramp_up_secs,
             csv,
             enable_retry,
             retry_count,
@@ -955,7 +960,14 @@ async fn main() -> Result<()> {
             } else {
                 None
             };
-            for _i in 0..subscribers {
+            let ramp_delay = if subscribers > 1 && ramp_up_secs > 0.0 {
+                Some(std::time::Duration::from_secs_f64(
+                    ramp_up_secs / f64::from(subscribers - 1),
+                ))
+            } else {
+                None
+            };
+            for i in 0..subscribers {
                 let crash_cfg = mq_bench::CrashConfig {
                     mttf_secs: mttf,
                     mttr_secs: mttr,
@@ -976,6 +988,11 @@ async fn main() -> Result<()> {
                 handles.push(tokio::spawn(async move {
                     let _ = run_subscriber(cfg).await;
                 }));
+                if i + 1 < subscribers {
+                    if let Some(delay) = ramp_delay {
+                        tokio::time::sleep(delay).await;
+                    }
+                }
             }
             let _ = join_all(handles).await;
             // Final snapshot and cleanup
