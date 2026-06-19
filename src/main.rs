@@ -372,6 +372,18 @@ enum Commands {
         /// RNG seed for reproducible crash patterns
         #[arg(long)]
         crash_seed: Option<u64>,
+
+        /// High-throughput subscriber mode: count every receive cheaply and sample latency
+        #[arg(long, default_value = "false")]
+        fast_count: bool,
+
+        /// Record latency for every Nth received message in --fast-count mode (0 = no latency samples)
+        #[arg(long, default_value = "1000")]
+        latency_sample_rate: u64,
+
+        /// Disable sequence duplicate/gap tracking in normal subscriber mode
+        #[arg(long, default_value = "false")]
+        disable_sequence_tracking: bool,
     },
     /// Requester role
     Req {
@@ -916,6 +928,9 @@ async fn main() -> Result<()> {
             mttr,
             crash_count,
             crash_seed,
+            fast_count,
+            latency_sample_rate,
+            disable_sequence_tracking,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
@@ -984,6 +999,9 @@ async fn main() -> Result<()> {
                     disable_internal_snapshot: true,
                     test_stop_after_secs: None,
                     crash_config: crash_cfg,
+                    fast_count,
+                    latency_sample_rate,
+                    disable_sequence_tracking,
                 };
                 handles.push(tokio::spawn(async move {
                     let _ = run_subscriber(cfg).await;

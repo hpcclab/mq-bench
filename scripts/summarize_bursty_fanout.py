@@ -3,6 +3,7 @@
 import argparse
 import csv
 import glob
+import json
 import math
 import os
 import re
@@ -32,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--pubs", required=True, type=int)
     p.add_argument("--subs-per-pub", type=int, default=None)
     p.add_argument("--profile", required=True)
+    p.add_argument("--phase-offset", type=float, default=0.0)
     p.add_argument("--run-id", required=True)
     p.add_argument("--artifacts-dir", required=True)
     return p.parse_args()
@@ -50,7 +52,7 @@ def parse_profile(spec: str) -> List[Dict[str, float]]:
         name, duration_s, rate = parts
         duration = float(duration_s)
         rate_f = float(rate)
-        if not name or duration <= 0 or rate_f <= 0:
+        if not name or duration <= 0 or rate_f < 0:
             raise ValueError(f"invalid phase '{raw}'")
         phases.append({"name": name, "start": cursor, "end": cursor + duration, "rate": rate_f})
         cursor += duration
@@ -64,6 +66,42 @@ def read_rows(path: str) -> List[Dict[str, str]]:
         return []
     with open(path, newline='') as f:
         return list(csv.DictReader(f))
+
+
+def read_early_stop(art_dir: str) -> Dict[str, object]:
+    path = os.path.join(art_dir, "EARLY_STOP.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def phase_effective_end(phase: Dict[str, float], early_stop: Dict[str, object]) -> float:
+    if not early_stop:
+        return phase["end"]
+    try:
+        stop_elapsed = float(early_stop.get("stop_elapsed_s", phase["end"]))
+    except (TypeError, ValueError):
+        stop_elapsed = phase["end"]
+    if stop_elapsed < phase["start"]:
+        return phase["start"]
+    if phase["start"] <= stop_elapsed <= phase["end"]:
+        return stop_elapsed
+    return phase["end"]
+
+
+def should_skip_phase_after_early_stop(phase: Dict[str, float], early_stop: Dict[str, object]) -> bool:
+    if not early_stop:
+        return False
+    try:
+        stop_elapsed = float(early_stop.get("stop_elapsed_s", phase["end"]))
+    except (TypeError, ValueError):
+        return False
+    return phase["start"] > stop_elapsed
 
 
 def fnum(row: Dict[str, str], key: str, default: float = 0.0) -> float:
@@ -276,14 +314,19 @@ def main() -> int:
     pub_files = sorted(glob.glob(os.path.join(art_dir, "pub_*.csv")))
     pub_rows_by_file = [read_rows(p) for p in pub_files if not p.endswith("pub_agg.csv")]
     stats_rows = read_rows(os.path.join(art_dir, "docker_stats.csv"))
+    early_stop = read_early_stop(art_dir)
 
     all_pub_rows = [row for rows in pub_rows_by_file for row in rows]
     start_candidates = [timestamp(r) for r in all_pub_rows if fnum(r, "sent_count", 0.0) > 0]
     if not start_candidates:
         start_candidates = [timestamp(r) for r in sub_rows if timestamp(r) > 0]
     if not start_candidates:
-        raise SystemExit(f"no timestamped rows found in {art_dir}")
-    run_start = min(start_candidates)
+        if early_stop:
+            run_start = 0.0
+        else:
+            raise SystemExit(f"no timestamped rows found in {art_dir}")
+    else:
+        run_start = min(start_candidates)
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     write_header = not os.path.exists(args.out) or os.path.getsize(args.out) == 0
@@ -292,9 +335,14 @@ def main() -> int:
         if write_header:
             writer.writeheader()
         for phase in phases:
+            if should_skip_phase_after_early_stop(phase, early_stop):
+                continue
+            effective_end = phase_effective_end(phase, early_stop)
             start_abs = run_start + phase["start"]
-            end_abs = run_start + phase["end"]
-            duration = max(phase["end"] - phase["start"], 1.0)
+            end_abs = run_start + effective_end
+            duration = max(effective_end - phase["start"], 1.0)
+            display_start = phase["start"] + args.phase_offset
+            display_end = effective_end + args.phase_offset
 
             sent = sum(counter_delta(rows, "sent_count", start_abs, end_abs) for rows in pub_rows_by_file)
             pub_errors = sum(counter_delta(rows, "error_count", start_abs, end_abs) for rows in pub_rows_by_file)
@@ -312,8 +360,8 @@ def main() -> int:
                 "subs": args.subs,
                 "pubs": args.pubs,
                 "phase": phase["name"],
-                "phase_start_s": f"{phase['start']:.0f}",
-                "phase_end_s": f"{phase['end']:.0f}",
+                "phase_start_s": f"{display_start:.0f}",
+                "phase_end_s": f"{display_end:.0f}",
                 "rate_per_pub": f"{phase['rate']:.2f}".rstrip('0').rstrip('.'),
                 "rate": f"{phase['rate'] * args.pubs:.2f}".rstrip('0').rstrip('.'),
                 "delivery_rate": f"{phase['rate'] * args.pubs * fanout_subs:.2f}".rstrip('0').rstrip('.'),

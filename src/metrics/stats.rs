@@ -100,6 +100,15 @@ impl Stats {
         }
     }
 
+    /// Fast-path receive counter for high-throughput subscribers.
+    ///
+    /// This intentionally avoids async locks and latency histograms; sampled
+    /// latency can be recorded separately.
+    #[inline]
+    pub fn record_received_fast(&self) -> u64 {
+        self.received_count.fetch_add(1, Ordering::Relaxed) + 1
+    }
+
     /// Record an error
     pub async fn record_error(&self) {
         self.error_count.fetch_add(1, Ordering::Relaxed);
@@ -202,6 +211,18 @@ impl Stats {
             for &lat in latencies_ns {
                 let _ = hist.record(lat);
             }
+        }
+    }
+
+    /// Record sampled latencies without changing the received message count.
+    pub async fn record_latency_sample_batch(&self, latencies_ns: &[u64]) {
+        if latencies_ns.is_empty() {
+            return;
+        }
+
+        let mut hist = self.latency_hist.write().await;
+        for &lat in latencies_ns {
+            let _ = hist.record(lat);
         }
     }
 

@@ -23,6 +23,10 @@ set -euo pipefail
 #   scripts/orchestrate_fanout_bursty_load.sh --host 192.168.0.245 --transports "zenoh nats"
 #   scripts/orchestrate_fanout_bursty_load.sh --transports "mqtt" --mqtt-brokers "mosquitto emqx artemis"
 #   scripts/orchestrate_fanout_bursty_load.sh --dry-run --transports "zenoh"
+#   scripts/orchestrate_fanout_bursty_load.sh --append-to results/fanout_bursty_load_YYYYmmdd_HHMMSS --transports "nats" --rate-profile "burst:60:8000,recovery:60:100"
+#   scripts/orchestrate_fanout_bursty_load.sh --append-after-current --transports "nats" --rate-profile "burst:60:8000,recovery:60:100"
+#   scripts/orchestrate_fanout_bursty_load.sh --min-delivery-ratio 0.70 --continue-on-broker-fail
+#   scripts/orchestrate_fanout_bursty_load.sh --abort-on-under-target
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -40,6 +44,7 @@ QOS=0
 KEY="bench/topic"
 RUN_ID_PREFIX="fanout_bursty"
 RATE_PROFILE="warmup:60:10,baseline:60:10,burst:60:30,elevated:60:15,recovery:60:10"
+PLOT_BUCKET_SECONDS="${PLOT_BUCKET_SECONDS:-1}"
 TRANSPORTS=(zenoh redis nats rabbitmq mqtt)
 DEFAULT_TRANSPORTS=(zenoh redis nats rabbitmq mqtt)
 START_SERVICES=0
@@ -50,8 +55,16 @@ SEQUENTIAL=0
 SSH_TARGET=""
 REMOTE_DIR="~/mq-bench"
 APPEND_LATEST=0
+APPEND_TO_DIR=""
+WAIT_FOR_CURRENT_APPEND=0
+PHASE_OFFSET_SECONDS=0
 SUMMARY_OVERRIDE="${SUMMARY_OVERRIDE:-}"
 SUB_RAMP_UP_SECS="${SUB_RAMP_UP_SECS:-}"
+ABORT_ON_UNDER_TARGET="${ABORT_ON_UNDER_TARGET:-0}"
+MIN_DELIVERY_RATIO="${MIN_DELIVERY_RATIO:-0.70}"
+PHASE_GRACE_SECS="${PHASE_GRACE_SECS:-10}"
+STUCK_TIMEOUT_SECS="${STUCK_TIMEOUT_SECS:-30}"
+CONTINUE_ON_BROKER_FAIL=0
 
 MQTT_BROKERS="mosquitto:127.0.0.1:1883 emqx:127.0.0.1:1884 hivemq:127.0.0.1:1885 rabbitmq:127.0.0.1:1886 artemis:127.0.0.1:1887"
 DEFAULT_MQTT_BROKERS="${MQTT_BROKERS}"
@@ -68,6 +81,9 @@ PLOTS_DIR=""
 SUMMARY_CSV=""
 PAYLOAD_BYTES=""
 DURATION=0
+RUNS_REMAINING=0
+RUN_FAILURES=0
+STOP_AFTER_CURRENT=0
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 run() { if [[ "${DRY_RUN}" = 1 ]]; then echo "+ $*"; else eval "$*"; fi; }
@@ -109,8 +125,57 @@ profile_duration_secs() {
   '
 }
 
+current_orchestrator_pids() {
+  if ! command -v pgrep >/dev/null 2>&1; then return 0; fi
+  local pid
+  pgrep -f "scripts/orchestrate_fanout_bursty_load.sh" 2>/dev/null | while read -r pid; do
+    if [[ -z "${pid}" || "${pid}" == "$$" || "${pid}" == "${BASHPID}" ]]; then
+      continue
+    fi
+    if [[ "${pid}" =~ ^[0-9]+$ ]] && kill -0 "${pid}" 2>/dev/null; then
+      echo "${pid}"
+    fi
+  done
+}
+
+wait_for_current_orchestrators() {
+  if [[ "${WAIT_FOR_CURRENT_APPEND}" -ne 1 ]]; then return 0; fi
+  APPEND_LATEST=1
+  while true; do
+    local pids
+    pids="$(current_orchestrator_pids | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+    if [[ -z "${pids}" ]]; then
+      log "No active benchmark orchestrator found; proceeding with append-latest run"
+      return 0
+    fi
+    log "Waiting for active benchmark orchestrator(s) to finish before appending: ${pids}"
+    sleep 15
+  done
+}
+
+summary_max_phase_end() {
+  local summary="${1:-}"
+  if [[ -z "${summary}" || ! -s "${summary}" ]]; then echo 0; return 0; fi
+  python3 - "${summary}" <<'PY'
+import csv
+import sys
+
+max_end = 0.0
+with open(sys.argv[1], newline="") as fh:
+    for row in csv.DictReader(fh):
+        try:
+            max_end = max(max_end, float(row.get("phase_end_s") or 0))
+        except ValueError:
+            pass
+print(int(max_end) if max_end.is_integer() else max_end)
+PY
+}
+
 write_phase_rate_summary() {
   local out="${BENCH_DIR}/phase-rate-summary.md"
+  if [[ "${PHASE_OFFSET_SECONDS:-0}" != "0" && "${PHASE_OFFSET_SECONDS:-0}" != "0.0" ]]; then
+    out="${BENCH_DIR}/phase-rate-summary-append-$(timestamp).md"
+  fi
   local pubs subs subs_per_pub payload profile
   pubs="$(calc_pubs_for_subs)"
   subs="${SUBS}"
@@ -360,6 +425,13 @@ manage_service() {
 }
 
 init_dirs() {
+  if [[ -n "${APPEND_TO_DIR}" ]]; then
+    case "${APPEND_TO_DIR}" in
+      /*) BENCH_DIR="${APPEND_TO_DIR}" ;;
+      *) BENCH_DIR="${REPO_ROOT}/${APPEND_TO_DIR}" ;;
+    esac
+    APPEND_LATEST=1
+  fi
   if [[ ${APPEND_LATEST} -eq 1 ]] && [[ -z "${SUMMARY_OVERRIDE}" ]] && [[ -z "${BENCH_DIR}" ]]; then
     local latest_dir
     latest_dir=$(ls -1d "${REPO_ROOT}/results/fanout_bursty_load_"* 2>/dev/null | sort -r | head -1 || true)
@@ -386,6 +458,10 @@ init_dirs() {
     mkdir -p "$(dirname -- "${SUMMARY_CSV}")"
   else
     SUMMARY_CSV="${RAW_DIR}/summary_by_phase.csv"
+  fi
+  if [[ ${APPEND_LATEST} -eq 1 ]]; then
+    PHASE_OFFSET_SECONDS="$(summary_max_phase_end "${SUMMARY_CSV}")"
+    log "Append phase offset: ${PHASE_OFFSET_SECONDS}s"
   fi
 }
 
@@ -437,7 +513,7 @@ copy_run_raw_data() {
 summarize_run() {
   local transport="$1" host="$2" port="$3" payload="$4" subs="$5" pubs="$6" rid="$7" art_dir="$8"
   if [[ "${DRY_RUN}" = 1 ]]; then
-    echo "+ python3 ${SCRIPT_DIR}/summarize_bursty_fanout.py --out ${SUMMARY_CSV} --transport ${transport} --host ${host} --port ${port} --payload ${payload} --subs ${subs} --pubs ${pubs} --subs-per-pub ${SUBS_PER_PUB} --profile ${RATE_PROFILE} --run-id ${rid} --artifacts-dir ${art_dir}"
+    echo "+ python3 ${SCRIPT_DIR}/summarize_bursty_fanout.py --out ${SUMMARY_CSV} --transport ${transport} --host ${host} --port ${port} --payload ${payload} --subs ${subs} --pubs ${pubs} --subs-per-pub ${SUBS_PER_PUB} --profile ${RATE_PROFILE} --phase-offset ${PHASE_OFFSET_SECONDS} --run-id ${rid} --artifacts-dir ${art_dir}"
     return 0
   fi
   python3 "${SCRIPT_DIR}/summarize_bursty_fanout.py" \
@@ -450,13 +526,14 @@ summarize_run() {
     --pubs "${pubs}" \
     --subs-per-pub "${SUBS_PER_PUB}" \
     --profile "${RATE_PROFILE}" \
+    --phase-offset "${PHASE_OFFSET_SECONDS}" \
     --run-id "${rid}" \
     --artifacts-dir "${art_dir}"
 }
 
 run_single_execution() {
   local transport="$1" broker_name="${2:-}" broker_host="${3:-}" broker_port="${4:-}"
-  local pubs payload sub_ramp_up_secs sub_ramp_duration_secs host_env monitor_env summary_transport summary_host summary_port rid_suffix rid art_dir env_common stats_container stats_pid stats_csv stats_duration remote_stats_target
+  local pubs payload sub_ramp_up_secs sub_ramp_duration_secs host_env monitor_env summary_transport summary_host summary_port rid_suffix rid art_dir env_common stats_container stats_pid stats_csv stats_duration remote_stats_target run_status raw_art_dir
   cleanup_processes
   pubs="$(calc_pubs_for_subs)"
   payload="${PAYLOAD_BYTES}"
@@ -490,7 +567,7 @@ run_single_execution() {
 
   local profile_q
   profile_q=$(printf '%q' "${RATE_PROFILE}")
-  env_common="PUBS=${pubs} SUBS=${SUBS} SUBS_PER_PUB=${SUBS_PER_PUB} SUB_PROCS_PER_TOPIC=${SUB_PROCS_PER_TOPIC} CONTROLLED_FANOUT=1 SUB_RAMP_UP_SECS=${sub_ramp_up_secs} RATE_PROFILE=${profile_q} PAYLOAD=${payload} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT}"
+  env_common="PUBS=${pubs} SUBS=${SUBS} SUBS_PER_PUB=${SUBS_PER_PUB} SUB_PROCS_PER_TOPIC=${SUB_PROCS_PER_TOPIC} CONTROLLED_FANOUT=1 SUB_RAMP_UP_SECS=${sub_ramp_up_secs} RATE_PROFILE=${profile_q} PAYLOAD=${payload} DURATION=${DURATION} SNAPSHOT=${SNAPSHOT} ABORT_ON_UNDER_TARGET=${ABORT_ON_UNDER_TARGET} MIN_DELIVERY_RATIO=${MIN_DELIVERY_RATIO} PHASE_GRACE_SECS=${PHASE_GRACE_SECS} STUCK_TIMEOUT_SECS=${STUCK_TIMEOUT_SECS}"
   host_env=""
   monitor_env=""
   if ! is_remote_host "${summary_host}" && [[ -n "${stats_container}" ]]; then monitor_env="MONITOR_CONTAINERS=${stats_container}"; fi
@@ -510,41 +587,87 @@ run_single_execution() {
   fi
 
   log "Run: transport=${summary_transport} subs=${SUBS} pubs=${pubs} payload=${payload}B profile=${RATE_PROFILE}"
+  run_status=0
+  set +e
   case "${transport}" in
     zenoh)
       if [[ -n "${HOST}" ]]; then host_env="ENDPOINT_SUB=tcp/${HOST}:7447 ENDPOINT_PUB=tcp/${HOST}:7447"; fi
       run "${monitor_env} ENGINE=zenoh ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      run_status=$?
       ;;
     redis)
       if [[ -n "${HOST}" ]]; then host_env="REDIS_URL=redis://${HOST}:6379"; fi
       run "${monitor_env} ENGINE=redis ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      run_status=$?
       ;;
     nats)
       if [[ -n "${HOST}" ]]; then host_env="NATS_HOST=${HOST}"; fi
       run "${monitor_env} ENGINE=nats ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      run_status=$?
       ;;
     rabbitmq)
       if [[ -n "${HOST}" ]]; then host_env="RABBITMQ_HOST=${HOST}"; fi
       run "${monitor_env} ENGINE=rabbitmq ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      run_status=$?
       ;;
     mqtt)
       host_env="MQTT_HOST=${broker_host} MQTT_PORT=${broker_port}"
       if [[ "${broker_name}" == "artemis" ]]; then host_env="${host_env} MQTT_USERNAME=admin MQTT_PASSWORD=admin"; fi
       run "${monitor_env} ENGINE=mqtt ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      run_status=$?
       ;;
     amqp)
       local amqp_user="guest" amqp_pass="guest" amqp_vhost="%2f"
       if [[ "${broker_name}" == "artemis" ]]; then amqp_user="admin"; amqp_pass="admin"; amqp_vhost=""; fi
       host_env="RABBITMQ_URL=amqp://${amqp_user}:${amqp_pass}@${broker_host}:${broker_port}/${amqp_vhost}"
       run "${monitor_env} ENGINE=rabbitmq ${host_env} ${env_common} bash \"${SCRIPT_DIR}/run_fanout.sh\" \"${rid}\""
+      run_status=$?
       ;;
-    *) log "Unknown transport: ${transport}"; return 1 ;;
+    *)
+      log "Unknown transport: ${transport}"
+      run_status=1
+      ;;
   esac
+  set -e
 
   if [[ -n "${stats_pid}" ]] && (( stats_pid > 0 )); then kill "${stats_pid}" 2>/dev/null || true; wait "${stats_pid}" 2>/dev/null || true; fi
-  local raw_art_dir
   raw_art_dir="$(copy_run_raw_data "${rid}" "${art_dir}")"
-  summarize_run "${summary_transport}" "${summary_host}" "${summary_port}" "${payload}" "${SUBS}" "${pubs}" "${rid}" "${raw_art_dir}"
+  summarize_run "${summary_transport}" "${summary_host}" "${summary_port}" "${payload}" "${SUBS}" "${pubs}" "${rid}" "${raw_art_dir}" || {
+    local summarize_status=$?
+    if (( run_status == 0 )); then run_status=${summarize_status}; fi
+  }
+  return "${run_status}"
+}
+
+count_planned_runs() {
+  local total=0 t
+  for t in "${TRANSPORTS[@]}"; do
+    if [[ "${t}" == "mqtt" ]]; then
+      total=$(( total + ${#MQTT_BROKERS_ARR[@]} ))
+    elif [[ "${t}" == "amqp" ]]; then
+      total=$(( total + ${#AMQP_BROKERS_ARR[@]} ))
+    else
+      total=$(( total + 1 ))
+    fi
+  done
+  echo "${total}"
+}
+
+cooldown_if_more_runs() {
+  local label="${1:-broker runs}"
+  if (( RUNS_REMAINING > 0 )); then
+    RUNS_REMAINING=$(( RUNS_REMAINING - 1 ))
+  fi
+  if (( RUNS_REMAINING > 0 )); then
+    cooldown_between_runs "${label}"
+  fi
+}
+
+record_run_status() {
+  local status="$1"
+  if (( status == 0 )); then return 0; fi
+  if (( RUN_FAILURES == 0 )); then RUN_FAILURES=${status}; fi
+  if (( CONTINUE_ON_BROKER_FAIL == 0 )); then STOP_AFTER_CURRENT=1; fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -571,6 +694,15 @@ while [[ $# -gt 0 ]]; do
     --ssh-target) shift; SSH_TARGET=${1:-} ;;
     --remote-dir) shift; REMOTE_DIR=${1:-} ;;
     --append-latest) APPEND_LATEST=1 ;;
+    --append-to) shift; APPEND_TO_DIR=${1:-} ;;
+    --append-after-current) WAIT_FOR_CURRENT_APPEND=1 ;;
+    --plot-bucket-seconds) shift; PLOT_BUCKET_SECONDS=${1:-1} ;;
+    --min-delivery-ratio) shift; MIN_DELIVERY_RATIO=${1:-0.70} ;;
+    --phase-grace-secs) shift; PHASE_GRACE_SECS=${1:-10} ;;
+    --stuck-timeout-secs) shift; STUCK_TIMEOUT_SECS=${1:-30} ;;
+    --continue-on-broker-fail) CONTINUE_ON_BROKER_FAIL=1 ;;
+    --abort-on-under-target) ABORT_ON_UNDER_TARGET=1 ;;
+    --no-abort-on-under-target) ABORT_ON_UNDER_TARGET=0 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1" >&2; usage; exit 2 ;;
   esac
@@ -589,12 +721,14 @@ if [[ -z "${RATE_PROFILE}" ]]; then echo "[error] --rate-profile cannot be empty
 if ! DURATION="$(profile_duration_secs "${RATE_PROFILE}")"; then echo "[error] Invalid --rate-profile: ${RATE_PROFILE}" >&2; exit 2; fi
 validate_controlled_fanout
 
+wait_for_current_orchestrators
 resolve_named_brokers "${MQTT_BROKERS}" "${DEFAULT_MQTT_BROKERS}" MQTT_BROKERS_ARR
 resolve_named_brokers "${AMQP_BROKERS}" "${DEFAULT_AMQP_BROKERS}" AMQP_BROKERS_ARR
 rewrite_broker_hosts MQTT_BROKERS_ARR
 rewrite_broker_hosts AMQP_BROKERS_ARR
 
 init_dirs
+RUNS_REMAINING="$(count_planned_runs)"
 log "Fan-out bursty-load benchmark -> ${BENCH_DIR}"
 log "Resolved: SUMMARY_CSV=${SUMMARY_CSV} | PLOTS_DIR=${PLOTS_DIR} | RAW_DIR=${RAW_DIR}"
 log "Resolved payload=${PAYLOAD_BYTES}B subs=${SUBS} pubs=$(calc_pubs_for_subs) duration=${DURATION}s profile=${RATE_PROFILE}"
@@ -613,40 +747,65 @@ for t in "${TRANSPORTS[@]}"; do
   if [[ "${t}" == "mqtt" ]]; then
     for b in "${MQTT_BROKERS_ARR[@]}"; do
       IFS=: read -r bname bhost bport <<<"${b}"
-      svc=""; first_iteration=1
+      svc=""; run_status_main=0
       if [[ ${SEQUENTIAL} -eq 1 ]]; then svc="$(get_services "${bname}")"; fi
-      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service up "${svc}"; wait_for_port "${bhost}" "${bport}"; fi
-      run_single_execution "mqtt" "${bname}" "${bhost}" "${bport}"
-      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service down "${svc}"; fi
-      cooldown_between_runs "mqtt/${bname}"
+      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then
+        manage_service up "${svc}" || run_status_main=$?
+        if (( run_status_main == 0 )); then wait_for_port "${bhost}" "${bport}" || run_status_main=$?; fi
+      fi
+      if (( run_status_main == 0 )); then run_single_execution "mqtt" "${bname}" "${bhost}" "${bport}" || run_status_main=$?; fi
+      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service down "${svc}" || true; fi
+      if (( run_status_main != 0 )); then record_run_status "${run_status_main}"; else cooldown_if_more_runs "mqtt/${bname}"; fi
+      if (( STOP_AFTER_CURRENT != 0 )); then break; fi
     done
   elif [[ "${t}" == "amqp" ]]; then
     for b in "${AMQP_BROKERS_ARR[@]}"; do
       IFS=: read -r bname bhost bport <<<"${b}"
-      svc=""
+      svc=""; run_status_main=0
       if [[ ${SEQUENTIAL} -eq 1 ]]; then svc="$(get_services "${bname}-amqp")"; fi
-      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service up "${svc}"; wait_for_port "${bhost}" "${bport}"; fi
-      run_single_execution "amqp" "${bname}" "${bhost}" "${bport}"
-      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service down "${svc}"; fi
-      cooldown_between_runs "amqp/${bname}"
+      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then
+        manage_service up "${svc}" || run_status_main=$?
+        if (( run_status_main == 0 )); then wait_for_port "${bhost}" "${bport}" || run_status_main=$?; fi
+      fi
+      if (( run_status_main == 0 )); then run_single_execution "amqp" "${bname}" "${bhost}" "${bport}" || run_status_main=$?; fi
+      if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service down "${svc}" || true; fi
+      if (( run_status_main != 0 )); then record_run_status "${run_status_main}"; else cooldown_if_more_runs "amqp/${bname}"; fi
+      if (( STOP_AFTER_CURRENT != 0 )); then break; fi
     done
   else
-    svc=""; port=""
+    svc=""; port=""; run_status_main=0
     if [[ ${SEQUENTIAL} -eq 1 ]]; then svc="$(get_services "${t}")"; port="$(get_standard_port "${t}")"; fi
-    if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service up "${svc}"; if [[ -n "${port}" ]]; then wait_for_port "${HOST:-127.0.0.1}" "${port}"; fi; fi
-    run_single_execution "${t}"
-    if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service down "${svc}"; fi
-    cooldown_between_runs "${t}"
+    if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then
+      manage_service up "${svc}" || run_status_main=$?
+      if (( run_status_main == 0 )) && [[ -n "${port}" ]]; then wait_for_port "${HOST:-127.0.0.1}" "${port}" || run_status_main=$?; fi
+    fi
+    if (( run_status_main == 0 )); then run_single_execution "${t}" || run_status_main=$?; fi
+    if [[ ${SEQUENTIAL} -eq 1 && -n "${svc}" ]]; then manage_service down "${svc}" || true; fi
+    if (( run_status_main != 0 )); then record_run_status "${run_status_main}"; else cooldown_if_more_runs "${t}"; fi
   fi
+  if (( STOP_AFTER_CURRENT != 0 )); then break; fi
 done
 
 write_phase_rate_summary
 
 log "Plotting bursty fan-out results to ${PLOTS_DIR}"
+plot_args=(--summary "${SUMMARY_CSV}" --out-dir "${PLOTS_DIR}" --profile "${RATE_PROFILE}" --latex)
+if [[ ${APPEND_LATEST} -eq 1 || "${PHASE_OFFSET_SECONDS:-0}" != "0" ]]; then
+  plot_args+=(--rebuild-plot-points)
+fi
+if [[ "${PLOT_BUCKET_SECONDS}" != "1" && "${PLOT_BUCKET_SECONDS}" != "1.0" ]]; then
+  plot_args+=(--bucket-seconds "${PLOT_BUCKET_SECONDS}")
+fi
 if [[ "${DRY_RUN}" = 1 ]]; then
-  echo "+ python3 ${SCRIPT_DIR}/plot_bursty_fanout.py --summary ${SUMMARY_CSV} --out-dir ${PLOTS_DIR} --profile ${RATE_PROFILE} --latex"
+  printf '+ python3 %q' "${SCRIPT_DIR}/plot_bursty_fanout.py"
+  printf ' %q' "${plot_args[@]}"
+  printf '\n'
 else
-  python3 "${SCRIPT_DIR}/plot_bursty_fanout.py" --summary "${SUMMARY_CSV}" --out-dir "${PLOTS_DIR}" --profile "${RATE_PROFILE}" --latex
+  python3 "${SCRIPT_DIR}/plot_bursty_fanout.py" "${plot_args[@]}"
 fi
 
 log "Done. Phase summary CSV: ${SUMMARY_CSV}"
+if (( RUN_FAILURES != 0 )); then
+  log "Experiment stopped early or failed; exiting with status ${RUN_FAILURES} after plotting"
+  exit "${RUN_FAILURES}"
+fi

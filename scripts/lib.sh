@@ -364,7 +364,15 @@ make_connect_args() {
 			;;
 		redis)
 			local url="${REDIS_URL:-redis://127.0.0.1:6379}"
-			_out=(--engine redis --connect "url=${url}")
+			if [[ "${role}" == "pub" ]]; then
+				local pub_mode="${REDIS_PUB_MODE:-buffered}"
+				local publish_queue="${REDIS_PUBLISH_QUEUE:-8192}"
+				local publish_batch="${REDIS_PUBLISH_BATCH:-256}"
+				local publish_flush_micros="${REDIS_PUBLISH_FLUSH_MICROS:-250}"
+				_out=(--engine redis --connect "url=${url}" --connect "pub_mode=${pub_mode}" --connect "publish_queue=${publish_queue}" --connect "publish_batch=${publish_batch}" --connect "publish_flush_micros=${publish_flush_micros}")
+			else
+				_out=(--engine redis --connect "url=${url}")
+			fi
 			;;
 		*)
 			echo "[lib] Unsupported ENGINE='${engine}'" >&2
@@ -386,7 +394,17 @@ start_sub() {
 	local SUB_RAMP_UP_SECS="${SUB_RAMP_UP_SECS:-0}"
 	local args=()
 	make_connect_args sub args
-	echo "[sub] ${ENGINE:-zenoh} → ${expr} (subs=${subs}, ramp_up=${SUB_RAMP_UP_SECS}s)"
+	local fast_count="${SUB_FAST_COUNT:-0}"
+	local latency_sample_rate="${SUB_LATENCY_SAMPLE_RATE:-1000}"
+	local disable_sequence_tracking="${SUB_DISABLE_SEQUENCE_TRACKING:-0}"
+	local -a sub_perf_args=()
+	if [[ "${fast_count}" == "1" || "${fast_count}" == "true" ]]; then
+		sub_perf_args+=(--fast-count --latency-sample-rate "${latency_sample_rate}")
+	fi
+	if [[ "${disable_sequence_tracking}" == "1" || "${disable_sequence_tracking}" == "true" ]]; then
+		sub_perf_args+=(--disable-sequence-tracking)
+	fi
+	echo "[sub] ${ENGINE:-zenoh} → ${expr} (subs=${subs}, ramp_up=${SUB_RAMP_UP_SECS}s, fast_count=${fast_count}, latency_sample_rate=${latency_sample_rate})"
 	local -a CMD=(
 		"${BIN}" --snapshot-interval "${SNAPSHOT}" sub
 		"${args[@]}"
@@ -394,6 +412,7 @@ start_sub() {
 		--subscribers "${subs}"
 		--ramp-up-secs "${SUB_RAMP_UP_SECS}"
 		--csv "${csv}"
+		"${sub_perf_args[@]}"
 	)
 	print_cmd "${CMD[@]}" && echo "       1>$(printf %q "${log}") 2>&1 &"
 	"${CMD[@]}" >"${log}" 2>&1 &

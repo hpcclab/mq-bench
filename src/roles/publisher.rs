@@ -113,6 +113,7 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
         .map(|profile| profile.total_duration_secs())
         .or(config.duration_secs);
     let mut active_profile_phase: Option<usize> = None;
+    let mut active_profile_rate: Option<f64> = None;
     let mut rate_controller = if config.rate_profile.is_some() {
         None
     } else {
@@ -183,7 +184,12 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
                                 "Publisher rate profile phase entered"
                             );
                             active_profile_phase = Some(phase_idx);
-                            rate_controller = Some(RateController::new(phase.rate_per_sec));
+                            active_profile_rate = Some(phase.rate_per_sec);
+                            rate_controller = if phase.rate_per_sec > 0.0 {
+                                Some(RateController::new(phase.rate_per_sec))
+                            } else {
+                                None
+                            };
                         }
                     }
                     None => {
@@ -212,6 +218,35 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
             // Determine if we should wait for crash timer
             let crash_check_enabled =
                 crash_injector.is_enabled() && crash_injector.has_crashes_remaining();
+
+            // Zero-rate profile phases keep the publisher connected but idle.
+            if config.rate_profile.is_some() && active_profile_rate == Some(0.0) {
+                let idle_tick = Duration::from_millis(200);
+                if crash_check_enabled {
+                    let time_to_crash = crash_injector.time_until_crash();
+                    tokio::select! {
+                        _ = tokio::time::sleep(time_to_crash) => {
+                            continue;
+                        }
+                        _ = tokio::time::sleep(idle_tick) => {}
+                        _ = signal::ctrl_c() => {
+                            info!("Ctrl+C received, stopping publisher");
+                            stopped = true;
+                            break false;
+                        }
+                    }
+                } else {
+                    tokio::select! {
+                        _ = tokio::time::sleep(idle_tick) => {}
+                        _ = signal::ctrl_c() => {
+                            info!("Ctrl+C received, stopping publisher");
+                            stopped = true;
+                            break false;
+                        }
+                    }
+                }
+                continue;
+            }
 
             // Wait for next scheduled send (if paced) or crash timer
             if crash_check_enabled {
@@ -288,6 +323,7 @@ pub async fn run_publisher(config: PublisherConfig) -> Result<()> {
             drop(transport);
         } else {
             // Normal exit: graceful shutdown
+            let _ = publisher.shutdown().await;
             let _ = transport.shutdown().await;
         }
 

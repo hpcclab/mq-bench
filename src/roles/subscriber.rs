@@ -27,6 +27,10 @@ pub struct SubscriberConfig {
     pub test_stop_after_secs: Option<u64>,
     // Crash injection
     pub crash_config: CrashConfig,
+    // High-throughput measurement mode
+    pub fast_count: bool,
+    pub latency_sample_rate: u64,
+    pub disable_sequence_tracking: bool,
 }
 
 pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
@@ -55,7 +59,9 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     };
 
     // Shared sequence tracker - wrapped in Arc<Mutex<>> so snapshot task can access stats
-    // This persists across reconnections to track all sequences throughout the test
+    // This persists across reconnections to track all sequences throughout the test.
+    // Fast-count mode only samples headers, so sequence accounting is disabled there.
+    let track_sequences = !config.fast_count && !config.disable_sequence_tracking;
     let seq_tracker = Arc::new(Mutex::new(SequenceTracker::new()));
 
     // Start snapshot task (only if not disabled)
@@ -63,13 +69,14 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
         let stats_clone = Arc::clone(&stats);
         let seq_tracker_snap = Arc::clone(&seq_tracker);
         let interval_secs = config.snapshot_interval_secs;
+        let track_sequences_snap = track_sequences;
         let mut out = output.take();
         Some(tokio::spawn(async move {
             let mut interval_timer = interval(Duration::from_secs(interval_secs));
             loop {
                 interval_timer.tick().await;
                 // Update stats with current sequence tracker state before snapshot
-                {
+                if track_sequences_snap {
                     let tracker = seq_tracker_snap.lock().await;
                     stats_clone.set_duplicates(tracker.duplicate_count());
                     stats_clone.set_gaps(tracker.gap_count());
@@ -102,6 +109,8 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     let (tx, rx) = flume::unbounded::<(u64, [u8; 24])>();
     let stats_worker = stats.clone();
     let seq_tracker_worker = Arc::clone(&seq_tracker);
+    let fast_count_worker = config.fast_count;
+    let track_sequences_worker = track_sequences;
     let worker_handle = tokio::spawn(async move {
         let mut buf = Vec::with_capacity(1024);
         loop {
@@ -122,23 +131,32 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
                     break;
                 }
             }
-            // Parse headers, track sequences, compute latencies
+            // Parse headers and compute latencies. Normal mode can also track
+            // sequences; fast-count mode only receives sampled headers here.
             let mut latencies = Vec::with_capacity(buf.len());
-            {
+            if track_sequences_worker {
                 let mut tracker = seq_tracker_worker.lock().await;
                 for (recv_ns, hdr) in buf.drain(..) {
                     if let Ok(h) = parse_header(&hdr) {
-                        // Track sequence (handles duplicates)
                         if tracker.record(h.seq) {
-                            // Only record latency for new messages
                             latencies.push(recv_ns.saturating_sub(h.timestamp_ns));
                         }
                     }
                 }
+            } else {
+                for (recv_ns, hdr) in buf.drain(..) {
+                    if let Ok(h) = parse_header(&hdr) {
+                        latencies.push(recv_ns.saturating_sub(h.timestamp_ns));
+                    }
+                }
             }
-            // Record latencies for new messages only
+
             if !latencies.is_empty() {
-                stats_worker.record_received_batch(&latencies).await;
+                if fast_count_worker {
+                    stats_worker.record_latency_sample_batch(&latencies).await;
+                } else {
+                    stats_worker.record_received_batch(&latencies).await;
+                }
             }
         }
     });
@@ -182,18 +200,32 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
 
         // Subscribe via Transport with a handler
         let handler_tx = tx.clone();
+        let handler_stats = stats.clone();
+        let handler_fast_count = config.fast_count;
+        let handler_latency_sample_rate = config.latency_sample_rate;
         let subscription = match transport
             .subscribe(
                 &config.key_expr,
                 Box::new(move |msg: TransportMessage| {
-                    // Minimal callback: copy 24-byte header and enqueue with receive timestamp
-                    let mut hdr = [0u8; 24];
                     let bytes = msg.payload.as_cow();
-                    if bytes.len() >= 24 {
-                        hdr.copy_from_slice(&bytes[..24]);
-                        let recv = now_unix_ns_estimate();
-                        let _ = handler_tx.try_send((recv, hdr));
+                    if bytes.len() < 24 {
+                        return;
                     }
+
+                    if handler_fast_count {
+                        let received = handler_stats.record_received_fast();
+                        if handler_latency_sample_rate == 0
+                            || received % handler_latency_sample_rate != 0
+                        {
+                            return;
+                        }
+                    }
+
+                    // Minimal callback: copy 24-byte header and enqueue with receive timestamp.
+                    let mut hdr = [0u8; 24];
+                    hdr.copy_from_slice(&bytes[..24]);
+                    let recv = now_unix_ns_estimate();
+                    let _ = handler_tx.try_send((recv, hdr));
                 }),
             )
             .await
@@ -312,7 +344,7 @@ pub async fn run_subscriber(config: SubscriberConfig) -> Result<()> {
     let _ = tokio::time::timeout(Duration::from_millis(100), worker_handle).await;
 
     // Update stats with final duplicate/gap counts from sequence tracker
-    {
+    if track_sequences {
         let tracker = seq_tracker.lock().await;
         stats.set_duplicates(tracker.duplicate_count());
         stats.set_gaps(tracker.gap_count());

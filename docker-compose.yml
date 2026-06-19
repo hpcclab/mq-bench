@@ -97,7 +97,27 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --tcp-backlog
+      - "65535"
+      - --timeout
+      - "0"
+      - --tcp-keepalive
+      - "60"
+      - --client-output-buffer-limit
+      - pubsub
+      - "0"
+      - "0"
+      - "0"
+      - --io-threads
+      - "4"
+      - --io-threads-do-reads
+      - "yes"
     ulimits:
       nofile:
         soft: 300000
@@ -114,6 +134,7 @@ services:
       - ./config/router1.json5:/etc/zenoh/router1.json5:ro
     environment:
       RUST_LOG: info
+      ZENOH_RUNTIME: "(rx: (worker_threads: 4), tx: (worker_threads: 4), net: (worker_threads: 2), app: (worker_threads: 2), acc: (worker_threads: 1))"
     ulimits:
       nofile:
         soft: 300000

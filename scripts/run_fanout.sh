@@ -47,6 +47,11 @@ def DURATION "${DURATION:-30}"
 def PAYLOAD  "${PAYLOAD:-1024}"
 def SNAPSHOT "${SNAPSHOT:-5}"
 RATE_PROFILE="${RATE_PROFILE:-}"
+RATE_PROFILE_DIR="${RATE_PROFILE_DIR:-}"
+ABORT_ON_UNDER_TARGET="${ABORT_ON_UNDER_TARGET:-0}"
+MIN_DELIVERY_RATIO="${MIN_DELIVERY_RATIO:-0.70}"
+PHASE_GRACE_SECS="${PHASE_GRACE_SECS:-10}"
+STUCK_TIMEOUT_SECS="${STUCK_TIMEOUT_SECS:-30}"
 SUB_RAMP_UP_SECS="${SUB_RAMP_UP_SECS:-}"
 if [[ -z "${SUB_RAMP_UP_SECS}" ]]; then
 	if (( SUBS >= 2000 )); then
@@ -77,7 +82,9 @@ SUB_PROCS_PER_TOPIC="${SUB_PROCS_PER_TOPIC:-1}"
 TOPIC_PREFIX="${TOPIC_PREFIX:-topic}"
 ZENOH_MODE="${ZENOH_MODE:-}"
 
-if [[ -n "${RATE_PROFILE}" ]]; then
+if [[ -n "${RATE_PROFILE_DIR}" ]]; then
+	echo "[run_fanout] Run ID: ${RUN_ID} | ENGINE=${ENGINE} | PUBS=${PUBS} SUBS=${SUBS} SUB_RAMP_UP_SECS=${SUB_RAMP_UP_SECS} RATE_PROFILE_DIR=${RATE_PROFILE_DIR} DURATION=${DURATION}s"
+elif [[ -n "${RATE_PROFILE}" ]]; then
 	echo "[run_fanout] Run ID: ${RUN_ID} | ENGINE=${ENGINE} | PUBS=${PUBS} SUBS=${SUBS} SUB_RAMP_UP_SECS=${SUB_RAMP_UP_SECS} RATE_PROFILE=${RATE_PROFILE} DURATION=${DURATION}s"
 else
 	echo "[run_fanout] Run ID: ${RUN_ID} | ENGINE=${ENGINE} | PUBS=${PUBS} SUBS=${SUBS} SUB_RAMP_UP_SECS=${SUB_RAMP_UP_SECS} RATE=${RATE} DURATION=${DURATION}s"
@@ -112,10 +119,167 @@ declare -a SUB_LOGS=()
 declare -a PUB_PIDS=()
 declare -a PUB_CSVS=()
 declare -a PUB_LOGS=()
+declare -a PROFILE_PHASE_NAMES=()
+declare -a PROFILE_PHASE_STARTS=()
+declare -a PROFILE_PHASE_ENDS=()
+declare -a PROFILE_PHASE_RATES=()
+RUN_STARTED_AT=0
+EARLY_STOP_STATUS=0
+LAST_EVALUATED_PHASE_IDX=-1
 
 topic_for_group() {
 	local group_id="$1"
 	echo "${TOPIC_PREFIX}_${group_id}"
+}
+
+
+parse_rate_profile_for_watchdog() {
+	PROFILE_PHASE_NAMES=()
+	PROFILE_PHASE_STARTS=()
+	PROFILE_PHASE_ENDS=()
+	PROFILE_PHASE_RATES=()
+	if [[ -z "${RATE_PROFILE}" || -n "${RATE_PROFILE_DIR}" ]]; then
+		return 0
+	fi
+	local cursor=0 item phase duration rate
+	IFS=',' read -r -a _profile_items <<<"${RATE_PROFILE}"
+	for item in "${_profile_items[@]}"; do
+		IFS=: read -r phase duration rate <<<"${item}"
+		if [[ -z "${phase:-}" || ! "${duration:-}" =~ ^[0-9]+$ || ! "${rate:-}" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+			continue
+		fi
+		PROFILE_PHASE_NAMES+=("${phase}")
+		PROFILE_PHASE_STARTS+=("${cursor}")
+		cursor=$(( cursor + duration ))
+		PROFILE_PHASE_ENDS+=("${cursor}")
+		PROFILE_PHASE_RATES+=("${rate}")
+	done
+}
+
+current_profile_phase() {
+	local elapsed="$1" idx
+	for idx in "${!PROFILE_PHASE_NAMES[@]}"; do
+		if (( elapsed >= PROFILE_PHASE_STARTS[idx] && elapsed < PROFILE_PHASE_ENDS[idx] )); then
+			echo "${idx}"
+			return 0
+		fi
+	done
+	return 1
+}
+
+fanout_target_for_rate() {
+	local rate_per_pub="$1"
+	local fanout_subs="${SUBS}"
+	if [[ "${CONTROLLED_FANOUT}" == "1" ]]; then
+		fanout_subs="${SUBS_PER_PUB}"
+	fi
+	awk -v r="${rate_per_pub}" -v pubs="${PUBS}" -v fanout="${fanout_subs}" 'BEGIN { printf "%.6f", r * pubs * fanout }'
+}
+
+last_interval_throughput() {
+	local csv="$1"
+	awk -F, 'END { print ($6 == "" ? 0 : $6) }' "${csv}" 2>/dev/null || echo 0
+}
+
+write_early_stop_marker() {
+	local elapsed="$1" phase="$2" observed="$3" target="$4" ratio="$5" reason="$6"
+	python3 - "${ART_DIR}/EARLY_STOP.json" "${elapsed}" "${phase}" "${observed}" "${target}" "${ratio}" "${reason}" <<'PYJSON'
+import json
+import sys
+path, elapsed, phase, observed, target, ratio, reason = sys.argv[1:]
+data = {
+    "stop_elapsed_s": float(elapsed),
+    "phase": phase,
+    "observed_delivery_rate": float(observed),
+    "target_delivery_rate": float(target),
+    "delivery_ratio": float(ratio),
+    "reason": reason,
+}
+with open(path, "w", encoding="utf-8") as fh:
+    json.dump(data, fh, indent=2, sort_keys=True)
+    fh.write("\n")
+PYJSON
+}
+
+phase_delivery_rate() {
+	local phase_start="$1" phase_end="$2"
+	python3 - "${SUB_CSV}" "${RUN_STARTED_AT}" "${phase_start}" "${phase_end}" <<'PYPHASE'
+import csv
+import sys
+
+path, run_started_s, phase_start_s, phase_end_s = sys.argv[1:]
+run_started = float(run_started_s)
+phase_start = float(phase_start_s)
+phase_end = float(phase_end_s)
+start_abs = run_started + phase_start
+end_abs = run_started + phase_end
+duration = max(phase_end - phase_start, 1.0)
+rows = []
+try:
+    with open(path, newline="") as fh:
+        for row in csv.DictReader(fh):
+            try:
+                ts = float(row.get("timestamp") or 0)
+                recv = float(row.get("received_count") or 0)
+            except ValueError:
+                continue
+            rows.append((ts, recv))
+except FileNotFoundError:
+    print("0")
+    raise SystemExit(0)
+
+rows.sort()
+
+def value_at_or_before(target):
+    value = 0.0
+    for ts, recv in rows:
+        if ts <= target:
+            value = recv
+        else:
+            break
+    return value
+
+start_recv = value_at_or_before(start_abs)
+end_recv = value_at_or_before(end_abs)
+print(max(end_recv - start_recv, 0.0) / duration)
+PYPHASE
+}
+
+check_early_stop() {
+	if [[ "${ABORT_ON_UNDER_TARGET}" != "1" ]]; then return 1; fi
+	if (( ${#PROFILE_PHASE_NAMES[@]} == 0 )); then return 1; fi
+	if [[ ${RUN_STARTED_AT} -le 0 ]]; then return 1; fi
+	local now elapsed idx phase_name phase_start phase_end rate target observed threshold ratio
+	now=$(date +%s)
+	elapsed=$(( now - RUN_STARTED_AT ))
+	for idx in "${!PROFILE_PHASE_NAMES[@]}"; do
+		if (( idx <= LAST_EVALUATED_PHASE_IDX )); then
+			continue
+		fi
+		phase_end="${PROFILE_PHASE_ENDS[idx]}"
+		if (( elapsed < phase_end )); then
+			break
+		fi
+		phase_name="${PROFILE_PHASE_NAMES[idx]}"
+		LAST_EVALUATED_PHASE_IDX=${idx}
+		if [[ "${phase_name}" == "warmup" ]]; then
+			continue
+		fi
+		phase_start="${PROFILE_PHASE_STARTS[idx]}"
+		rate="${PROFILE_PHASE_RATES[idx]}"
+		target="$(fanout_target_for_rate "${rate}")"
+		observed="$(phase_delivery_rate "${phase_start}" "${phase_end}")"
+		threshold="$(awk -v target="${target}" -v min="${MIN_DELIVERY_RATIO}" 'BEGIN { printf "%.6f", target * min }')"
+		ratio="$(awk -v obs="${observed}" -v target="${target}" 'BEGIN { if (target <= 0) print 1; else printf "%.6f", obs / target }')"
+		echo "[watch] Phase complete: phase=${phase_name} end=${phase_end}s observed=${observed} target=${target} ratio=${ratio} min=${MIN_DELIVERY_RATIO}"
+		if awk -v obs="${observed}" -v limit="${threshold}" 'BEGIN { exit !(obs < limit) }'; then
+			echo "[watch] Early stop after failed phase: phase=${phase_name} end=${phase_end}s observed=${observed} target=${target} ratio=${ratio} min=${MIN_DELIVERY_RATIO}"
+			write_early_stop_marker "${phase_end}" "${phase_name}" "${observed}" "${target}" "${ratio}" "completed_phase_delivery_ratio_below_minimum"
+			kill "${PUB_PIDS[@]}" >/dev/null 2>&1 || true
+			return 0
+		fi
+	done
+	return 1
 }
 
 cleanup_run_clients() {
@@ -194,6 +358,9 @@ else
 	rate_desc="rate=${PUB_RATE}"
 fi
 
+parse_rate_profile_for_watchdog
+RUN_STARTED_AT=$(date +%s)
+
 if [[ "${CONTROLLED_FANOUT}" == "1" ]]; then
 	echo "Running ${PUBS} controlled publishers across ${PUBS} topics (${rate_desc})"
 	for ((group_id = 0; group_id < PUBS; group_id++)); do
@@ -201,7 +368,17 @@ if [[ "${CONTROLLED_FANOUT}" == "1" ]]; then
 		PUB_CSVS+=("${ART_DIR}/pub_${group_id}.csv")
 		PUB_LOGS+=("${ART_DIR}/pub_${group_id}.log")
 		pub_pid=0
+		saved_rate_profile="${RATE_PROFILE:-}"
+		if [[ -n "${RATE_PROFILE_DIR}" ]]; then
+			profile_file="${RATE_PROFILE_DIR}/group_${group_id}.profile"
+			if [[ ! -f "${profile_file}" ]]; then
+				echo "[run_fanout] Missing per-group profile: ${profile_file}" >&2
+				exit 2
+			fi
+			RATE_PROFILE="$(<"${profile_file}")"
+		fi
 		start_pub pub_pid "${topic}" "${PAYLOAD}" "${PUB_RATE}" "${DURATION}" "${PUB_CSVS[group_id]}" "${PUB_LOGS[group_id]}" 1
+		RATE_PROFILE="${saved_rate_profile}"
 		PUB_PIDS+=("${pub_pid}")
 	done
 else
@@ -401,6 +578,10 @@ wait_for_publishers() {
 			break
 		fi
 		print_status "${SUB_CSV}"
+		if check_early_stop; then
+			EARLY_STOP_STATUS=42
+			break
+		fi
 		sleep "${SNAPSHOT}"
 	done
 }
@@ -423,3 +604,6 @@ echo "Publishers: ${PUBS} | Subscribers: ${SUBS}"
 summarize_common "${SUB_CSV}" "${PUB_CSV}"
 
 echo "Fanout run complete. Artifacts at ${ART_DIR}"
+if (( EARLY_STOP_STATUS != 0 )); then
+	exit "${EARLY_STOP_STATUS}"
+fi

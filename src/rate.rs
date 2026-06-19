@@ -54,8 +54,8 @@ impl RateProfile {
             let rate_per_sec: f64 = parts[2]
                 .parse()
                 .map_err(|_| format!("phase '{}' has invalid rate '{}'", name, parts[2]))?;
-            if !rate_per_sec.is_finite() || rate_per_sec <= 0.0 {
-                return Err(format!("phase '{}' rate must be > 0", name));
+            if !rate_per_sec.is_finite() || rate_per_sec < 0.0 {
+                return Err(format!("phase '{}' rate must be >= 0", name));
             }
 
             let duration = Duration::from_secs(duration_secs);
@@ -203,7 +203,7 @@ mod tests {
     fn rate_profile_rejects_invalid_profile() {
         assert!(RateProfile::parse("").is_err());
         assert!(RateProfile::parse("warmup:0:10").is_err());
-        assert!(RateProfile::parse("warmup:10:0").is_err());
+        assert!(RateProfile::parse("warmup:10:-1").is_err());
         assert!(RateProfile::parse("warmup:10").is_err());
         assert!(RateProfile::parse(":10:10").is_err());
     }
@@ -228,6 +228,16 @@ mod tests {
         assert_eq!(p2.name, "burst");
 
         assert!(profile.phase_at_elapsed(Duration::from_secs(140)).is_none());
+    }
+
+    #[test]
+    fn rate_profile_allows_zero_rate_idle_phases() {
+        let profile = RateProfile::parse("idle:10:0,burst:20:30").unwrap();
+
+        assert_eq!(profile.phases().len(), 2);
+        assert_eq!(profile.phases()[0].name, "idle");
+        assert_eq!(profile.phases()[0].rate_per_sec, 0.0);
+        assert_eq!(profile.total_duration_secs(), 30);
     }
 
     // This is a coarse-grained timing check to ensure the controller spaces events out.
