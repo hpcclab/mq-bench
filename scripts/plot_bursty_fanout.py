@@ -116,6 +116,11 @@ def parse_args() -> argparse.Namespace:
         help="Rebuild the readable plot-points CSV from raw artifacts before plotting",
     )
     p.add_argument(
+        "--latest-run-per-transport",
+        action="store_true",
+        help="When a transport appears multiple times, plot only its latest run and keep older summary rows ignored",
+    )
+    p.add_argument(
         "--throughput-y-scale",
         type=float,
         default=1_000_000.0,
@@ -254,6 +259,38 @@ def early_stop_markers(rows, summary_path, warmup_offset):
             "reason": data.get("reason", "failed"),
         }
     return markers
+
+
+def filter_latest_run_per_transport(rows):
+    grouped = defaultdict(lambda: defaultdict(list))
+    for row in rows:
+        transport = row.get("transport", "")
+        if not transport:
+            continue
+        run_id = row.get("run_id", "") or row.get("artifacts_dir", "") or "__unknown__"
+        grouped[transport][run_id].append(row)
+
+    keep_keys = set()
+    for transport, runs in grouped.items():
+        if len(runs) <= 1:
+            keep_keys.update((transport, run_id) for run_id in runs)
+            continue
+        latest_run_id = max(
+            runs,
+            key=lambda run_id: max((optional_float(row, "phase_end_s") or 0.0) for row in runs[run_id]),
+        )
+        keep_keys.add((transport, latest_run_id))
+
+    if not keep_keys:
+        return rows
+
+    filtered = []
+    for row in rows:
+        transport = row.get("transport", "")
+        run_id = row.get("run_id", "") or row.get("artifacts_dir", "") or "__unknown__"
+        if (transport, run_id) in keep_keys:
+            filtered.append(row)
+    return filtered
 
 
 def complete_phases_from_profile(summary_rows, profile):
@@ -1361,7 +1398,8 @@ def normalize_plot_series(series_map, warmup_offset, visible_end):
 def load_or_build_plot_series(args, rows, visible_phases, warmup_offset, visible_end):
     bucket_seconds = max(1.0, float(args.bucket_seconds or 1.0))
     plot_points_path = args.plot_points or default_plot_points_path(args.summary, bucket_seconds)
-    if plot_points_needs_rebuild(plot_points_path, args.summary, rows, args.rebuild_plot_points):
+    force_rebuild = args.rebuild_plot_points or args.latest_run_per_transport
+    if plot_points_needs_rebuild(plot_points_path, args.summary, rows, force_rebuild):
         series_map = normalize_plot_series(raw_plot_series_from_artifacts(rows, args.summary), warmup_offset, visible_end)
         series_map = bucket_series_map(series_map, bucket_seconds)
         write_plot_points_csv(plot_points_path, rows, visible_phases, warmup_offset, series_map)
@@ -1664,6 +1702,10 @@ def main() -> int:
         print(f"[plot] LaTeX mode enabled: PDF + PNG output, {plot_dpi} DPI")
     inline_legend = args.inline_legend
     rows = read_summary(args.summary)
+    if args.latest_run_per_transport:
+        original_count = len(rows)
+        rows = filter_latest_run_per_transport(rows)
+        print(f"[plot] Latest-run filtering kept {len(rows)} of {original_count} summary rows")
     phases = complete_phases_from_profile(rows, args.profile)
     warmup_offset = warmup_end(phases)
     visible_phases = phases_after_warmup(phases)

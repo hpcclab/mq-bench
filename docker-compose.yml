@@ -114,10 +114,6 @@ services:
       - "0"
       - "0"
       - "0"
-      - --io-threads
-      - "4"
-      - --io-threads-do-reads
-      - "yes"
     ulimits:
       nofile:
         soft: 300000

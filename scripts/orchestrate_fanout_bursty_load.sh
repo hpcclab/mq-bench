@@ -25,6 +25,7 @@ set -euo pipefail
 #   scripts/orchestrate_fanout_bursty_load.sh --dry-run --transports "zenoh"
 #   scripts/orchestrate_fanout_bursty_load.sh --append-to results/fanout_bursty_load_YYYYmmdd_HHMMSS --transports "nats" --rate-profile "burst:60:8000,recovery:60:100"
 #   scripts/orchestrate_fanout_bursty_load.sh --append-after-current --transports "nats" --rate-profile "burst:60:8000,recovery:60:100"
+#   scripts/orchestrate_fanout_bursty_load.sh --rerun --append-to results/mqtt --transports "mqtt" --mqtt-brokers "mosquitto"
 #   scripts/orchestrate_fanout_bursty_load.sh --min-delivery-ratio 0.70 --continue-on-broker-fail
 #   scripts/orchestrate_fanout_bursty_load.sh --abort-on-under-target
 
@@ -57,6 +58,7 @@ REMOTE_DIR="~/mq-bench"
 APPEND_LATEST=0
 APPEND_TO_DIR=""
 WAIT_FOR_CURRENT_APPEND=0
+RERUN=0
 PHASE_OFFSET_SECONDS=0
 SUMMARY_OVERRIDE="${SUMMARY_OVERRIDE:-}"
 SUB_RAMP_UP_SECS="${SUB_RAMP_UP_SECS:-}"
@@ -696,6 +698,7 @@ while [[ $# -gt 0 ]]; do
     --append-latest) APPEND_LATEST=1 ;;
     --append-to) shift; APPEND_TO_DIR=${1:-} ;;
     --append-after-current) WAIT_FOR_CURRENT_APPEND=1 ;;
+    --rerun) RERUN=1 ;;
     --plot-bucket-seconds) shift; PLOT_BUCKET_SECONDS=${1:-1} ;;
     --min-delivery-ratio) shift; MIN_DELIVERY_RATIO=${1:-0.70} ;;
     --phase-grace-secs) shift; PHASE_GRACE_SECS=${1:-10} ;;
@@ -726,6 +729,10 @@ resolve_named_brokers "${MQTT_BROKERS}" "${DEFAULT_MQTT_BROKERS}" MQTT_BROKERS_A
 resolve_named_brokers "${AMQP_BROKERS}" "${DEFAULT_AMQP_BROKERS}" AMQP_BROKERS_ARR
 rewrite_broker_hosts MQTT_BROKERS_ARR
 rewrite_broker_hosts AMQP_BROKERS_ARR
+
+if [[ ${RERUN} -eq 1 ]]; then
+  APPEND_LATEST=1
+fi
 
 init_dirs
 RUNS_REMAINING="$(count_planned_runs)"
@@ -792,6 +799,9 @@ log "Plotting bursty fan-out results to ${PLOTS_DIR}"
 plot_args=(--summary "${SUMMARY_CSV}" --out-dir "${PLOTS_DIR}" --profile "${RATE_PROFILE}" --latex)
 if [[ ${APPEND_LATEST} -eq 1 || "${PHASE_OFFSET_SECONDS:-0}" != "0" ]]; then
   plot_args+=(--rebuild-plot-points)
+fi
+if [[ ${RERUN} -eq 1 ]]; then
+  plot_args+=(--latest-run-per-transport)
 fi
 if [[ "${PLOT_BUCKET_SECONDS}" != "1" && "${PLOT_BUCKET_SECONDS}" != "1.0" ]]; then
   plot_args+=(--bucket-seconds "${PLOT_BUCKET_SECONDS}")
