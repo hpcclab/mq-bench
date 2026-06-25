@@ -103,7 +103,7 @@ COLOR_MAP = {
     "nats": "#e377c2",            # pink
     "zenoh": "#7f7f7f",           # gray
     "zenoh_mqtt": "#bcbd22",      # olive
-    "rabbitmq": "#d62728",        # red (same as mqtt_rabbitmq, different marker)
+    "rabbitmq": "#17becf",        # cyan (native AMQP; distinct from mqtt_rabbitmq red)
 }
 
 _MARKERS_CYCLE = ["o", "s", "^", "D", "v", "P", "X", "*", "h", "+", "x"]

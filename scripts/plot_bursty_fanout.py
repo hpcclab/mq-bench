@@ -31,6 +31,7 @@ PLOT_LEGEND_FONTSIZE = 5.5
 PLOT_LEGEND_HANDLE_LENGTH = 0.9
 PLOT_LEGEND_COLUMN_SPACING = 0.45
 PLOT_LEGEND_HANDLE_TEXT_PAD = 0.25
+PLOT_Y_LABEL_FONTSIZE = 8.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -128,8 +129,13 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--throughput-y-label",
-        default="Delivered throughput (M msg/s)",
+        default="Throughput (million msgs/s)",
         help="Y-axis label for delivery throughput time-series plot",
+    )
+    p.add_argument(
+        "--start-phase",
+        default=None,
+        help="Start time-series plots at a phase label such as B5, burst 5, or recovery 4; earlier points are hidden",
     )
     return p.parse_args()
 
@@ -188,9 +194,66 @@ def display_transport_label(label):
     return names.get(label, label)
 
 
+def phase_name_looks_valid(value):
+    lower = (value or "").strip().lower()
+    return lower in {"warmup", "baseline", "recovery", "elevated"} or is_burst_phase(lower)
+
+
+def infer_transport_from_values(values):
+    haystack = " ".join(values).lower()
+    transports = [
+        "mqtt_mosquitto",
+        "mqtt_rabbitmq",
+        "mqtt_artemis",
+        "mqtt_hivemq",
+        "mqtt_emqx",
+        "mosquitto",
+        "rabbitmq",
+        "artemis",
+        "hivemq",
+        "emqx",
+        "zenoh",
+        "redis",
+        "nats",
+    ]
+    for transport in transports:
+        token = transport.replace("mqtt_", "")
+        if f"_{transport}_" in haystack or f"/{transport}_" in haystack or f"_{token}_" in haystack:
+            return transport
+    return ""
+
+
 def read_summary(path: str):
+    rows = []
+    repaired = 0
+    skipped = 0
     with open(path, newline="") as f:
-        return list(csv.DictReader(f))
+        reader = csv.reader(f)
+        try:
+            header = next(reader)
+        except StopIteration:
+            return rows
+        for values in reader:
+            if not values:
+                continue
+            if len(values) == len(header) - 1 and len(values) > 6 and phase_name_looks_valid(values[5]):
+                transport = infer_transport_from_values(values)
+                if transport:
+                    values = [transport] + values
+                    repaired += 1
+            if len(values) != len(header):
+                skipped += 1
+                continue
+            row = dict(zip(header, values))
+            if not phase_name_looks_valid(row.get("phase", "")):
+                skipped += 1
+                continue
+            rows.append(row)
+    if repaired:
+        print(f"[plot] Repaired {repaired} shifted summary row(s)")
+    if skipped:
+        print(f"[plot] Skipped {skipped} malformed summary row(s)")
+    return rows
 
 
 def transport_artifacts(rows, summary_path=None):
@@ -321,41 +384,54 @@ def first_active_pub_ts(art_dir: str) -> float:
 
 
 
-def phases_from_summary(rows):
+def summary_group_key(row):
+    return row.get("run_id", "") or row.get("transport", "")
+
+
+def grouped_summary_rows(rows):
+    grouped = defaultdict(list)
+    for row in rows:
+        key = summary_group_key(row)
+        if key:
+            grouped[key].append(row)
+    return grouped
+
+
+def normalized_phases_for_rows(rows):
+    valid_rows = []
+    offset = None
+    for row in rows:
+        if not phase_name_looks_valid(row.get("phase", "")):
+            continue
+        start = optional_float(row, "phase_start_s")
+        end = optional_float(row, "phase_end_s")
+        rate = optional_float(row, "rate_per_pub")
+        if start is None or end is None or rate is None or end <= start:
+            continue
+        valid_rows.append((start, end, row.get("phase", ""), rate))
+        offset = start if offset is None else min(offset, start)
+    if offset is None:
+        return []
+
     phases = []
     seen = set()
-    offsets = {}
-    for row in rows:
-        phase_key = row.get("run_id", "") or row.get("transport", "")
-        if not phase_key:
-            continue
-        try:
-            start = float(row.get("phase_start_s", ""))
-        except ValueError:
-            continue
-        if phase_key not in offsets or start < offsets[phase_key]:
-            offsets[phase_key] = start
-
-    for row in rows:
-        name = row.get("phase", "")
-        if not name:
-            continue
-        try:
-            raw_start = float(row.get("phase_start_s", ""))
-            raw_end = float(row.get("phase_end_s", ""))
-            rate = float(row.get("rate_per_pub", ""))
-        except ValueError:
-            continue
-        offset_key = row.get("run_id", "") or row.get("transport", "")
-        offset = offsets.get(offset_key, 0.0)
+    for raw_start, raw_end, name, rate in sorted(valid_rows, key=lambda item: (item[0], item[1], item[2])):
         start = raw_start - offset
         end = raw_end - offset
-        key = (name, start, end)
+        key = (name.strip().lower(), round(start, 6), round(end, 6), round(rate, 6))
         if key in seen:
             continue
         phases.append({"name": name, "start": start, "end": end, "rate": rate})
         seen.add(key)
     return phases
+
+
+def phases_from_summary(rows):
+    candidates = [normalized_phases_for_rows(group) for group in grouped_summary_rows(rows).values()]
+    candidates = [phases for phases in candidates if phases]
+    if not candidates:
+        return []
+    return max(candidates, key=lambda phases: (len(phases), phases[-1]["end"] - phases[0]["start"]))
 
 
 def warmup_end(phases):
@@ -757,63 +833,184 @@ def phase_label(phase):
     return f"{label}\n{fmt_plot_number(rate)}/s"
 
 
-def compact_phase_label_items(phases):
-    items = []
-    burst_levels = []
+def fmt_compact_rate(value):
+    if value is None:
+        return ""
+    value = float(value)
+    if abs(value) >= 1000:
+        return f"{fmt_plot_number(value / 1000.0)}k"
+    return fmt_plot_number(value)
+
+
+def phases_with_compact_labels(phases):
+    labeled = []
     baseline_labeled = False
     burst_index = 0
+    recovery_index = 0
+    for phase in phases:
+        item = dict(phase)
+        name = (phase.get("name") or "").strip().lower()
+        item["rate_label"] = fmt_compact_rate(phase.get("rate"))
+        if is_burst_phase(name):
+            burst_index += 1
+            item["compact_label"] = f"B{burst_index}"
+            item["burst_level"] = item["rate_label"]
+        elif not baseline_labeled and name == "baseline":
+            item["compact_label"] = "Baseline"
+            baseline_labeled = True
+        elif name == "recovery":
+            recovery_index += 1
+            item["compact_label"] = f"R{recovery_index}"
+        labeled.append(item)
+    if not baseline_labeled:
+        for item in labeled:
+            name = (item.get("name") or "").strip().lower()
+            if name not in ("warmup", "recovery") and not is_burst_phase(name):
+                item["compact_label"] = "Baseline"
+                break
+    return labeled
+
+
+def compact_phase_label_items(phases):
+    items = []
+    rate_items = []
+    baseline_labeled = False
+    burst_index = 0
+    recovery_index = 0
     for phase in phases:
         name = (phase.get("name") or "").strip().lower()
         mid = (phase["start"] + phase["end"]) / 2.0
+        rate_label = phase.get("rate_label", fmt_compact_rate(phase.get("rate")))
+        compact_label = phase.get("compact_label")
+        if compact_label:
+            items.append((mid, compact_label))
+            rate_items.append((mid, rate_label))
+            if compact_label == "Baseline":
+                baseline_labeled = True
+            continue
         if is_burst_phase(name):
             burst_index += 1
             label = f"B{burst_index}"
             items.append((mid, label))
-            burst_levels.append((label, fmt_plot_number(phase.get("rate"))))
+            rate_items.append((mid, rate_label))
         elif not baseline_labeled and name == "baseline":
             items.append((mid, "Baseline"))
+            rate_items.append((mid, rate_label))
             baseline_labeled = True
+        elif name == "recovery":
+            recovery_index += 1
+            items.append((mid, f"R{recovery_index}"))
+            rate_items.append((mid, rate_label))
     if not baseline_labeled:
         for phase in phases:
             name = (phase.get("name") or "").strip().lower()
             if name not in ("warmup", "recovery") and not is_burst_phase(name):
                 mid = (phase["start"] + phase["end"]) / 2.0
                 items.insert(0, (mid, "Baseline"))
+                rate_items.insert(0, (mid, phase.get("rate_label", fmt_compact_rate(phase.get("rate")))))
                 break
-    return items, burst_levels
+    return items, rate_items
 
 
-def add_burst_level_box(ax, burst_levels, latex=False):
-    if not burst_levels:
-        return
-    pairs = [f"{label}={level}" for label, level in burst_levels if level != ""]
-    if not pairs:
-        return
-    rows = []
-    for idx in range(0, len(pairs), 2):
-        rows.append("   ".join(pairs[idx:idx + 2]))
-    rows.append("Recovery = low-rate interval")
-    ax.text(
-        0.02,
-        0.98,
-        "\n".join(rows),
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-        fontsize=7.2 if latex else 8.0,
-        color="#333333",
-        bbox={
-            "facecolor": "white",
-            "edgecolor": "#bbbbbb",
-            "boxstyle": "round,pad=0.25",
-            "alpha": 0.86,
-            "linewidth": 0.6,
-        },
-        zorder=5,
+def normalize_phase_selector(value):
+    return (value or "").strip().lower().replace("_", " ").replace("-", " ")
+
+
+def phase_selector_aliases(phase, burst_index, repeated_counts):
+    name = (phase.get("name") or "").strip()
+    lower_name = name.lower()
+    aliases = {normalize_phase_selector(name)}
+    count = repeated_counts[lower_name]
+    if count > 1:
+        aliases.add(normalize_phase_selector(f"{name} {count}"))
+    if lower_name == "baseline":
+        aliases.add("baseline")
+    if lower_name == "recovery":
+        aliases.add(normalize_phase_selector(f"recovery {count}"))
+    if is_burst_phase(lower_name):
+        aliases.add(normalize_phase_selector(f"B{burst_index}"))
+        aliases.add(normalize_phase_selector(f"burst {burst_index}"))
+    return aliases
+
+
+def start_offset_for_phase(phases, selector):
+    wanted = normalize_phase_selector(selector)
+    if not wanted:
+        return 0.0
+    repeated_counts = defaultdict(int)
+    burst_index = 0
+    for idx, phase in enumerate(phases):
+        lower_name = (phase.get("name") or "").strip().lower()
+        repeated_counts[lower_name] += 1
+        if is_burst_phase(lower_name):
+            burst_index += 1
+        if wanted in phase_selector_aliases(phase, burst_index, repeated_counts):
+            if is_burst_phase(lower_name):
+                for previous in reversed(phases[:idx]):
+                    previous_name = (previous.get("name") or "").strip().lower()
+                    if previous_name in {"baseline", "recovery"}:
+                        return previous["start"]
+            return phase["start"]
+    available = []
+    repeated_counts = defaultdict(int)
+    burst_index = 0
+    for phase in phases:
+        lower_name = (phase.get("name") or "").strip().lower()
+        repeated_counts[lower_name] += 1
+        if is_burst_phase(lower_name):
+            burst_index += 1
+            available.append(f"B{burst_index}")
+        elif lower_name == "baseline":
+            available.append("baseline")
+        elif lower_name == "recovery":
+            available.append(f"recovery {repeated_counts[lower_name]}")
+    raise SystemExit(
+        f"[plot] Unknown --start-phase {selector!r}; available examples: {', '.join(available)}"
     )
 
 
-def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_labels=False, show_burst_level_box=False):
+def rebase_phases_from(phases, start_offset):
+    if start_offset <= 0:
+        return phases
+    rebased = []
+    for phase in phases:
+        if phase["end"] <= start_offset:
+            continue
+        shifted = dict(phase)
+        shifted["start"] = max(0.0, phase["start"] - start_offset)
+        shifted["end"] = phase["end"] - start_offset
+        rebased.append(shifted)
+    return rebased
+
+
+def rebase_series_from(series, start_offset):
+    if start_offset <= 0:
+        return series
+    rebased = defaultdict(list)
+    for label, points in series.items():
+        rebased[label] = [(x - start_offset, y) for x, y in points if x >= start_offset]
+    return rebased
+
+
+def rebase_series_map_from(series_map, start_offset):
+    if start_offset <= 0:
+        return series_map
+    return {key: rebase_series_from(series, start_offset) for key, series in series_map.items()}
+
+
+def rebase_failure_markers_from(failures, start_offset):
+    if start_offset <= 0 or not failures:
+        return failures
+    rebased = {}
+    for label, failure in failures.items():
+        shifted = dict(failure)
+        shifted["x"] = max(0.0, float(shifted.get("x", 0.0)) - start_offset)
+        rebased[label] = shifted
+    return rebased
+
+
+
+def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_labels=False):
     if not phases:
         return
     for phase in phases:
@@ -821,16 +1018,28 @@ def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_label
             ax.axvline(phase["start"], color="#999999", linewidth=0.8, linestyle="--", alpha=0.6)
 
     if compact_labels:
-        label_items, burst_levels = compact_phase_label_items(phases)
+        label_items, rate_items = compact_phase_label_items(phases)
     else:
         label_items = [((phase["start"] + phase["end"]) / 2.0, phase_label(phase)) for phase in phases]
-        burst_levels = []
+        rate_items = []
 
     label_fontsize = 7.6 if latex else 8.5
+    if compact_labels:
+        ax.text(
+            0.5,
+            1.106,
+            "Phase · Offered rate per publisher (msg/s)",
+            transform=ax.transAxes,
+            ha="center",
+            va="bottom",
+            fontsize=10.0 if latex else 8.0,
+            color=ax.xaxis.label.get_color(),
+            clip_on=False,
+        )
     for mid, label in label_items:
         ax.text(
             mid,
-            1.025,
+            1.055 if compact_labels else 1.025,
             label,
             transform=ax.get_xaxis_transform(),
             ha="center",
@@ -841,8 +1050,20 @@ def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_label
             clip_on=False,
         )
 
-    if show_burst_level_box:
-        add_burst_level_box(ax, burst_levels, latex)
+    if compact_labels:
+        for mid, rate in rate_items:
+            ax.text(
+                mid,
+                1.025,
+                rate,
+                transform=ax.get_xaxis_transform(),
+                ha="center",
+                va="bottom",
+                fontsize=label_fontsize,
+                color=ax.xaxis.label.get_color(),
+                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.0},
+                clip_on=False,
+            )
 
     if show_boundaries:
         ax.axvline(phases[-1]["end"], color="#999999", linewidth=0.8, linestyle="--", alpha=0.6)
@@ -857,6 +1078,18 @@ def marker_sampled_points(points, marker_every):
     if sampled[-1] != points[-1]:
         sampled.append(points[-1])
     return sampled
+
+
+def marker_sample_indices(points, marker_every):
+    if marker_every is None or marker_every <= 1:
+        return None
+    if marker_every == 0 or not points:
+        return []
+    indices = list(range(0, len(points), marker_every))
+    last_index = len(points) - 1
+    if indices[-1] != last_index:
+        indices.append(last_index)
+    return indices
 
 
 def anchor_axes_at_zero(ax, x_max=None, y_min=0.0, hide_y_zero_label=False, y_top_padding=0.12):
@@ -891,7 +1124,7 @@ def nearest_y_at_or_before(points, x):
     return points[0][1] if points else 0.0
 
 
-def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, legend=False, log_y=False, y_scale=1.0, target_series=None, marker_every=None, step=False, y_min=None, compact_phase_labels=False, show_burst_level_box=False, failure_markers=None):
+def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, legend=False, log_y=False, y_scale=1.0, target_series=None, marker_every=None, step=False, y_min=None, compact_phase_labels=False, failure_markers=None, caption=None):
     if not series:
         return None
     marker_every = 0 if marker_every is None else marker_every
@@ -904,12 +1137,12 @@ def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, l
         if not points:
             continue
         x_values.extend(p[0] for p in points)
-        plot_points = marker_sampled_points(points, marker_every)
         marker, color = transport_style(label)
         ax.plot(
-            [p[0] for p in plot_points],
-            [p[1] / y_scale for p in plot_points],
+            [p[0] for p in points],
+            [p[1] / y_scale for p in points],
             marker=marker if marker_every != 0 else None,
+            markevery=marker_sample_indices(points, marker_every),
             linestyle="-",
             markersize=PLOT_MARKER_SIZE,
             linewidth=2.2 if has_target else PLOT_LINEWIDTH,
@@ -955,15 +1188,15 @@ def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, l
                 va="bottom",
                 clip_on=True,
             )
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel(ylabel)
+    ax.set_xlabel("Time (s)", fontsize = PLOT_X_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7)
+    ax.set_ylabel(ylabel, fontsize=PLOT_Y_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7)
     if latex:
         ax.grid(False)
     else:
         ax.grid(True, alpha=0.3)
     if log_y:
         ax.set_yscale("symlog", linthresh=1.0)
-    add_phase_lines(ax, phases, latex, show_boundaries=not has_target, compact_labels=compact_phase_labels, show_burst_level_box=show_burst_level_box)
+    add_phase_lines(ax, phases, latex, show_boundaries=not has_target, compact_labels=compact_phase_labels)
     if phases:
         x_max = max(phase["end"] for phase in phases)
     elif x_values:
@@ -982,10 +1215,20 @@ def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, l
             columnspacing=PLOT_LEGEND_COLUMN_SPACING,
             handletextpad=PLOT_LEGEND_HANDLE_TEXT_PAD,
         )
+    if caption:
+        fig.text(
+            0.125,
+            0.015,
+            caption,
+            ha="left",
+            va="bottom",
+            fontsize=7.0 if latex else 8.0,
+            color="#333333",
+        )
     if compact_phase_labels:
-        fig.subplots_adjust(top=0.86)
+        fig.subplots_adjust(top=0.84, bottom=0.16 if caption else 0.11)
     else:
-        fig.tight_layout()
+        fig.tight_layout(rect=(0, 0.08, 1, 1) if caption else None)
     gallery_file = save_fig(fig, out_dir, filename, ext, dpi)
     plt.close(fig)
     return gallery_file
@@ -1142,10 +1385,10 @@ def phase_at_time(phases, x):
     return "", None
 
 
-def target_segments_from_summary(rows, warmup_offset):
+def target_segments_from_summary(rows, warmup_offset, reference_phases=None):
     segments = []
     seen = set()
-    offsets = summary_phase_offsets(rows)
+    offsets = summary_phase_offsets(rows, reference_phases)
     for row in rows:
         phase = row.get("phase", "")
         if not phase or phase.lower() == "warmup":
@@ -1241,10 +1484,10 @@ def forward_fill_plot_columns(rows_by_key, columns):
                     row[column] = next_values[column]
 
 
-def write_plot_points_csv(path, summary_rows, visible_phases, warmup_offset, series_map):
+def write_plot_points_csv(path, summary_rows, visible_phases, warmup_offset, series_map, reference_phases=None):
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     labeled_phases = labeled_visible_phases(visible_phases)
-    target_segments = target_segments_from_summary(summary_rows, warmup_offset)
+    target_segments = target_segments_from_summary(summary_rows, warmup_offset, reference_phases)
     run_ids = run_ids_by_transport(summary_rows)
     rows_by_key = {}
 
@@ -1312,21 +1555,11 @@ def load_plot_points_csv(path):
     with open(path, newline="") as handle:
         rows = list(csv.DictReader(handle))
 
-    first_sample_time = {}
     for row in rows:
         transport = row.get("transport", "")
         x = optional_float(row, "time_s")
         if not transport or x is None:
             continue
-        if transport not in first_sample_time or x < first_sample_time[transport]:
-            first_sample_time[transport] = x
-
-    for row in rows:
-        transport = row.get("transport", "")
-        x = optional_float(row, "time_s")
-        if not transport or x is None:
-            continue
-        x -= first_sample_time.get(transport, 0.0)
         for column, key, scale in metric_specs:
             value = optional_float(row, column)
             if value is not None:
@@ -1334,10 +1567,13 @@ def load_plot_points_csv(path):
     return series_map
 
 
-def offset_points(points, offset):
+def offset_points(points, offset, trim_before=None):
+    selected = points
+    if trim_before is not None:
+        selected = [(x, y) for x, y in selected if x >= trim_before]
     if not offset:
-        return points
-    return [(x + offset, y) for x, y in points]
+        return selected
+    return [(x + offset, y) for x, y in selected]
 
 
 def artifact_time_offsets(rows, summary_path=None):
@@ -1356,7 +1592,7 @@ def artifact_time_offsets(rows, summary_path=None):
     return offsets
 
 
-def raw_plot_series_from_artifacts(rows, summary_path=None):
+def raw_plot_series_from_artifacts(rows, summary_path=None, reference_phases=None):
     series_map = {
         "throughput": defaultdict(list),
         "p50": defaultdict(list),
@@ -1368,21 +1604,25 @@ def raw_plot_series_from_artifacts(rows, summary_path=None):
         "rx": defaultdict(list),
         "tx": defaultdict(list),
     }
+    alignments = artifact_alignments(rows, summary_path, reference_phases)
     for art_dir, transport in transport_artifacts(rows, summary_path).items():
         run_start = first_active_pub_ts(art_dir)
         if run_start <= 0:
             continue
+        alignment = alignments.get(art_dir, {"shift": 0.0, "trim_before": None})
+        shift = alignment.get("shift", 0.0)
+        trim_before = alignment.get("trim_before")
         sub_throughput, sub_p50, sub_p95, sub_p99, sub_avg_latency = time_series_from_sub(art_dir, run_start)
         stat_cpu, stat_mem, stat_rx, stat_tx = time_series_from_stats(art_dir, run_start)
-        series_map["throughput"][transport].extend(sub_throughput)
-        series_map["p50"][transport].extend(sub_p50)
-        series_map["p95"][transport].extend(sub_p95)
-        series_map["p99"][transport].extend(sub_p99)
-        series_map["avg_latency"][transport].extend(sub_avg_latency)
-        series_map["cpu"][transport].extend(stat_cpu)
-        series_map["mem"][transport].extend(stat_mem)
-        series_map["rx"][transport].extend(stat_rx)
-        series_map["tx"][transport].extend(stat_tx)
+        series_map["throughput"][transport].extend(offset_points(sub_throughput, shift, trim_before))
+        series_map["p50"][transport].extend(offset_points(sub_p50, shift, trim_before))
+        series_map["p95"][transport].extend(offset_points(sub_p95, shift, trim_before))
+        series_map["p99"][transport].extend(offset_points(sub_p99, shift, trim_before))
+        series_map["avg_latency"][transport].extend(offset_points(sub_avg_latency, shift, trim_before))
+        series_map["cpu"][transport].extend(offset_points(stat_cpu, shift, trim_before))
+        series_map["mem"][transport].extend(offset_points(stat_mem, shift, trim_before))
+        series_map["rx"][transport].extend(offset_points(stat_rx, shift, trim_before))
+        series_map["tx"][transport].extend(offset_points(stat_tx, shift, trim_before))
     return series_map
 
 
@@ -1395,14 +1635,14 @@ def normalize_plot_series(series_map, warmup_offset, visible_end):
     return normalized
 
 
-def load_or_build_plot_series(args, rows, visible_phases, warmup_offset, visible_end):
+def load_or_build_plot_series(args, rows, phases, visible_phases, warmup_offset, visible_end):
     bucket_seconds = max(1.0, float(args.bucket_seconds or 1.0))
     plot_points_path = args.plot_points or default_plot_points_path(args.summary, bucket_seconds)
     force_rebuild = args.rebuild_plot_points or args.latest_run_per_transport
     if plot_points_needs_rebuild(plot_points_path, args.summary, rows, force_rebuild):
-        series_map = normalize_plot_series(raw_plot_series_from_artifacts(rows, args.summary), warmup_offset, visible_end)
+        series_map = normalize_plot_series(raw_plot_series_from_artifacts(rows, args.summary, phases), warmup_offset, visible_end)
         series_map = bucket_series_map(series_map, bucket_seconds)
-        write_plot_points_csv(plot_points_path, rows, visible_phases, warmup_offset, series_map)
+        write_plot_points_csv(plot_points_path, rows, visible_phases, warmup_offset, series_map, phases)
         if bucket_seconds > 1:
             print(f"[plot] Wrote {fmt_plot_number(bucket_seconds)}s-bucketed plot points: {plot_points_path}")
         else:
@@ -1413,19 +1653,74 @@ def load_or_build_plot_series(args, rows, visible_phases, warmup_offset, visible
     return series_map, plot_points_path
 
 
-def summary_phase_offsets(rows):
+def rates_match(left, right):
+    if left is None or right is None:
+        return False
+    return abs(float(left) - float(right)) <= max(1e-6, abs(float(right)) * 1e-6)
+
+
+def run_alignment(run_phases, reference_phases):
+    if not run_phases or not reference_phases:
+        return {"shift": 0.0, "trim_before": None}
+    for run_phase in run_phases:
+        run_name = (run_phase.get("name") or "").strip().lower()
+        if not is_burst_phase(run_name):
+            continue
+        for reference_phase in reference_phases:
+            reference_name = (reference_phase.get("name") or "").strip().lower()
+            if is_burst_phase(reference_name) and rates_match(run_phase.get("rate"), reference_phase.get("rate")):
+                shift = reference_phase["start"] - run_phase["start"]
+                trim_before = run_phase["start"] if abs(shift) > 1e-9 else None
+                return {"shift": shift, "trim_before": trim_before}
+    return {"shift": 0.0, "trim_before": None}
+
+
+def run_alignment_shift(run_phases, reference_phases):
+    return run_alignment(run_phases, reference_phases).get("shift", 0.0)
+
+
+def summary_phase_offsets(rows, reference_phases=None):
     offsets = {}
-    for row in rows:
-        transport = row.get("transport", "")
-        key = row.get("run_id", "") or transport
-        if not key:
+    for key, group in grouped_summary_rows(rows).items():
+        starts = [optional_float(row, "phase_start_s") for row in group]
+        starts = [start for start in starts if start is not None]
+        if not starts:
             continue
-        start = optional_float(row, "phase_start_s")
-        if start is None:
-            continue
-        if key not in offsets or start < offsets[key]:
-            offsets[key] = start
+        shift = run_alignment_shift(normalized_phases_for_rows(group), reference_phases or [])
+        offsets[key] = min(starts) - shift
     return offsets
+
+
+def artifact_alignments(rows, summary_path=None, reference_phases=None):
+    alignments = {}
+    if not reference_phases:
+        return alignments
+    summary_raw_dir = os.path.dirname(os.path.abspath(summary_path)) if summary_path else ""
+    grouped = defaultdict(list)
+    for row in rows:
+        art_dir = row.get("artifacts_dir", "")
+        if not art_dir:
+            continue
+        resolved = resolve_artifacts_dir(art_dir, row.get("run_id", ""), summary_raw_dir)
+        grouped[resolved].append(row)
+    for art_dir, group in grouped.items():
+        alignments[art_dir] = run_alignment(normalized_phases_for_rows(group), reference_phases)
+    return alignments
+
+
+def phase_matches_reference(phase, start, end, rate, reference_phases):
+    if not reference_phases:
+        return True
+    lower = (phase or "").strip().lower()
+    for reference_phase in reference_phases:
+        ref_lower = (reference_phase.get("name") or "").strip().lower()
+        if lower != ref_lower:
+            continue
+        if not rates_match(rate, reference_phase.get("rate")):
+            continue
+        if abs(start - reference_phase["start"]) <= 1e-6 and abs(end - reference_phase["end"]) <= 1e-6:
+            return True
+    return False
 
 
 def normalized_summary_phase_key(row, transport, phase, start, end, offsets):
@@ -1434,13 +1729,13 @@ def normalized_summary_phase_key(row, transport, phase, start, end, offsets):
     return (phase, start - offset, end - offset)
 
 
-def save_phase_plot(out_dir, filename, title, ylabel, rows, metric, ext, dpi, legend=False, log_y=False, y_scale=1.0):
+def save_phase_plot(out_dir, filename, title, ylabel, rows, metric, ext, dpi, legend=False, log_y=False, y_scale=1.0, reference_phases=None):
     phases = []
     labels = []
     label_counts = defaultdict(int)
     transports = []
     values = defaultdict(dict)
-    phase_offsets = summary_phase_offsets(rows)
+    phase_offsets = summary_phase_offsets(rows, reference_phases)
     for row in rows:
         phase = row.get("phase", "")
         transport = row.get("transport", "")
@@ -1454,6 +1749,9 @@ def save_phase_plot(out_dir, filename, title, ylabel, rows, metric, ext, dpi, le
         except ValueError:
             continue
         phase_key = normalized_summary_phase_key(row, transport, phase, start, end, phase_offsets)
+        rate = optional_float(row, "rate_per_pub")
+        if not phase_matches_reference(phase, phase_key[1], phase_key[2], rate, reference_phases):
+            continue
         if phase_key not in phases:
             phases.append(phase_key)
             label_counts[phase] += 1
@@ -1525,14 +1823,14 @@ def _positive_float(row, key):
     return value if value > 0 else None
 
 
-def save_latency_whisker_plot(out_dir, filename, title, rows, ext, dpi, legend=False, log_y=True):
+def save_latency_whisker_plot(out_dir, filename, title, rows, ext, dpi, legend=False, log_y=True, reference_phases=None):
     phases = []
     labels = []
     label_counts = defaultdict(int)
     transports = []
     values = defaultdict(dict)
     warned_missing_quartiles = False
-    phase_offsets = summary_phase_offsets(rows)
+    phase_offsets = summary_phase_offsets(rows, reference_phases)
 
     for row in rows:
         phase = row.get("phase", "")
@@ -1565,6 +1863,9 @@ def save_latency_whisker_plot(out_dir, filename, title, rows, ext, dpi, legend=F
         whishi = max(whishi, q3_ms)
 
         phase_key = normalized_summary_phase_key(row, transport, phase, start, end, phase_offsets)
+        rate = optional_float(row, "rate_per_pub")
+        if not phase_matches_reference(phase, phase_key[1], phase_key[2], rate, reference_phases):
+            continue
         if phase_key not in phases:
             phases.append(phase_key)
             label_counts[phase] += 1
@@ -1708,7 +2009,7 @@ def main() -> int:
         print(f"[plot] Latest-run filtering kept {len(rows)} of {original_count} summary rows")
     phases = complete_phases_from_profile(rows, args.profile)
     warmup_offset = warmup_end(phases)
-    visible_phases = phases_after_warmup(phases)
+    visible_phases = phases_with_compact_labels(phases_after_warmup(phases))
     failures = early_stop_markers(rows, args.summary, warmup_offset)
     failed_labels = set(failures)
 
@@ -1716,7 +2017,13 @@ def main() -> int:
     common_marker_every = args.marker_every if args.marker_every is not None else None
     artifacts = transport_artifacts(rows, args.summary)
     visible_end = max((phase["end"] for phase in visible_phases), default=0.0)
-    series_map, plot_points_path = load_or_build_plot_series(args, rows, visible_phases, warmup_offset, visible_end)
+    series_map, plot_points_path = load_or_build_plot_series(args, rows, phases, visible_phases, warmup_offset, visible_end)
+    plot_start_offset = start_offset_for_phase(visible_phases, args.start_phase)
+    if plot_start_offset > 0:
+        visible_phases = rebase_phases_from(visible_phases, plot_start_offset)
+        series_map = rebase_series_map_from(series_map, plot_start_offset)
+        failures = rebase_failure_markers_from(failures, plot_start_offset)
+        print(f"[plot] Starting time-series plots at {args.start_phase} ({fmt_plot_number(plot_start_offset)}s after warmup)")
 
     throughput = series_map["throughput"]
     p50 = series_map["p50"]
@@ -1769,20 +2076,20 @@ def main() -> int:
     legend_file = standalone_legend(args.out_dir, artifacts.values(), plot_ext, plot_dpi, include_target=bool(target_throughput))
     if legend_file:
         images.append(("Legend", legend_file))
-    images.append(("Delivery Throughput vs Time", save_line_plot(args.out_dir, "delivery_throughput_vs_time.png", "Delivery Throughput vs Time", args.throughput_y_label, throughput, visible_phases, plot_ext, plot_dpi, inline_legend, y_scale=args.throughput_y_scale, target_series=target_throughput, marker_every=throughput_marker_every, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("P99 Latency vs Time", save_line_plot(args.out_dir, "p99_latency_vs_time.png", "P99 Latency vs Time", "P99 latency (ms)", p99, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("P95 Latency vs Time", save_line_plot(args.out_dir, "p95_latency_vs_time.png", "P95 Latency vs Time", "P95 latency (ms)", p95, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("P50 Latency vs Time", save_line_plot(args.out_dir, "p50_latency_vs_time.png", "P50 Latency vs Time", "P50 latency (ms)", p50, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("Average Latency vs Time", save_line_plot(args.out_dir, "avg_latency_vs_time.png", "Average Latency vs Time", "Average latency (ms)", avg_latency, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("CPU vs Time", save_line_plot(args.out_dir, "cpu_vs_time.png", "CPU Utilization vs Time", "CPU Core Used", cpu, visible_phases, plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("Memory vs Time", save_line_plot(args.out_dir, "memory_vs_time.png", "Memory Utilization vs Time", "Memory (GB)", mem, visible_phases, plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, step=True, y_min=0.0, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("Network TX vs Time", save_line_plot(args.out_dir, "network_tx_vs_time.png", "Network TX vs Time", "Network bandwidth (Gbps)", tx, visible_phases, plot_ext, plot_dpi, inline_legend, y_scale=1_000_000_000.0, marker_every=resource_marker_every, compact_phase_labels=True, show_burst_level_box=True, failure_markers=failures)))
-    images.append(("Latency Quartile Boxplot by Phase", save_latency_whisker_plot(args.out_dir, "phase_latency_whisker.png", "Latency Quartile Boxplot by Phase", rows, plot_ext, plot_dpi, inline_legend)))
-    images.append(("Phase P99 Latency", save_phase_plot(args.out_dir, "phase_p99_latency.png", "P99 Latency by Phase", "P99 latency (ms)", rows, "p99_ms", plot_ext, plot_dpi, inline_legend, log_y=True)))
-    images.append(("Phase Average Latency", save_phase_plot(args.out_dir, "phase_avg_latency.png", "Average Latency by Phase", "Average latency (ms)", rows, "avg_latency_ms", plot_ext, plot_dpi, inline_legend, log_y=True)))
-    images.append(("Phase Delivery Throughput", save_phase_plot(args.out_dir, "phase_delivery_throughput.png", "Delivery Throughput by Phase", "Messages/s (x10$^5$)", rows, "sub_tps", plot_ext, plot_dpi, inline_legend, y_scale=100000.0)))
-    images.append(("Phase CPU", save_phase_plot(args.out_dir, "phase_cpu.png", "CPU by Phase", "CPU Core Used", rows, "max_cpu_perc", plot_ext, plot_dpi, inline_legend, y_scale=100.0)))
-    images.append(("Phase Memory", save_phase_plot(args.out_dir, "phase_memory.png", "Memory by Phase", "Memory (GB)", rows, "max_mem_used_bytes", plot_ext, plot_dpi, inline_legend, y_scale=1024.0 ** 3)))
+    images.append(("Delivery Throughput vs Time", save_line_plot(args.out_dir, "delivery_throughput_vs_time.png", "Delivery Throughput vs Time", args.throughput_y_label, throughput, visible_phases, plot_ext, plot_dpi, inline_legend, y_scale=args.throughput_y_scale, target_series=target_throughput, marker_every=throughput_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("P99 Latency vs Time", save_line_plot(args.out_dir, "p99_latency_vs_time.png", "P99 Latency vs Time", "P99 latency (ms)", p99, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("P95 Latency vs Time", save_line_plot(args.out_dir, "p95_latency_vs_time.png", "P95 Latency vs Time", "P95 latency (ms)", p95, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("P50 Latency vs Time", save_line_plot(args.out_dir, "p50_latency_vs_time.png", "P50 Latency vs Time", "P50 latency (ms)", p50, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("Average Latency vs Time", save_line_plot(args.out_dir, "avg_latency_vs_time.png", "Average Latency vs Time", "Average latency (ms)", avg_latency, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("CPU vs Time", save_line_plot(args.out_dir, "cpu_vs_time.png", "CPU Utilization vs Time", "CPU Core Used", cpu, visible_phases, plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("Memory vs Time", save_line_plot(args.out_dir, "memory_vs_time.png", "Memory Utilization vs Time", "Memory (GB)", mem, visible_phases, plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, step=True, y_min=0.0, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("Network TX vs Time", save_line_plot(args.out_dir, "network_tx_vs_time.png", "Network TX vs Time", "Network bandwidth (Gbps)", tx, visible_phases, plot_ext, plot_dpi, inline_legend, y_scale=1_000_000_000.0, marker_every=resource_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("Latency Quartile Boxplot by Phase", save_latency_whisker_plot(args.out_dir, "phase_latency_whisker.png", "Latency Quartile Boxplot by Phase", rows, plot_ext, plot_dpi, inline_legend, reference_phases=phases)))
+    images.append(("Phase P99 Latency", save_phase_plot(args.out_dir, "phase_p99_latency.png", "P99 Latency by Phase", "P99 latency (ms)", rows, "p99_ms", plot_ext, plot_dpi, inline_legend, log_y=True, reference_phases=phases)))
+    images.append(("Phase Average Latency", save_phase_plot(args.out_dir, "phase_avg_latency.png", "Average Latency by Phase", "Average latency (ms)", rows, "avg_latency_ms", plot_ext, plot_dpi, inline_legend, log_y=True, reference_phases=phases)))
+    images.append(("Phase Delivery Throughput", save_phase_plot(args.out_dir, "phase_delivery_throughput.png", "Delivery Throughput by Phase", "Messages/s (x10$^5$)", rows, "sub_tps", plot_ext, plot_dpi, inline_legend, y_scale=100000.0, reference_phases=phases)))
+    images.append(("Phase CPU", save_phase_plot(args.out_dir, "phase_cpu.png", "CPU by Phase", "CPU Core Used", rows, "max_cpu_perc", plot_ext, plot_dpi, inline_legend, y_scale=100.0, reference_phases=phases)))
+    images.append(("Phase Memory", save_phase_plot(args.out_dir, "phase_memory.png", "Memory by Phase", "Memory (GB)", rows, "max_mem_used_bytes", plot_ext, plot_dpi, inline_legend, y_scale=1024.0 ** 3, reference_phases=phases)))
     write_gallery(args.out_dir, args.summary, images, plot_points_path)
     print(f"[plot] Wrote plots to {args.out_dir}")
     print(f"[plot] Wrote gallery: {os.path.join(args.out_dir, 'README.md')}")
