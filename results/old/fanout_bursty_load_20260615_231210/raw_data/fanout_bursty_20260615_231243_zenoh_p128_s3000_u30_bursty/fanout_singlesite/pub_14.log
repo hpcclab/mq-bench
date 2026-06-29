@@ -1,0 +1,12 @@
+mq-bench starting with run_id: auto
+Writing CSV output to: artifacts/fanout_bursty_20260615_231243_zenoh_p128_s3000_u30_bursty/fanout_singlesite/pub_14.csv
+2026-06-15T23:13:45.693603Z  INFO mq_bench::roles::publisher: Starting publisher engine=Zenoh key=topic_14 payload_size=128 rate=None rate_profile=Some(RateProfile { phases: [RatePhase { name: "warmup", duration: 60s, rate_per_sec: 20.0 }, RatePhase { name: "baseline", duration: 60s, rate_per_sec: 20.0 }, RatePhase { name: "burst", duration: 60s, rate_per_sec: 2000.0 }, RatePhase { name: "recovery", duration: 60s, rate_per_sec: 20.0 }], cumulative_ends: [60s, 120s, 180s, 240s] }) duration_secs=Some(240) endpoint=Some("tcp/192.168.0.245:7447") crash_enabled=false sequence_start=0 sequence_step=1
+2026-06-15T23:13:45.693960Z  INFO zenoh::net::runtime: Using ZID: 3c4d3863b6b07aa69cf6260fa7f52b16
+2026-06-15T23:13:45.696600Z  INFO mq_bench::roles::publisher: Connected via transport engine=Zenoh
+2026-06-15T23:13:45.696663Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=warmup rate=20.0 elapsed_secs=0.003012154
+2026-06-15T23:14:45.697302Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=baseline rate=20.0 elapsed_secs=60.00364498
+2026-06-15T23:15:45.698369Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=burst rate=2000.0 elapsed_secs=120.004716069
+2026-06-15T23:16:45.698994Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=recovery rate=20.0 elapsed_secs=180.00534063
+2026-06-15T23:17:45.700838Z  INFO mq_bench::roles::publisher: Duration limit reached, stopping publisher
+2026-06-15T23:17:45.700865Z  INFO zenoh::api::session: close session zid=3c4d3863b6b07aa69cf6260fa7f52b16
+2026-06-15T23:17:45.701837Z  INFO mq_bench::roles::publisher: Final Publisher Statistics sent=123608 errors=0 crashes=0 reconnects=0 avg_rate="515.02" duration="240.01s"

@@ -1,0 +1,11 @@
+mq-bench starting with run_id: auto
+Writing CSV output to: artifacts/fanout_bursty_20260617_190733_nats_p64_s1000_u10_bursty/fanout_singlesite/pub_4.csv
+2026-06-17T19:08:34.787705Z  INFO mq_bench::roles::publisher: Starting publisher engine=Nats key=topic_4 payload_size=64 rate=None rate_profile=Some(RateProfile { phases: [RatePhase { name: "burst", duration: 60s, rate_per_sec: 8000.0 }, RatePhase { name: "recovery", duration: 60s, rate_per_sec: 100.0 }], cumulative_ends: [60s, 120s] }) duration_secs=Some(120) endpoint=None crash_enabled=false sequence_start=0 sequence_step=1
+2026-06-17T19:08:34.787776Z  INFO mq_bench::roles::publisher: Connected via transport engine=Nats
+2026-06-17T19:08:34.793434Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T19:08:34.793474Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=burst rate=8000.0 elapsed_secs=0.005724197
+2026-06-17T19:08:34.793482Z  INFO async_nats: event: connected
+2026-06-17T19:09:34.795018Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=recovery rate=100.0 elapsed_secs=60.00725112
+2026-06-17T19:10:34.795836Z  INFO mq_bench::roles::publisher: Duration limit reached, stopping publisher
+2026-06-17T19:10:34.796234Z  INFO mq_bench::roles::publisher: Final Publisher Statistics sent=486004 errors=0 crashes=0 reconnects=0 avg_rate="4049.74" duration="120.01s"
+2026-06-17T19:10:34.796339Z  INFO async_nats: event: closed

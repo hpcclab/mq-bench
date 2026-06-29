@@ -31,7 +31,15 @@ PLOT_LEGEND_FONTSIZE = 5.5
 PLOT_LEGEND_HANDLE_LENGTH = 0.9
 PLOT_LEGEND_COLUMN_SPACING = 0.45
 PLOT_LEGEND_HANDLE_TEXT_PAD = 0.25
+PLOT_X_LABEL_FONTSIZE = 8.0
 PLOT_Y_LABEL_FONTSIZE = 8.0
+PHASE_LABEL_FONTSIZE = 10.4
+PHASE_LABEL_FONTSIZE_LATEX = 9.0
+PHASE_HEADER_FONTSIZE = 10.0
+PHASE_HEADER_FONTSIZE_LATEX = 12.0
+PHASE_LABEL_Y = 1.055
+PHASE_RATE_Y = 1.025
+PHASE_HEADER_Y = 1.106
 
 
 def parse_args() -> argparse.Namespace:
@@ -129,8 +137,18 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--throughput-y-label",
-        default="Throughput (million msgs/s)",
+        default="Throughput (million msg/s)",
         help="Y-axis label for delivery throughput time-series plot",
+    )
+    p.add_argument(
+        "--throughput-broken-y-axis",
+        action="store_true",
+        help="Render delivery throughput with a broken y-axis (0-1 and 2-11 million msg/s)",
+    )
+    p.add_argument(
+        "--throughput-phase-panels",
+        action="store_true",
+        help="Render delivery throughput as two side-by-side phase-range panels (Baseline-B6 and B7-B11)",
     )
     p.add_argument(
         "--start-phase",
@@ -664,6 +682,27 @@ def representative_series(*series_list):
     return selected
 
 
+def series_max_y(series):
+    values = [y for points in series.values() for _x, y in points]
+    if not values:
+        return None
+    return max(values)
+
+
+def normalized_target_overlay(target_series, reference_series, top_fraction=0.92):
+    if not target_series:
+        return {}
+    target_max = series_max_y(target_series)
+    ref_max = series_max_y(reference_series)
+    if target_max is None or target_max <= 0 or ref_max is None or ref_max <= 0:
+        return {}
+    scale = (ref_max * top_fraction) / target_max
+    overlay = {}
+    for label, points in target_series.items():
+        overlay[label] = [(x, y * scale) for x, y in points]
+    return overlay
+
+
 def _odd_window(points):
     points = max(1, int(round(points)))
     if points > 1 and points % 2 == 0:
@@ -883,9 +922,11 @@ def compact_phase_label_items(phases):
         rate_label = phase.get("rate_label", fmt_compact_rate(phase.get("rate")))
         compact_label = phase.get("compact_label")
         if compact_label:
+            if str(compact_label).strip().lower() == "bl":
+                mid += (phase["end"] - phase["start"]) * 0.10
             items.append((mid, compact_label))
             rate_items.append((mid, rate_label))
-            if compact_label == "Baseline":
+            if str(compact_label).strip().lower() in {"baseline", "bl"}:
                 baseline_labeled = True
             continue
         if is_burst_phase(name):
@@ -1010,12 +1051,12 @@ def rebase_failure_markers_from(failures, start_offset):
 
 
 
-def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_labels=False):
+def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_labels=False, show_labels=True, show_header=True, compact_label_y=None, compact_rate_y=None):
     if not phases:
         return
-    for phase in phases:
-        if show_boundaries:
-            ax.axvline(phase["start"], color="#999999", linewidth=0.8, linestyle="--", alpha=0.6)
+
+    if not show_labels:
+        return
 
     if compact_labels:
         label_items, rate_items = compact_phase_label_items(phases)
@@ -1023,23 +1064,25 @@ def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_label
         label_items = [((phase["start"] + phase["end"]) / 2.0, phase_label(phase)) for phase in phases]
         rate_items = []
 
-    label_fontsize = 7.6 if latex else 8.5
-    if compact_labels:
+    label_fontsize = PHASE_LABEL_FONTSIZE_LATEX if latex else PHASE_LABEL_FONTSIZE
+    compact_label_y = PHASE_LABEL_Y if compact_label_y is None else compact_label_y
+    compact_rate_y = PHASE_RATE_Y if compact_rate_y is None else compact_rate_y
+    if compact_labels and show_header:
         ax.text(
             0.5,
-            1.106,
+            PHASE_HEADER_Y,
             "Phase · Offered rate per publisher (msg/s)",
             transform=ax.transAxes,
             ha="center",
             va="bottom",
-            fontsize=10.0 if latex else 8.0,
+            fontsize=PHASE_HEADER_FONTSIZE_LATEX if latex else PHASE_HEADER_FONTSIZE,
             color=ax.xaxis.label.get_color(),
             clip_on=False,
         )
     for mid, label in label_items:
         ax.text(
             mid,
-            1.055 if compact_labels else 1.025,
+            compact_label_y if compact_labels else 1.025,
             label,
             transform=ax.get_xaxis_transform(),
             ha="center",
@@ -1054,7 +1097,7 @@ def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_label
         for mid, rate in rate_items:
             ax.text(
                 mid,
-                1.025,
+                compact_rate_y,
                 rate,
                 transform=ax.get_xaxis_transform(),
                 ha="center",
@@ -1064,9 +1107,6 @@ def add_phase_lines(ax, phases, latex=False, show_boundaries=True, compact_label
                 bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.0},
                 clip_on=False,
             )
-
-    if show_boundaries:
-        ax.axvline(phases[-1]["end"], color="#999999", linewidth=0.8, linestyle="--", alpha=0.6)
 
 
 def marker_sampled_points(points, marker_every):
@@ -1092,13 +1132,16 @@ def marker_sample_indices(points, marker_every):
     return indices
 
 
-def anchor_axes_at_zero(ax, x_max=None, y_min=0.0, hide_y_zero_label=False, y_top_padding=0.12):
+def anchor_axes_at_zero(ax, x_max=None, y_min=0.0, hide_y_zero_label=False, y_top_padding=0.12, y_bottom_padding=0.0):
     """Place the zero origin at the lower-left corner of generated plots."""
     ax.margins(x=0, y=0)
     if x_max is not None and x_max > 0:
         ax.set_xlim(left=0.0, right=x_max)
     else:
         ax.set_xlim(left=0.0)
+    bottom, top = ax.get_ylim()
+    if y_bottom_padding > 0 and top > y_min:
+        y_min -= (top - y_min) * y_bottom_padding
     ax.set_ylim(bottom=y_min)
     bottom, top = ax.get_ylim()
     if y_top_padding > 0 and top > bottom:
@@ -1124,14 +1167,24 @@ def nearest_y_at_or_before(points, x):
     return points[0][1] if points else 0.0
 
 
-def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, legend=False, log_y=False, y_scale=1.0, target_series=None, marker_every=None, step=False, y_min=None, compact_phase_labels=False, failure_markers=None, caption=None):
-    if not series:
-        return None
-    marker_every = 0 if marker_every is None else marker_every
-    latex = ext == ".pdf"
-    has_target = bool(target_series)
+def configure_axis_grid(ax, latex):
+    if latex:
+        ax.grid(False)
+    else:
+        ax.grid(True, alpha=0.3)
+
+
+def hide_zero_y_tick_label(ax):
+    def one_origin_zero(value, _position):
+        if abs(value) < 1e-12:
+            return ""
+        return f"{value:g}"
+
+    ax.yaxis.set_major_formatter(FuncFormatter(one_origin_zero))
+
+
+def plot_line_series(ax, series, y_scale, marker_every, step=False, linewidth=None, include_labels=True, zorder=None):
     x_values = []
-    fig, ax = plt.subplots(figsize=LATEX_FIGSIZE if ext == ".pdf" else (10, 5.5))
     for label, points in sorted(series.items()):
         points = sorted(points, key=lambda point: point[0])
         if not points:
@@ -1145,55 +1198,447 @@ def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, l
             markevery=marker_sample_indices(points, marker_every),
             linestyle="-",
             markersize=PLOT_MARKER_SIZE,
-            linewidth=2.2 if has_target else PLOT_LINEWIDTH,
+            linewidth=PLOT_LINEWIDTH if linewidth is None else linewidth,
             color=color,
-            label=display_transport_label(label),
+            label=display_transport_label(label) if include_labels else "_nolegend_",
             drawstyle="steps-post" if step else "default",
+            zorder=zorder,
         )
-    if target_series:
-        for label, points in sorted(target_series.items()):
-            if not points:
-                continue
-            xs = [p[0] for p in points]
-            ys = [p[1] / y_scale for p in points]
-            x_values.extend(xs)
-            ax.step(
-                xs,
-                ys,
-                where="post",
-                linestyle="--",
-                linewidth=1.5,
-                color="black",
-                alpha=0.65,
-                label=label,
-            )
-    if failure_markers:
-        for label, failure in failure_markers.items():
-            points = sorted(series.get(label, []), key=lambda point: point[0])
-            if not points:
-                continue
-            marker, color = transport_style(label)
-            fail_x = failure.get("x", points[-1][0])
-            fail_x = min(max(fail_x, points[0][0]), points[-1][0])
-            fail_y = nearest_y_at_or_before(points, fail_x) / y_scale
-            ax.scatter([fail_x], [fail_y], marker="x", s=42, linewidths=1.6, color=color, zorder=6)
-            ax.annotate(
-                failure.get("label", "failed"),
-                xy=(fail_x, fail_y),
-                xytext=(4, 6),
-                textcoords="offset points",
-                fontsize=7.0 if latex else 8.0,
-                color=color,
-                ha="left",
-                va="bottom",
-                clip_on=True,
-            )
-    ax.set_xlabel("Time (s)", fontsize = PLOT_X_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7)
-    ax.set_ylabel(ylabel, fontsize=PLOT_Y_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7)
-    if latex:
-        ax.grid(False)
+    return x_values
+
+
+def plot_target_series(ax, target_series, y_scale, include_labels=True):
+    x_values = []
+    if not target_series:
+        return x_values
+    for label, points in sorted(target_series.items()):
+        if not points:
+            continue
+        xs = [p[0] for p in points]
+        ys = [p[1] / y_scale for p in points]
+        x_values.extend(xs)
+        ax.step(
+            xs,
+            ys,
+            where="post",
+            linestyle="--",
+            linewidth=1.5,
+            color="black",
+            alpha=0.65,
+            label=label if include_labels else "_nolegend_",
+        )
+    return x_values
+
+
+def plot_target_series_with_style(ax, target_series, y_scale, linewidth=1.5, alpha=0.65, include_labels=True, zorder=1):
+    x_values = []
+    if not target_series:
+        return x_values
+    for label, points in sorted(target_series.items()):
+        if not points:
+            continue
+        xs = [p[0] for p in points]
+        ys = [p[1] / y_scale for p in points]
+        x_values.extend(xs)
+        ax.step(
+            xs,
+            ys,
+            where="post",
+            linestyle="--",
+            linewidth=linewidth,
+            color="black",
+            alpha=alpha,
+            label=label if include_labels else "_nolegend_",
+            zorder=zorder,
+        )
+    return x_values
+
+
+def plot_failure_markers(ax, series, failure_markers, y_scale, latex=False):
+    if not failure_markers:
+        return
+    for label, failure in failure_markers.items():
+        points = sorted(series.get(label, []), key=lambda point: point[0])
+        if not points:
+            continue
+        marker, color = transport_style(label)
+        fail_x = failure.get("x", points[-1][0])
+        fail_x = min(max(fail_x, points[0][0]), points[-1][0])
+        fail_y = nearest_y_at_or_before(points, fail_x) / y_scale
+        ax.scatter([fail_x], [fail_y], marker="x", s=42, linewidths=1.6, color=color, zorder=6)
+        ax.annotate(
+            failure.get("label", "failed"),
+            xy=(fail_x, fail_y),
+            xytext=(4, 6),
+            textcoords="offset points",
+            fontsize=7.0 if latex else 8.0,
+            color=color,
+            ha="left",
+            va="bottom",
+            clip_on=True,
+        )
+
+
+def draw_broken_axis_markers(ax_upper, ax_lower):
+    size = 0.012
+    kwargs = {"color": "#444444", "clip_on": False, "linewidth": 1.1}
+    ax_upper.plot((-size, +size), (-size, +size), transform=ax_upper.transAxes, **kwargs)
+    ax_upper.plot((1 - size, 1 + size), (-size, +size), transform=ax_upper.transAxes, **kwargs)
+    ax_lower.plot((-size, +size), (1 - size, 1 + size), transform=ax_lower.transAxes, **kwargs)
+    ax_lower.plot((1 - size, 1 + size), (1 - size, 1 + size), transform=ax_lower.transAxes, **kwargs)
+
+
+def save_broken_y_line_plot(out_dir, filename, ylabel, series, phases, ext, dpi, legend=False, y_scale=1.0, target_series=None, marker_every=None, step=False, compact_phase_labels=False, failure_markers=None, caption=None, lower_ylim=(0.0, 1.0), upper_ylim=(2.0, 11.0)):
+    if not series:
+        return None
+    marker_every = 0 if marker_every is None else marker_every
+    latex = ext == ".pdf"
+    has_target = bool(target_series)
+    fig, (ax_upper, ax_lower) = plt.subplots(
+        2,
+        1,
+        sharex=True,
+        figsize=LATEX_FIGSIZE if ext == ".pdf" else (10, 5.8),
+        gridspec_kw={"hspace": 0.05},
+    )
+
+    line_width = 2.2 if has_target else PLOT_LINEWIDTH
+    x_values = plot_line_series(ax_upper, series, y_scale, marker_every, step=step, linewidth=line_width, include_labels=True)
+    plot_line_series(ax_lower, series, y_scale, marker_every, step=step, linewidth=line_width, include_labels=False)
+    x_values.extend(plot_target_series(ax_upper, target_series, y_scale, include_labels=True))
+    plot_target_series(ax_lower, target_series, y_scale, include_labels=False)
+    plot_failure_markers(ax_upper, series, failure_markers, y_scale, latex=latex)
+    plot_failure_markers(ax_lower, series, failure_markers, y_scale, latex=latex)
+
+    ax_lower.set_xlabel("Time (s)", fontsize=PLOT_X_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7)
+    for axis in (ax_upper, ax_lower):
+        configure_axis_grid(axis, latex)
+
+    add_phase_lines(ax_upper, phases, latex, show_boundaries=not has_target, compact_labels=compact_phase_labels, show_labels=True)
+    add_phase_lines(ax_lower, phases, latex, show_boundaries=not has_target, compact_labels=compact_phase_labels, show_labels=False)
+
+    if phases:
+        x_max = max(phase["end"] for phase in phases)
+    elif x_values:
+        x_max = max(x_values)
     else:
-        ax.grid(True, alpha=0.3)
+        x_max = None
+
+    for axis in (ax_upper, ax_lower):
+        axis.margins(x=0, y=0)
+        if x_max is not None and x_max > 0:
+            axis.set_xlim(left=0.0, right=x_max)
+        else:
+            axis.set_xlim(left=0.0)
+
+    ax_lower.set_ylim(*lower_ylim)
+    ax_upper.set_ylim(*upper_ylim)
+    hide_zero_y_tick_label(ax_lower)
+
+    ax_upper.spines["bottom"].set_visible(False)
+    ax_lower.spines["top"].set_visible(False)
+    ax_upper.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
+    ax_lower.tick_params(axis="x", top=False)
+    ax_upper.xaxis.set_ticks_position("none")
+
+    draw_broken_axis_markers(ax_upper, ax_lower)
+
+    if legend:
+        ax_upper.legend(
+            loc="lower center",
+            bbox_to_anchor=(0.5, 1.02),
+            ncol=min(4, max(1, len(series) + len(target_series or {}))),
+            frameon=False,
+            fontsize=PLOT_LEGEND_FONTSIZE,
+            handlelength=PLOT_LEGEND_HANDLE_LENGTH,
+            columnspacing=PLOT_LEGEND_COLUMN_SPACING,
+            handletextpad=PLOT_LEGEND_HANDLE_TEXT_PAD,
+        )
+
+    fig.text(
+        0.03,
+        0.5,
+        ylabel,
+        rotation=90,
+        va="center",
+        ha="center",
+        fontsize=PLOT_Y_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7,
+    )
+    if caption:
+        fig.text(
+            0.125,
+            0.015,
+            caption,
+            ha="left",
+            va="bottom",
+            fontsize=7.0 if latex else 8.0,
+            color="#333333",
+        )
+
+    top = 0.84 if compact_phase_labels else 0.92
+    bottom = 0.16 if caption else 0.11
+    fig.subplots_adjust(left=0.11, right=0.985, top=top, bottom=bottom, hspace=0.05)
+    gallery_file = save_fig(fig, out_dir, filename, ext, dpi)
+    plt.close(fig)
+    return gallery_file
+
+
+def phase_by_compact_label(phases, label):
+    wanted = normalize_phase_selector(label)
+    for phase in phases:
+        if normalize_phase_selector(phase.get("compact_label") or phase.get("name") or "") == wanted:
+            return phase
+    return None
+
+
+def phases_within_window(phases, start_x, end_x):
+    return [phase for phase in phases if phase["end"] > start_x and phase["start"] < end_x]
+
+
+def phase_window(phases, start_label, end_label):
+    start_phase = phase_by_compact_label(phases, start_label)
+    if not start_phase:
+        return [], None, None
+    x_min = start_phase["start"]
+    end_phase = phase_by_compact_label(phases, end_label)
+    if end_phase and end_phase["end"] >= x_min:
+        x_max = end_phase["end"]
+    else:
+        trailing = [phase["end"] for phase in phases if phase["start"] >= x_min]
+        x_max = max(trailing) if trailing else start_phase["end"]
+    return phases_within_window(phases, x_min, x_max), x_min, x_max
+
+
+def throughput_legend_handles(series, include_target=False, target_alpha=0.65, target_linewidth=1.5):
+    handles = []
+    labels = []
+    for label in sorted(series):
+        marker, color = transport_style(label)
+        handles.append(Line2D([0], [0], marker=marker, linestyle="-", linewidth=PLOT_LINEWIDTH, color=color, markersize=PLOT_MARKER_SIZE + 1, markerfacecolor=color))
+        labels.append(display_transport_label(label))
+    if include_target:
+        handles.append(Line2D([0], [0], linestyle="--", linewidth=target_linewidth, color="black", alpha=target_alpha))
+        labels.append("Fan-out target")
+    return handles, labels
+
+
+def relabel_baseline_compact(phases, replacement="BL"):
+    relabeled = []
+    for phase in phases:
+        item = dict(phase)
+        compact = (item.get("compact_label") or "").strip().lower()
+        name = (item.get("name") or "").strip().lower()
+        if compact == "baseline" or name == "baseline":
+            item["compact_label"] = replacement
+        relabeled.append(item)
+    return relabeled
+
+
+def clip_line_points(points, start_x, end_x, include_end=True):
+    clipped = []
+    for x, y in sorted(points, key=lambda point: point[0]):
+        if x < start_x:
+            continue
+        if x > end_x or (not include_end and x >= end_x):
+            break
+        clipped.append((x, y))
+    return clipped
+
+
+def clip_step_points(points, start_x, end_x, include_end=True):
+    ordered = sorted(points, key=lambda point: point[0])
+    if not ordered:
+        return []
+    clipped = []
+    start_y = nearest_y_at_or_before(ordered, start_x)
+    clipped.append((start_x, start_y))
+    last_y = start_y
+    for x, y in ordered:
+        if x < start_x:
+            continue
+        if x > end_x or (not include_end and x >= end_x):
+            break
+        if clipped and abs(clipped[-1][0] - x) < 1e-12 and abs(clipped[-1][1] - y) < 1e-12:
+            last_y = y
+            continue
+        clipped.append((x, y))
+        last_y = y
+    if clipped[-1][0] < end_x:
+        clipped.append((end_x, last_y))
+    return clipped
+
+
+def clip_series_window(series, start_x, end_x, step=False, include_end=True):
+    clipped = defaultdict(list)
+    for label, points in series.items():
+        windowed = clip_step_points(points, start_x, end_x, include_end=include_end) if step else clip_line_points(points, start_x, end_x, include_end=include_end)
+        if windowed:
+            clipped[label] = windowed
+    return clipped
+
+
+def save_throughput_phase_panel_plot(out_dir, filename, ylabel, series, phases, ext, dpi, legend=False, y_scale=1.0, target_series=None, marker_every=None, step=False, compact_phase_labels=False, failure_markers=None, caption=None):
+    if not series:
+        return None
+    marker_every = 0 if marker_every is None else marker_every
+    latex = ext == ".pdf"
+    split_phase = phase_by_compact_label(phases, "B7")
+    split_x = split_phase["start"] if split_phase else None
+    split_overlap = 3.0 * median_sample_interval(series) if split_x is not None else 0.0
+    right_panel_start = max(0.0, split_x - split_overlap) if split_x is not None else None
+    panels = [
+        {"title": "Low-load regime", "start": "Baseline", "end": "R6", "ylim": (0.0, 1.15), "y_side": "left", "include_end": False},
+        {"title": "High-load regime", "start": "B7", "end": "R11", "ylim": (0.0, 11.0), "y_side": "right", "include_end": True},
+    ]
+    panel_windows = []
+    for index, panel in enumerate(panels):
+        panel_phases, x_min, x_max = phase_window(phases, panel["start"], panel["end"])
+        if split_x is not None and right_panel_start is not None:
+            if index == 0:
+                x_max = right_panel_start
+                panel_phases = phases_within_window(panel_phases, x_min if x_min is not None else right_panel_start, right_panel_start)
+            else:
+                x_min = right_panel_start
+                panel_phases = phases_within_window(panel_phases, right_panel_start, x_max if x_max is not None else right_panel_start)
+        panel_windows.append({"meta": panel, "phases": relabel_baseline_compact(panel_phases, "BL"), "x_min": x_min, "x_max": x_max})
+
+    fig, axes = plt.subplots(1, 2, figsize=LATEX_FIGSIZE if latex else (12.5, 4.8), gridspec_kw={"wspace": 0.08})
+    target_linewidth = 1.15
+    target_alpha = 0.62
+    top = 0.82 if compact_phase_labels else 0.89
+    bottom = 0.16 if caption else 0.12
+    panel_header_y = top + ((PHASE_HEADER_Y - PHASE_LABEL_Y) * (top - bottom))
+    for ax, panel in zip(axes, panel_windows):
+        configure_axis_grid(ax, latex)
+        ax.set_ylim(*panel["meta"]["ylim"])
+        if panel["meta"]["y_side"] == "right":
+            ax.yaxis.tick_right()
+            ax.yaxis.set_ticks_position("right")
+            ax.tick_params(axis="y", labelleft=False, left=False, labelright=True, right=True)
+        else:
+            ax.yaxis.tick_left()
+            ax.yaxis.set_ticks_position("left")
+            ax.tick_params(axis="y", labelleft=True, left=True, labelright=False, right=False)
+        if panel["x_min"] is not None and panel["x_max"] is not None and panel["x_max"] > panel["x_min"]:
+            x_min = panel["x_min"]
+            x_max = panel["x_max"]
+            clipped_target = clip_series_window(target_series or {}, x_min, x_max, step=True, include_end=panel["meta"]["include_end"])
+            clipped_series = clip_series_window(series, x_min, x_max, step=step, include_end=panel["meta"]["include_end"])
+            plot_target_series_with_style(ax, clipped_target, y_scale, linewidth=target_linewidth, alpha=target_alpha, include_labels=False, zorder=1)
+            plot_line_series(ax, clipped_series, y_scale, marker_every, step=step, linewidth=PLOT_LINEWIDTH, include_labels=False, zorder=3)
+            plot_failure_markers(ax, clipped_series, failure_markers, y_scale, latex=latex)
+            add_phase_lines(ax, panel["phases"], latex, show_boundaries=False, compact_labels=compact_phase_labels, show_labels=True, show_header=False, compact_label_y=PHASE_LABEL_Y, compact_rate_y=PHASE_RATE_Y)
+            ax.set_xlim(panel["x_min"], panel["x_max"])
+        else:
+            ax.set_xlim(0.0, 1.0)
+            ax.set_xticks([])
+            ax.text(
+                0.5,
+                0.5,
+                "No matching phases",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=8.0 if latex else 9.0,
+                color="#666666",
+            )
+        ax.margins(x=0, y=0)
+    fig.text(
+        0.515,
+        panel_header_y,
+        "Phase · Offered rate per publisher (msg/s)",
+        ha="center",
+        va="bottom",
+        fontsize=PHASE_HEADER_FONTSIZE_LATEX if latex else PHASE_HEADER_FONTSIZE,
+        color=axes[0].xaxis.label.get_color(),
+    )
+    fig.text(
+        0.03,
+        0.5,
+        ylabel,
+        rotation=90,
+        va="center",
+        ha="center",
+        fontsize=PLOT_Y_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7,
+    )
+    fig.text(
+        0.515,
+        0.03 if caption else 0.038,
+        "Time (s)",
+        ha="center",
+        va="center",
+        fontsize=PLOT_X_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7,
+    )
+    if caption:
+        fig.text(
+            0.125,
+            0.015,
+            caption,
+            ha="left",
+            va="bottom",
+            fontsize=7.0 if latex else 8.0,
+            color="#333333",
+        )
+
+    fig.subplots_adjust(left=0.10, right=0.965, top=top, bottom=bottom, wspace=0.08)
+    gallery_file = save_fig(fig, out_dir, filename, ext, dpi)
+    plt.close(fig)
+    return gallery_file
+
+
+def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, legend=False, log_y=False, y_scale=1.0, target_series=None, marker_every=None, step=False, y_min=None, compact_phase_labels=False, failure_markers=None, caption=None, broken_y=None, phase_panels=False, y_bottom_padding=0.0):
+    if not series:
+        return None
+    if phase_panels:
+        return save_throughput_phase_panel_plot(
+            out_dir,
+            filename,
+            ylabel,
+            series,
+            phases,
+            ext,
+            dpi,
+            legend=True,
+            y_scale=y_scale,
+            target_series=target_series,
+            marker_every=marker_every,
+            step=step,
+            compact_phase_labels=compact_phase_labels,
+            failure_markers=failure_markers,
+            caption=caption,
+        )
+    if broken_y is not None:
+        lower_ylim, upper_ylim = broken_y
+        return save_broken_y_line_plot(
+            out_dir,
+            filename,
+            ylabel,
+            series,
+            phases,
+            ext,
+            dpi,
+            legend=legend,
+            y_scale=y_scale,
+            target_series=target_series,
+            marker_every=marker_every,
+            step=step,
+            compact_phase_labels=compact_phase_labels,
+            failure_markers=failure_markers,
+            caption=caption,
+            lower_ylim=lower_ylim,
+            upper_ylim=upper_ylim,
+        )
+    marker_every = 0 if marker_every is None else marker_every
+    latex = ext == ".pdf"
+    has_target = bool(target_series)
+    x_values = []
+    fig, ax = plt.subplots(figsize=LATEX_FIGSIZE if ext == ".pdf" else (10, 5.5))
+    x_values.extend(plot_line_series(ax, series, y_scale, marker_every, step=step, linewidth=2.2 if has_target else PLOT_LINEWIDTH, include_labels=True))
+    x_values.extend(plot_target_series(ax, target_series, y_scale, include_labels=True))
+    plot_failure_markers(ax, series, failure_markers, y_scale, latex=latex)
+    ax.set_xlabel("Time (s)", fontsize=PLOT_X_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7)
+    ax.set_ylabel(ylabel, fontsize=PLOT_Y_LABEL_FONTSIZE if not latex else LATEX_AXIS_LABEL_SIZE - 7)
+    configure_axis_grid(ax, latex)
     if log_y:
         ax.set_yscale("symlog", linthresh=1.0)
     add_phase_lines(ax, phases, latex, show_boundaries=not has_target, compact_labels=compact_phase_labels)
@@ -1203,7 +1648,13 @@ def save_line_plot(out_dir, filename, title, ylabel, series, phases, ext, dpi, l
         x_max = max(x_values)
     else:
         x_max = None
-    anchor_axes_at_zero(ax, x_max=x_max, y_min=0.0 if y_min is None else y_min, hide_y_zero_label=True)
+    anchor_axes_at_zero(
+        ax,
+        x_max=x_max,
+        y_min=0.0 if y_min is None else y_min,
+        hide_y_zero_label=True,
+        y_bottom_padding=y_bottom_padding,
+    )
     if legend:
         ax.legend(
             loc="lower center",
@@ -1992,6 +2443,8 @@ def write_gallery(out_dir, summary, images, plot_points=None):
 
 def main() -> int:
     args = parse_args()
+    if args.throughput_broken_y_axis and args.throughput_phase_panels:
+        raise SystemExit("[plot] --throughput-broken-y-axis and --throughput-phase-panels cannot be used together")
     if not args.out_dir:
         summary_dir = os.path.dirname(os.path.abspath(args.summary))
         bench_dir = os.path.dirname(summary_dir)
@@ -2076,13 +2529,14 @@ def main() -> int:
     legend_file = standalone_legend(args.out_dir, artifacts.values(), plot_ext, plot_dpi, include_target=bool(target_throughput))
     if legend_file:
         images.append(("Legend", legend_file))
-    images.append(("Delivery Throughput vs Time", save_line_plot(args.out_dir, "delivery_throughput_vs_time.png", "Delivery Throughput vs Time", args.throughput_y_label, throughput, visible_phases, plot_ext, plot_dpi, inline_legend, y_scale=args.throughput_y_scale, target_series=target_throughput, marker_every=throughput_marker_every, compact_phase_labels=True, failure_markers=failures)))
+    throughput_broken_y = ((0.0, 1.0), (2.0, 11.0)) if args.throughput_broken_y_axis else None
+    images.append(("Delivery Throughput vs Time", save_line_plot(args.out_dir, "delivery_throughput_vs_time.png", "Delivery Throughput vs Time", args.throughput_y_label, throughput, visible_phases, plot_ext, plot_dpi, inline_legend, y_scale=args.throughput_y_scale, target_series=target_throughput, marker_every=throughput_marker_every, compact_phase_labels=True, failure_markers=failures, broken_y=throughput_broken_y, phase_panels=args.throughput_phase_panels)))
     images.append(("P99 Latency vs Time", save_line_plot(args.out_dir, "p99_latency_vs_time.png", "P99 Latency vs Time", "P99 latency (ms)", p99, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
     images.append(("P95 Latency vs Time", save_line_plot(args.out_dir, "p95_latency_vs_time.png", "P95 Latency vs Time", "P95 latency (ms)", p95, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
     images.append(("P50 Latency vs Time", save_line_plot(args.out_dir, "p50_latency_vs_time.png", "P50 Latency vs Time", "P50 latency (ms)", p50, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
     images.append(("Average Latency vs Time", save_line_plot(args.out_dir, "avg_latency_vs_time.png", "Average Latency vs Time", "Average latency (ms)", avg_latency, visible_phases, plot_ext, plot_dpi, inline_legend, log_y=True, marker_every=latency_marker_every, compact_phase_labels=True, failure_markers=failures)))
-    images.append(("CPU vs Time", save_line_plot(args.out_dir, "cpu_vs_time.png", "CPU Utilization vs Time", "CPU Core Used", cpu, visible_phases, plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, compact_phase_labels=True, failure_markers=failures)))
-    images.append(("Memory vs Time", save_line_plot(args.out_dir, "memory_vs_time.png", "Memory Utilization vs Time", "Memory (GB)", mem, visible_phases, plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, step=True, y_min=0.0, compact_phase_labels=True, failure_markers=failures)))
+    images.append(("CPU vs Time", save_line_plot(args.out_dir, "cpu_vs_time.png", "CPU Utilization vs Time", "CPU Core Used", cpu, relabel_baseline_compact(visible_phases, "BL"), plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, compact_phase_labels=True, failure_markers=failures, y_bottom_padding=0.04)))
+    images.append(("Memory vs Time", save_line_plot(args.out_dir, "memory_vs_time.png", "Memory Utilization vs Time", "Memory (GB)", mem, relabel_baseline_compact(visible_phases, "BL"), plot_ext, plot_dpi, inline_legend, marker_every=resource_marker_every, step=True, y_min=0.0, compact_phase_labels=True, failure_markers=failures, y_bottom_padding=0.04)))
     images.append(("Network TX vs Time", save_line_plot(args.out_dir, "network_tx_vs_time.png", "Network TX vs Time", "Network bandwidth (Gbps)", tx, visible_phases, plot_ext, plot_dpi, inline_legend, y_scale=1_000_000_000.0, marker_every=resource_marker_every, compact_phase_labels=True, failure_markers=failures)))
     images.append(("Latency Quartile Boxplot by Phase", save_latency_whisker_plot(args.out_dir, "phase_latency_whisker.png", "Latency Quartile Boxplot by Phase", rows, plot_ext, plot_dpi, inline_legend, reference_phases=phases)))
     images.append(("Phase P99 Latency", save_phase_plot(args.out_dir, "phase_p99_latency.png", "P99 Latency by Phase", "P99 latency (ms)", rows, "p99_ms", plot_ext, plot_dpi, inline_legend, log_y=True, reference_phases=phases)))

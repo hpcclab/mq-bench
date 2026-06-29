@@ -1,0 +1,10 @@
+mq-bench starting with run_id: auto
+Writing CSV output to: artifacts/fanout_bursty_20260618_065754_mqtt_artemis_p64_s1000_u10_bursty/fanout_singlesite/pub_4.csv
+2026-06-18T06:58:56.114709Z  INFO mq_bench::roles::publisher: Starting publisher engine=Mqtt key=topic_4 payload_size=64 rate=None rate_profile=Some(RateProfile { phases: [RatePhase { name: "warmup", duration: 60s, rate_per_sec: 200.0 }, RatePhase { name: "baseline", duration: 60s, rate_per_sec: 200.0 }, RatePhase { name: "burst", duration: 60s, rate_per_sec: 500.0 }, RatePhase { name: "recovery", duration: 60s, rate_per_sec: 200.0 }], cumulative_ends: [60s, 120s, 180s, 240s] }) duration_secs=Some(240) endpoint=None crash_enabled=false sequence_start=0 sequence_step=1
+2026-06-18T06:58:56.114779Z  INFO mq_bench::roles::publisher: Connected via transport engine=Mqtt
+2026-06-18T06:58:56.114812Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=warmup rate=200.0 elapsed_secs=5.3434e-5
+2026-06-18T06:59:56.116174Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=baseline rate=200.0 elapsed_secs=60.00141016
+2026-06-18T07:00:56.117881Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=burst rate=500.0 elapsed_secs=120.003105647
+2026-06-18T07:01:56.118951Z  INFO mq_bench::roles::publisher: Publisher rate profile phase entered phase=recovery rate=200.0 elapsed_secs=180.004190836
+2026-06-18T07:02:56.120025Z  INFO mq_bench::roles::publisher: Duration limit reached, stopping publisher
+2026-06-18T07:02:56.120312Z  INFO mq_bench::roles::publisher: Final Publisher Statistics sent=66008 errors=0 crashes=0 reconnects=0 avg_rate="275.03" duration="240.01s"

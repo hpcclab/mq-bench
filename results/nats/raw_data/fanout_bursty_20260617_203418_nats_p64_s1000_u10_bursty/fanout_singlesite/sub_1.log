@@ -1,0 +1,502 @@
+mq-bench starting with run_id: auto
+Writing CSV output to: artifacts/fanout_bursty_20260617_203418_nats_p64_s1000_u10_bursty/fanout_singlesite/sub_1.csv
+2026-06-17T20:34:18.927705Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:18.927774Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:18.930237Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:18.930300Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:18.930302Z  INFO async_nats: event: connected
+2026-06-17T20:34:19.535121Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:19.535180Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:19.537661Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:19.537760Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:19.537782Z  INFO async_nats: event: connected
+2026-06-17T20:34:20.142443Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:20.142505Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:20.144953Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:20.145046Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:20.145051Z  INFO async_nats: event: connected
+2026-06-17T20:34:20.748922Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:20.748965Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:20.751440Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:20.751528Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:20.751534Z  INFO async_nats: event: connected
+2026-06-17T20:34:21.356070Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:21.356112Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:21.358626Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:21.358729Z  INFO async_nats: event: connected
+2026-06-17T20:34:21.358732Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:21.963491Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:21.963529Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:21.965983Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:21.966084Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:21.966086Z  INFO async_nats: event: connected
+2026-06-17T20:34:22.569893Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:22.569952Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:22.572595Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:22.572685Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:22.572695Z  INFO async_nats: event: connected
+2026-06-17T20:34:23.177075Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:23.177110Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:23.179351Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:23.179467Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:23.179474Z  INFO async_nats: event: connected
+2026-06-17T20:34:23.783976Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:23.784014Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:23.786392Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:23.786486Z  INFO async_nats: event: connected
+2026-06-17T20:34:23.786488Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:24.390931Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:24.390979Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:24.393347Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:24.393446Z  INFO async_nats: event: connected
+2026-06-17T20:34:24.393446Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:24.998191Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:24.998243Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:25.000441Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:25.000541Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:25.000551Z  INFO async_nats: event: connected
+2026-06-17T20:34:25.605077Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:25.605117Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:25.607365Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:25.607461Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:25.607465Z  INFO async_nats: event: connected
+2026-06-17T20:34:26.212145Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:26.212186Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:26.214527Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:26.214630Z  INFO async_nats: event: connected
+2026-06-17T20:34:26.214630Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:26.818987Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:26.819025Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:26.821326Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:26.821407Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:26.821414Z  INFO async_nats: event: connected
+2026-06-17T20:34:27.425872Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:27.425921Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:27.428140Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:27.428263Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:27.428268Z  INFO async_nats: event: connected
+2026-06-17T20:34:28.033407Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:28.033462Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:28.035722Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:28.035822Z  INFO async_nats: event: connected
+2026-06-17T20:34:28.035827Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:28.640415Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:28.640453Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:28.642715Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:28.642799Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:28.642804Z  INFO async_nats: event: connected
+2026-06-17T20:34:29.247299Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:29.247339Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:29.249898Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:29.249988Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:29.249993Z  INFO async_nats: event: connected
+2026-06-17T20:34:29.854013Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:29.854048Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:29.856493Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:29.856590Z  INFO async_nats: event: connected
+2026-06-17T20:34:29.856594Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:30.461413Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:30.461453Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:30.463775Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:30.463863Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:30.463869Z  INFO async_nats: event: connected
+2026-06-17T20:34:31.068182Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:31.068249Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:31.070605Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:31.070686Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:31.070691Z  INFO async_nats: event: connected
+2026-06-17T20:34:31.675770Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:31.675811Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:31.678062Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:31.678146Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:31.678146Z  INFO async_nats: event: connected
+2026-06-17T20:34:32.283597Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:32.283644Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:32.284967Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:32.285054Z  INFO async_nats: event: connected
+2026-06-17T20:34:32.285062Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:32.889859Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:32.889902Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:32.892171Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:32.892282Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:32.892286Z  INFO async_nats: event: connected
+2026-06-17T20:34:33.497070Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:33.497112Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:33.499382Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:33.499468Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:33.499475Z  INFO async_nats: event: connected
+2026-06-17T20:34:34.103878Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:34.103919Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:34.106257Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:34.106352Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:34.106360Z  INFO async_nats: event: connected
+2026-06-17T20:34:34.711437Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:34.711473Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:34.713694Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:34.713775Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:34.713780Z  INFO async_nats: event: connected
+2026-06-17T20:34:35.318608Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:35.318650Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:35.319930Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:35.320005Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:35.320013Z  INFO async_nats: event: connected
+2026-06-17T20:34:35.925001Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:35.925042Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:35.927227Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:35.927326Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:35.927335Z  INFO async_nats: event: connected
+2026-06-17T20:34:36.532627Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:36.532666Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:36.534937Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:36.535038Z  INFO async_nats: event: connected
+2026-06-17T20:34:36.535040Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:37.139042Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:37.139081Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:37.141308Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:37.141397Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:37.141399Z  INFO async_nats: event: connected
+2026-06-17T20:34:37.746279Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:37.746338Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:37.748684Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:37.748768Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:37.748774Z  INFO async_nats: event: connected
+2026-06-17T20:34:38.353411Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:38.353477Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:38.355872Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:38.355958Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:38.355967Z  INFO async_nats: event: connected
+2026-06-17T20:34:38.960767Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:38.960809Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:38.963349Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:38.963438Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:38.963442Z  INFO async_nats: event: connected
+2026-06-17T20:34:39.568512Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:39.568552Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:39.570889Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:39.570967Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:39.570975Z  INFO async_nats: event: connected
+2026-06-17T20:34:40.175032Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:40.175074Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:40.177381Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:40.177465Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:40.177471Z  INFO async_nats: event: connected
+2026-06-17T20:34:40.782256Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:40.782298Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:40.784587Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:40.784661Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:40.784668Z  INFO async_nats: event: connected
+2026-06-17T20:34:41.389431Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:41.389473Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:41.391728Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:41.391815Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:41.391816Z  INFO async_nats: event: connected
+2026-06-17T20:34:41.996278Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:41.996317Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:41.998597Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:41.998673Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:41.998678Z  INFO async_nats: event: connected
+2026-06-17T20:34:42.602918Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:42.602973Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:42.605239Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:42.605329Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:42.605330Z  INFO async_nats: event: connected
+2026-06-17T20:34:43.210073Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:43.210124Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:43.212398Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:43.212476Z  INFO async_nats: event: connected
+2026-06-17T20:34:43.212478Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:43.817281Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:43.817351Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:43.819561Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:43.819654Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:43.819653Z  INFO async_nats: event: connected
+2026-06-17T20:34:44.424563Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:44.424603Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:44.426925Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:44.427013Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:44.427014Z  INFO async_nats: event: connected
+2026-06-17T20:34:45.031702Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:45.031748Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:45.034067Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:45.034144Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:45.034151Z  INFO async_nats: event: connected
+2026-06-17T20:34:45.639695Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:45.639735Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:45.641915Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:45.642013Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:45.642014Z  INFO async_nats: event: connected
+2026-06-17T20:34:46.247762Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:46.247804Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:46.250038Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:46.250123Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:46.250132Z  INFO async_nats: event: connected
+2026-06-17T20:34:46.854897Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:46.854941Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:46.857359Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:46.857448Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:46.857456Z  INFO async_nats: event: connected
+2026-06-17T20:34:47.462165Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:47.462198Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:47.464358Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:47.464452Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:47.464453Z  INFO async_nats: event: connected
+2026-06-17T20:34:48.068816Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:48.068866Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:48.071195Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:48.071300Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:48.071310Z  INFO async_nats: event: connected
+2026-06-17T20:34:48.675988Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:48.676024Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:48.678485Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:48.678590Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:48.678596Z  INFO async_nats: event: connected
+2026-06-17T20:34:49.283415Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:49.283457Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:49.285694Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:49.285769Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:49.285777Z  INFO async_nats: event: connected
+2026-06-17T20:34:49.890726Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:49.890779Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:49.893110Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:49.893232Z  INFO async_nats: event: connected
+2026-06-17T20:34:49.893196Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:50.498232Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:50.498269Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:50.500503Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:50.500582Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:50.500589Z  INFO async_nats: event: connected
+2026-06-17T20:34:51.105162Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:51.105239Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:51.107814Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:51.107889Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:51.107896Z  INFO async_nats: event: connected
+2026-06-17T20:34:51.712556Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:51.712589Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:51.714793Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:51.714879Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:51.714886Z  INFO async_nats: event: connected
+2026-06-17T20:34:52.319276Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:52.319340Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:52.321844Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:52.321943Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:52.321945Z  INFO async_nats: event: connected
+2026-06-17T20:34:52.926489Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:52.926536Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:52.929046Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:52.929133Z  INFO async_nats: event: connected
+2026-06-17T20:34:52.929146Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:53.532911Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:53.532973Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:53.535274Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:53.535370Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:53.535376Z  INFO async_nats: event: connected
+2026-06-17T20:34:54.140345Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:54.140392Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:54.142672Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:54.142767Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:54.142783Z  INFO async_nats: event: connected
+2026-06-17T20:34:54.747452Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:54.747484Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:54.749646Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:54.749734Z  INFO async_nats: event: connected
+2026-06-17T20:34:54.749732Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:55.354618Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:55.354672Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:55.356955Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:55.357048Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:55.357062Z  INFO async_nats: event: connected
+2026-06-17T20:34:55.961710Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:55.961746Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:55.964223Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:55.964311Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:55.964316Z  INFO async_nats: event: connected
+2026-06-17T20:34:56.569552Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:56.569595Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:56.571940Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:56.572025Z  INFO async_nats: event: connected
+2026-06-17T20:34:56.572031Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:57.175836Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:57.175872Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:57.178265Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:57.178337Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:57.178345Z  INFO async_nats: event: connected
+2026-06-17T20:34:57.783755Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:57.783786Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:57.785964Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:57.786061Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:57.786066Z  INFO async_nats: event: connected
+2026-06-17T20:34:58.391286Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:58.391325Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:58.393725Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:58.393803Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:58.393810Z  INFO async_nats: event: connected
+2026-06-17T20:34:58.998631Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:58.998669Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:59.000924Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:59.001029Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:59.001036Z  INFO async_nats: event: connected
+2026-06-17T20:34:59.605172Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:34:59.605197Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:34:59.607364Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:34:59.607452Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:34:59.607459Z  INFO async_nats: event: connected
+2026-06-17T20:35:00.212683Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:00.212727Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:00.215144Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:00.215252Z  INFO async_nats: event: connected
+2026-06-17T20:35:00.215255Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:00.819897Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:00.819937Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:00.822251Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:00.822330Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:00.822339Z  INFO async_nats: event: connected
+2026-06-17T20:35:01.427003Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:01.427049Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:01.429257Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:01.429352Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:01.429357Z  INFO async_nats: event: connected
+2026-06-17T20:35:02.034080Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:02.034117Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:02.036327Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:02.036411Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:02.036418Z  INFO async_nats: event: connected
+2026-06-17T20:35:02.641063Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:02.641093Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:02.643403Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:02.643499Z  INFO async_nats: event: connected
+2026-06-17T20:35:02.643500Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:03.248380Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:03.248419Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:03.250788Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:03.250877Z  INFO async_nats: event: connected
+2026-06-17T20:35:03.250877Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:03.855707Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:03.855739Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:03.857875Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:03.857975Z  INFO async_nats: event: connected
+2026-06-17T20:35:03.857976Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:04.463115Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:04.463149Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:04.465377Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:04.465462Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:04.465471Z  INFO async_nats: event: connected
+2026-06-17T20:35:05.070560Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:05.070593Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:05.072693Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:05.072777Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:05.072784Z  INFO async_nats: event: connected
+2026-06-17T20:35:05.677563Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:05.677593Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:05.680029Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:05.680124Z  INFO async_nats: event: connected
+2026-06-17T20:35:05.680125Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:06.284074Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:06.284114Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:06.286256Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:06.286347Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:06.286354Z  INFO async_nats: event: connected
+2026-06-17T20:35:06.891483Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:06.891515Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:06.893779Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:06.893858Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:06.893863Z  INFO async_nats: event: connected
+2026-06-17T20:35:07.498565Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:07.498598Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:07.501097Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:07.501179Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:07.501186Z  INFO async_nats: event: connected
+2026-06-17T20:35:08.105083Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:08.105115Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:08.107331Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:08.107422Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:08.107430Z  INFO async_nats: event: connected
+2026-06-17T20:35:08.711994Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:08.712026Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:08.714304Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:08.714398Z  INFO async_nats: event: connected
+2026-06-17T20:35:08.714400Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:09.319463Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:09.319509Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:09.321838Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:09.321932Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:09.321933Z  INFO async_nats: event: connected
+2026-06-17T20:35:09.926015Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:09.926044Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:09.928506Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:09.928582Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:09.928586Z  INFO async_nats: event: connected
+2026-06-17T20:35:10.533289Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:10.533332Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:10.535611Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:10.535681Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:10.535687Z  INFO async_nats: event: connected
+2026-06-17T20:35:11.140506Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:11.140547Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:11.142923Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:11.142996Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:11.143001Z  INFO async_nats: event: connected
+2026-06-17T20:35:11.747399Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:11.747434Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:11.749790Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:11.749878Z  INFO async_nats: event: connected
+2026-06-17T20:35:11.749879Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:12.353840Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:12.353866Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:12.356101Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:12.356218Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:12.356224Z  INFO async_nats: event: connected
+2026-06-17T20:35:12.961262Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:12.961298Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:12.963528Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:12.963609Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:12.963615Z  INFO async_nats: event: connected
+2026-06-17T20:35:13.568167Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:13.568247Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:13.570462Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:13.570543Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:13.570552Z  INFO async_nats: event: connected
+2026-06-17T20:35:14.174822Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:14.174862Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:14.177143Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:14.177255Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:14.177262Z  INFO async_nats: event: connected
+2026-06-17T20:35:14.781824Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:14.781855Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:14.784474Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:14.784563Z  INFO async_nats: event: connected
+2026-06-17T20:35:14.784564Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:15.389784Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:15.389821Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:15.392171Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:15.392277Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:15.392283Z  INFO async_nats: event: connected
+2026-06-17T20:35:15.996831Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:15.996884Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:15.999304Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:15.999386Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:15.999395Z  INFO async_nats: event: connected
+2026-06-17T20:35:16.604354Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:16.604389Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:16.606584Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:16.606671Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:16.606676Z  INFO async_nats: event: connected
+2026-06-17T20:35:17.211032Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:17.211062Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:17.213360Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:17.213448Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:17.213456Z  INFO async_nats: event: connected
+2026-06-17T20:35:17.818417Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:17.818450Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:17.820563Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:17.820649Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:17.820655Z  INFO async_nats: event: connected
+2026-06-17T20:35:18.425627Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:18.425660Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:18.427912Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:18.428000Z  INFO async_nats: event: connected
+2026-06-17T20:35:18.428000Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:19.032527Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Nats key=topic_1 endpoint=None crash_enabled=false
+2026-06-17T20:35:19.032556Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Nats
+2026-06-17T20:35:19.034754Z  INFO async_nats::connector: connected successfully server=4222 max_payload=10485760
+2026-06-17T20:35:19.034838Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_1
+2026-06-17T20:35:19.034839Z  INFO async_nats: event: connected
