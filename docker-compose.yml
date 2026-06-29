@@ -31,9 +31,9 @@ services:
     image: hivemq/hivemq-ce:latest
     container_name: hivemq
     environment:
-      - JAVA_OPTS=-Xms1g -Xmx4g
-    tmpfs:
-      - /opt/hivemq/data:size=1G
+      - JAVA_OPTS=-Xms1g -Xmx5g
+    volumes:
+      - hivemq_data:/opt/hivemq/data
     ports:
       - "1885:1883"   # MQTT TCP
       - "8081:8080"   # Dashboard (optional)
@@ -50,8 +50,7 @@ services:
       - RABBITMQ_MNESIA_BASE=/tmp/rabbitmq-mnesia
     volumes:
       - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-    tmpfs:
-      - /tmp/rabbitmq-mnesia:size=512M
+      - rabbitmq_data:/tmp/rabbitmq-mnesia
     ports:
       - "5672:5672"   # AMQP
       - "15672:15672" # Management UI
@@ -63,13 +62,14 @@ services:
   artemis:
     image: apache/activemq-artemis:latest-alpine
     container_name: artemis
+    user: root
     environment:
       - ARTEMIS_USER=admin
       - ARTEMIS_PASSWORD=admin
       - AMQ_JOURNAL_TYPE=NIO
       - AMQ_DATA_DIR=/var/lib/artemis-instance/data
-    tmpfs:
-      - /var/lib/artemis-instance/data:size=512M
+    volumes:
+      - artemis_data:/var/lib/artemis-instance/data
     ports:
       - "5673:5672"   # AMQP 1.0 (host 5673 to avoid RabbitMQ 5672)
       - "1887:1883"   # MQTT (host 1887; Artemis MQTT)
@@ -97,7 +97,23 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --tcp-backlog
+      - "65535"
+      - --timeout
+      - "0"
+      - --tcp-keepalive
+      - "60"
+      - --client-output-buffer-limit
+      - pubsub
+      - "0"
+      - "0"
+      - "0"
     ulimits:
       nofile:
         soft: 300000
@@ -114,6 +130,7 @@ services:
       - ./config/router1.json5:/etc/zenoh/router1.json5:ro
     environment:
       RUST_LOG: info
+      ZENOH_RUNTIME: "(rx: (worker_threads: 4), tx: (worker_threads: 4), net: (worker_threads: 2), app: (worker_threads: 2), acc: (worker_threads: 1))"
     ulimits:
       nofile:
         soft: 300000
@@ -155,3 +172,6 @@ services:
 
 volumes:
   mosquitto_data:
+  hivemq_data:
+  rabbitmq_data:
+  artemis_data:

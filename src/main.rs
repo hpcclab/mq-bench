@@ -4,6 +4,7 @@ use futures::future::join_all;
 use mq_bench::crash::CrashConfig;
 use mq_bench::metrics::stats::Stats;
 use mq_bench::output::OutputWriter;
+use mq_bench::rate::RateProfile;
 use mq_bench::roles::multi_topic::{
     KeyMappingMode, MultiTopicConfig, MultiTopicSubConfig, run_multi_topic, run_multi_topic_sub,
 };
@@ -75,6 +76,10 @@ enum Commands {
         /// Rate per publisher (msg/s). If omitted or <= 0, runs at max speed (no delay)
         #[arg(long, alias = "qps", allow_hyphen_values = true)]
         rate: Option<i32>,
+
+        /// Comma-separated phases as name:duration_secs:rate_per_publisher. Overrides --rate.
+        #[arg(long)]
+        rate_profile: Option<String>,
 
         /// Duration in seconds
         #[arg(long, default_value = "60")]
@@ -328,6 +333,10 @@ enum Commands {
         #[arg(long, default_value = "1")]
         subscribers: u32,
 
+        /// Total ramp-up time in seconds to spread subscriber connection creation
+        #[arg(long, default_value = "0")]
+        ramp_up_secs: f64,
+
         /// QoS level (0,1,2). Mapped per engine; for zenoh: 0=best effort, 1/2=reliable
         #[arg(long, default_value_t = 0u8)]
         qos: u8,
@@ -363,6 +372,18 @@ enum Commands {
         /// RNG seed for reproducible crash patterns
         #[arg(long)]
         crash_seed: Option<u64>,
+
+        /// High-throughput subscriber mode: count every receive cheaply and sample latency
+        #[arg(long, default_value = "false")]
+        fast_count: bool,
+
+        /// Record latency for every Nth received message in --fast-count mode (0 = no latency samples)
+        #[arg(long, default_value = "1000")]
+        latency_sample_rate: u64,
+
+        /// Disable sequence duplicate/gap tracking in normal subscriber mode
+        #[arg(long, default_value = "false")]
+        disable_sequence_tracking: bool,
     },
     /// Requester role
     Req {
@@ -545,6 +566,7 @@ async fn main() -> Result<()> {
             publishers,
             payload,
             rate,
+            rate_profile,
             duration,
             qos,
             csv,
@@ -565,6 +587,19 @@ async fn main() -> Result<()> {
                     conn.params.insert("endpoint".into(), ep.clone());
                 }
             }
+            let parsed_rate_profile = if let Some(spec) = rate_profile.as_deref() {
+                Some(
+                    RateProfile::parse(spec)
+                        .map_err(|e| anyhow::anyhow!("invalid --rate-profile: {e}"))?,
+                )
+            } else {
+                None
+            };
+            let publisher_duration_secs = parsed_rate_profile
+                .as_ref()
+                .map(|profile| profile.total_duration_secs())
+                .unwrap_or(duration as u64);
+
             // Wire retry options
             conn.retry_enabled = enable_retry;
             conn.retry_count = retry_count;
@@ -620,13 +655,20 @@ async fn main() -> Result<()> {
                     connect: conn.clone(),
                     key_expr,
                     payload_size: payload as usize,
-                    rate: match rate {
-                        Some(v) if v > 0 => Some(v as f64),
-                        _ => None,
+                    rate: if parsed_rate_profile.is_some() {
+                        None
+                    } else {
+                        match rate {
+                            Some(v) if v > 0 => Some(v as f64),
+                            _ => None,
+                        }
                     },
-                    duration_secs: Some(duration as u64),
+                    rate_profile: parsed_rate_profile.clone(),
+                    duration_secs: Some(publisher_duration_secs),
                     output_file: None,
                     snapshot_interval_secs: snapshot_interval_secs,
+                    sequence_start: i as u64,
+                    sequence_step: publishers as u64,
                     shared_stats: shared_stats.clone(),
                     disable_internal_snapshot: true,
                     crash_config: crash_cfg,
@@ -877,6 +919,7 @@ async fn main() -> Result<()> {
             expr,
             subscribers,
             qos,
+            ramp_up_secs,
             csv,
             enable_retry,
             retry_count,
@@ -885,6 +928,9 @@ async fn main() -> Result<()> {
             mttr,
             crash_count,
             crash_seed,
+            fast_count,
+            latency_sample_rate,
+            disable_sequence_tracking,
         } => {
             let engine = parse_engine(&engine).unwrap_or(Engine::Zenoh);
             let mut conn = parse_connect_kv(&connect);
@@ -929,7 +975,14 @@ async fn main() -> Result<()> {
             } else {
                 None
             };
-            for _i in 0..subscribers {
+            let ramp_delay = if subscribers > 1 && ramp_up_secs > 0.0 {
+                Some(std::time::Duration::from_secs_f64(
+                    ramp_up_secs / f64::from(subscribers - 1),
+                ))
+            } else {
+                None
+            };
+            for i in 0..subscribers {
                 let crash_cfg = mq_bench::CrashConfig {
                     mttf_secs: mttf,
                     mttr_secs: mttr,
@@ -946,10 +999,18 @@ async fn main() -> Result<()> {
                     disable_internal_snapshot: true,
                     test_stop_after_secs: None,
                     crash_config: crash_cfg,
+                    fast_count,
+                    latency_sample_rate,
+                    disable_sequence_tracking,
                 };
                 handles.push(tokio::spawn(async move {
                     let _ = run_subscriber(cfg).await;
                 }));
+                if i + 1 < subscribers {
+                    if let Some(delay) = ramp_delay {
+                        tokio::time::sleep(delay).await;
+                    }
+                }
             }
             let _ = join_all(handles).await;
             // Final snapshot and cleanup

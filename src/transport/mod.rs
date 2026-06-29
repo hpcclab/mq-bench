@@ -284,7 +284,10 @@ impl TransportBuilder {
 
         let max_attempts = opts.retry_count.max(1);
         let initial_delay = std::time::Duration::from_millis(opts.retry_delay_ms.max(100));
-        let max_delay = std::time::Duration::from_millis(opts.retry_max_delay_ms.max(initial_delay.as_millis() as u64));
+        let max_delay = std::time::Duration::from_millis(
+            opts.retry_max_delay_ms
+                .max(initial_delay.as_millis() as u64),
+        );
         let mut current_delay = initial_delay;
         let mut last_error = None;
 

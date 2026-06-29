@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 pub struct Stats {
     // Latency histogram (nanosecond precision)
     latency_hist: RwLock<Histogram<u64>>,
+    interval_latency_hist: RwLock<Histogram<u64>>,
 
     // Counters
     pub sent_count: AtomicU64,
@@ -49,6 +50,9 @@ impl Stats {
         Self {
             // 1ns to 60s range, 3 significant digits
             latency_hist: RwLock::new(Histogram::new_with_bounds(1, 60_000_000_000, 3).unwrap()),
+            interval_latency_hist: RwLock::new(
+                Histogram::new_with_bounds(1, 60_000_000_000, 3).unwrap(),
+            ),
             sent_count: AtomicU64::new(0),
             received_count: AtomicU64::new(0),
             error_count: AtomicU64::new(0),
@@ -91,6 +95,18 @@ impl Stats {
         if let Ok(mut hist) = self.latency_hist.try_write() {
             let _ = hist.record(latency_ns);
         }
+        if let Ok(mut hist) = self.interval_latency_hist.try_write() {
+            let _ = hist.record(latency_ns);
+        }
+    }
+
+    /// Fast-path receive counter for high-throughput subscribers.
+    ///
+    /// This intentionally avoids async locks and latency histograms; sampled
+    /// latency can be recorded separately.
+    #[inline]
+    pub fn record_received_fast(&self) -> u64 {
+        self.received_count.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// Record an error
@@ -183,7 +199,27 @@ impl Stats {
                 *first = Some(Instant::now());
             }
         }
-        // Record all latencies under a single histogram write lock
+        // Record all latencies under a single histogram write lock per histogram.
+        {
+            let mut hist = self.latency_hist.write().await;
+            for &lat in latencies_ns {
+                let _ = hist.record(lat);
+            }
+        }
+        {
+            let mut hist = self.interval_latency_hist.write().await;
+            for &lat in latencies_ns {
+                let _ = hist.record(lat);
+            }
+        }
+    }
+
+    /// Record sampled latencies without changing the received message count.
+    pub async fn record_latency_sample_batch(&self, latencies_ns: &[u64]) {
+        if latencies_ns.is_empty() {
+            return;
+        }
+
         let mut hist = self.latency_hist.write().await;
         for &lat in latencies_ns {
             let _ = hist.record(lat);
@@ -207,17 +243,33 @@ impl Stats {
         let gaps = self.gap_count.load(Ordering::Relaxed);
         let head_loss = self.head_loss.load(Ordering::Relaxed);
 
-        let hist = self.latency_hist.read().await;
-        let p25 = hist.value_at_quantile(0.25);
-        let p50 = hist.value_at_quantile(0.5);
-        let p75 = hist.value_at_quantile(0.75);
-        let p95 = hist.value_at_quantile(0.95);
-        let p99 = hist.value_at_quantile(0.99);
-        let min = hist.min();
-        let max = hist.max();
-        let mean = hist.mean();
-        let stddev = hist.stdev();
-        let sample_count = hist.len();
+        let (p25, p50, p75, p95, p99, min, max, mean, stddev, sample_count) = {
+            let hist = self.latency_hist.read().await;
+            (
+                hist.value_at_quantile(0.25),
+                hist.value_at_quantile(0.5),
+                hist.value_at_quantile(0.75),
+                hist.value_at_quantile(0.95),
+                hist.value_at_quantile(0.99),
+                hist.min(),
+                hist.max(),
+                hist.mean(),
+                hist.stdev(),
+                hist.len(),
+            )
+        };
+        let (interval_p50, interval_p95, interval_p99, interval_mean, interval_sample_count) = {
+            let mut hist = self.interval_latency_hist.write().await;
+            let values = (
+                hist.value_at_quantile(0.5),
+                hist.value_at_quantile(0.95),
+                hist.value_at_quantile(0.99),
+                hist.mean(),
+                hist.len(),
+            );
+            hist.reset();
+            values
+        };
 
         let total_elapsed = now.duration_since(self.start_time);
         let since_last = {
@@ -264,6 +316,11 @@ impl Stats {
             interval_duration: since_last,
             interval_sent_count: interval_sent,
             interval_received_count: interval_received,
+            interval_latency_ns_p50: interval_p50,
+            interval_latency_ns_p95: interval_p95,
+            interval_latency_ns_p99: interval_p99,
+            interval_latency_ns_mean: interval_mean,
+            interval_latency_sample_count: interval_sample_count,
             since_first_sent,
             since_first_received,
             latency_ns_p25: p25,
@@ -305,6 +362,7 @@ impl Stats {
         self.duplicate_count.store(0, Ordering::Relaxed);
         self.gap_count.store(0, Ordering::Relaxed);
         self.latency_hist.write().await.reset();
+        self.interval_latency_hist.write().await.reset();
         *self.last_snapshot.write().await = Instant::now();
     }
 }
@@ -319,6 +377,11 @@ pub struct StatsSnapshot {
     pub interval_duration: Duration,
     pub interval_sent_count: u64,
     pub interval_received_count: u64,
+    pub interval_latency_ns_p50: u64,
+    pub interval_latency_ns_p95: u64,
+    pub interval_latency_ns_p99: u64,
+    pub interval_latency_ns_mean: f64,
+    pub interval_latency_sample_count: u64,
     pub since_first_sent: Option<Duration>,
     pub since_first_received: Option<Duration>,
     pub latency_ns_p25: u64,
@@ -389,7 +452,7 @@ impl StatsSnapshot {
     /// Convert to CSV row
     pub fn to_csv_row(&self) -> String {
         format!(
-            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{:.2},{:.2},{},{},{},{},{},{},{},{},{},{},{},{},{},{:.2},{}",
             self.timestamp,
             self.sent_count,
             self.received_count,
@@ -414,13 +477,18 @@ impl StatsSnapshot {
             self.reconnects,
             self.reconnect_failures,
             self.duplicate_count,
-            self.gap_count
+            self.gap_count,
+            self.interval_latency_ns_p50,
+            self.interval_latency_ns_p95,
+            self.interval_latency_ns_p99,
+            self.interval_latency_ns_mean,
+            self.interval_latency_sample_count
         )
     }
 
     /// CSV header
     pub fn csv_header() -> &'static str {
-        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p25,latency_ns_p50,latency_ns_p75,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean,latency_ns_stddev,latency_sample_count,connections,active_connections,connection_attempts,connection_failures,crashes_injected,reconnects,reconnect_failures,duplicate_count,gap_count"
+        "timestamp,sent_count,received_count,error_count,total_throughput,interval_throughput,latency_ns_p25,latency_ns_p50,latency_ns_p75,latency_ns_p95,latency_ns_p99,latency_ns_min,latency_ns_max,latency_ns_mean,latency_ns_stddev,latency_sample_count,connections,active_connections,connection_attempts,connection_failures,crashes_injected,reconnects,reconnect_failures,duplicate_count,gap_count,interval_latency_ns_p50,interval_latency_ns_p95,interval_latency_ns_p99,interval_latency_ns_mean,interval_latency_sample_count"
     }
 }
 
@@ -443,6 +511,25 @@ mod tests {
         let snap = stats.snapshot().await;
         assert_eq!(snap.interval_received_count, 0);
         assert_eq!(snap.interval_throughput(), 0.0);
+    }
+
+    #[tokio::test]
+    async fn interval_latency_resets_after_snapshot() {
+        let stats = Stats::new();
+        stats
+            .record_received_batch(&[1_000_000, 2_000_000, 3_000_000])
+            .await;
+
+        let snap1 = stats.snapshot().await;
+        assert_eq!(snap1.interval_latency_sample_count, 3);
+        assert!(snap1.interval_latency_ns_p99 >= 3_000_000);
+        assert!(snap1.interval_latency_ns_mean > 0.0);
+
+        let snap2 = stats.snapshot().await;
+        assert_eq!(snap2.interval_latency_sample_count, 0);
+        assert_eq!(snap2.interval_latency_ns_p99, 0);
+        assert_eq!(snap2.interval_latency_ns_mean, 0.0);
+        assert_eq!(snap2.latency_sample_count, 3);
     }
 
     #[tokio::test]

@@ -42,7 +42,6 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         cfg.insert_json5("connect/endpoints", &list)
             .map_err(|e| TransportError::Connect(e.to_string()))?;
     }
-    
 
     let session = zenoh::open(cfg)
         .await
@@ -58,7 +57,10 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
     } else {
         Reliability::Reliable
     };
-    Ok(Box::new(ZenohTransport { session, pub_reliability }))
+    Ok(Box::new(ZenohTransport {
+        session,
+        pub_reliability,
+    }))
 }
 
 #[async_trait::async_trait]

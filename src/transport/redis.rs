@@ -9,17 +9,27 @@ use bytes::Bytes;
 use futures::StreamExt;
 // no extra imports needed for helpers
 use redis::aio::ConnectionManager;
+use std::time::Duration;
 use tokio::sync::{Mutex, mpsc, oneshot};
 
 pub struct RedisTransport {
     client: redis::Client,
     pub_mode: PubMode,
+    buffered_config: BufferedConfig,
 }
 
 #[derive(Clone, Copy, Debug)]
 enum PubMode {
     Shared,
     Single,
+    Buffered,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct BufferedConfig {
+    queue_len: usize,
+    batch_size: usize,
+    flush_micros: u64,
 }
 
 pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, TransportError> {
@@ -32,9 +42,19 @@ pub async fn connect(opts: ConnectOptions) -> Result<Box<dyn Transport>, Transpo
         redis::Client::open(url.as_str()).map_err(|e| TransportError::Connect(e.to_string()))?;
     let pub_mode = match opts.params.get("pub_mode").map(|s| s.as_str()) {
         Some("single") => PubMode::Single,
+        Some("buffered") | Some("pipeline") | Some("pipelined") => PubMode::Buffered,
         _ => PubMode::Shared,
     };
-    Ok(Box::new(RedisTransport { client, pub_mode }))
+    let buffered_config = BufferedConfig {
+        queue_len: parse_usize_param(&opts, "publish_queue", 8_192),
+        batch_size: parse_usize_param(&opts, "publish_batch", 256).max(1),
+        flush_micros: parse_u64_param(&opts, "publish_flush_micros", 250),
+    };
+    Ok(Box::new(RedisTransport {
+        client,
+        pub_mode,
+        buffered_config,
+    }))
 }
 
 #[async_trait::async_trait]
@@ -106,6 +126,16 @@ impl Transport for RedisTransport {
                     publisher_task(client, topic_str, rx).await;
                 });
                 Ok(Box::new(RedisPublisherSingle { tx }))
+            }
+            PubMode::Buffered => {
+                let (tx, rx) = mpsc::channel::<BufferedPubCmd>(self.buffered_config.queue_len);
+                let client = self.client.clone();
+                let topic_str = topic.to_string();
+                let config = self.buffered_config;
+                tokio::spawn(async move {
+                    buffered_publisher_task(client, topic_str, rx, config).await;
+                });
+                Ok(Box::new(RedisPublisherBuffered { tx }))
             }
         }
     }
@@ -259,6 +289,36 @@ impl Publisher for RedisPublisherSingle {
     }
 }
 
+struct RedisPublisherBuffered {
+    tx: mpsc::Sender<BufferedPubCmd>,
+}
+
+enum BufferedPubCmd {
+    Msg(Bytes),
+    Shutdown(oneshot::Sender<Result<(), TransportError>>),
+}
+
+#[async_trait::async_trait]
+impl Publisher for RedisPublisherBuffered {
+    async fn publish(&self, payload: Bytes) -> Result<(), TransportError> {
+        self.tx
+            .send(BufferedPubCmd::Msg(payload))
+            .await
+            .map_err(|_| TransportError::Disconnected)
+    }
+
+    async fn shutdown(&self) -> Result<(), TransportError> {
+        let (tx_ack, rx_ack) = oneshot::channel();
+        self.tx
+            .send(BufferedPubCmd::Shutdown(tx_ack))
+            .await
+            .map_err(|_| TransportError::Disconnected)?;
+        rx_ack
+            .await
+            .unwrap_or_else(|_| Err(TransportError::Disconnected))
+    }
+}
+
 async fn publisher_task(client: redis::Client, topic: String, mut rx: mpsc::Receiver<PubCmd>) {
     // Establish a dedicated multiplexed connection
     let conn_result = client.get_multiplexed_async_connection().await;
@@ -288,6 +348,69 @@ async fn publisher_task(client: redis::Client, topic: String, mut rx: mpsc::Rece
                 let _ = ack.send(res);
             }
             PubCmd::Shutdown => break,
+        }
+    }
+}
+
+async fn buffered_publisher_task(
+    client: redis::Client,
+    topic: String,
+    mut rx: mpsc::Receiver<BufferedPubCmd>,
+    config: BufferedConfig,
+) {
+    let conn_result = client.get_multiplexed_async_connection().await;
+    let mut conn = match conn_result {
+        Ok(conn) => conn,
+        Err(_) => return,
+    };
+    let mut batch = Vec::with_capacity(config.batch_size);
+
+    loop {
+        batch.clear();
+        let mut shutdown_ack = None;
+        match rx.recv().await {
+            Some(BufferedPubCmd::Msg(bytes)) => batch.push(bytes),
+            Some(BufferedPubCmd::Shutdown(ack)) => shutdown_ack = Some(ack),
+            None => break,
+        }
+
+        let flush_at = tokio::time::Instant::now() + Duration::from_micros(config.flush_micros);
+        while shutdown_ack.is_none() && batch.len() < config.batch_size {
+            match rx.try_recv() {
+                Ok(BufferedPubCmd::Msg(bytes)) => batch.push(bytes),
+                Ok(BufferedPubCmd::Shutdown(ack)) => shutdown_ack = Some(ack),
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    if config.flush_micros == 0 {
+                        break;
+                    }
+                    match tokio::time::timeout_at(flush_at, rx.recv()).await {
+                        Ok(Some(BufferedPubCmd::Msg(bytes))) => batch.push(bytes),
+                        Ok(Some(BufferedPubCmd::Shutdown(ack))) => shutdown_ack = Some(ack),
+                        Ok(None) | Err(_) => break,
+                    }
+                }
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => break,
+            }
+        }
+
+        let result = if batch.is_empty() {
+            Ok(())
+        } else {
+            let mut pipe = redis::pipe();
+            for bytes in &batch {
+                pipe.cmd("PUBLISH").arg(&topic).arg(bytes.as_ref()).ignore();
+            }
+            pipe.query_async::<()>(&mut conn)
+                .await
+                .map_err(|e| TransportError::Publish(e.to_string()))
+        };
+
+        if let Some(ack) = shutdown_ack {
+            let _ = ack.send(result);
+            break;
+        }
+        if result.is_err() {
+            break;
         }
     }
 }
@@ -340,6 +463,21 @@ impl QueryRegistration for RedisQueryRegistration {
         self.handle.abort();
         Ok(())
     }
+}
+
+fn parse_usize_param(opts: &ConnectOptions, key: &str, default: usize) -> usize {
+    opts.params
+        .get(key)
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+fn parse_u64_param(opts: &ConnectOptions, key: &str, default: u64) -> u64 {
+    opts.params
+        .get(key)
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(default)
 }
 
 // Helpers for simple req encoding

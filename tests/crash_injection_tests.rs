@@ -6,8 +6,8 @@
 
 use mq_bench::crash::{CrashConfig, CrashInjector};
 use mq_bench::metrics::stats::Stats;
-use mq_bench::roles::publisher::{run_publisher, PublisherConfig};
-use mq_bench::roles::subscriber::{run_subscriber, SubscriberConfig};
+use mq_bench::roles::publisher::{PublisherConfig, run_publisher};
+use mq_bench::roles::subscriber::{SubscriberConfig, run_subscriber};
 use mq_bench::transport::{ConnectOptions, Engine};
 use std::sync::Arc;
 use std::time::Duration;
@@ -137,7 +137,10 @@ async fn crash_injector_should_crash_after_time() {
     tokio::time::sleep(wait_time + Duration::from_millis(10)).await;
 
     // Now it should be ready
-    assert!(injector.should_crash(), "Expected crash to be due after waiting");
+    assert!(
+        injector.should_crash(),
+        "Expected crash to be due after waiting"
+    );
 
     // Consume and verify
     assert!(injector.consume_crash());
@@ -180,9 +183,15 @@ async fn stats_crash_metrics_in_csv() {
     let header = mq_bench::metrics::stats::StatsSnapshot::csv_header();
 
     // Verify header contains crash columns
-    assert!(header.contains("crashes_injected"), "Header missing crashes_injected");
+    assert!(
+        header.contains("crashes_injected"),
+        "Header missing crashes_injected"
+    );
     assert!(header.contains("reconnects"), "Header missing reconnects");
-    assert!(header.contains("reconnect_failures"), "Header missing reconnect_failures");
+    assert!(
+        header.contains("reconnect_failures"),
+        "Header missing reconnect_failures"
+    );
 
     // Verify row has correct number of columns
     let header_cols: Vec<&str> = header.split(',').collect();
@@ -208,9 +217,12 @@ async fn publisher_with_crash_disabled_runs_normally() {
         key_expr: "test/no_crash".to_string(),
         payload_size: 64,
         rate: Some(100.0), // 100 msg/s
+        rate_profile: None,
         duration_secs: Some(1),
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config: CrashConfig::default(), // Disabled
@@ -221,7 +233,10 @@ async fn publisher_with_crash_disabled_runs_normally() {
 
     let snapshot = stats.snapshot().await;
     assert!(snapshot.sent_count > 0, "Should have sent some messages");
-    assert_eq!(snapshot.crashes_injected, 0, "No crashes should be injected");
+    assert_eq!(
+        snapshot.crashes_injected, 0,
+        "No crashes should be injected"
+    );
     assert_eq!(snapshot.reconnects, 0, "No reconnects should occur");
 }
 
@@ -231,7 +246,7 @@ async fn publisher_with_single_crash_reconnects() {
 
     // Configure for exactly 1 crash with short MTTF
     let crash_config = CrashConfig {
-        mttf_secs: 0.1, // 100ms mean time to failure
+        mttf_secs: 0.1,  // 100ms mean time to failure
         mttr_secs: 0.05, // 50ms repair time
         crash_count: 1,
         seed: Some(42),
@@ -246,9 +261,12 @@ async fn publisher_with_single_crash_reconnects() {
         key_expr: "test/single_crash".to_string(),
         payload_size: 64,
         rate: Some(50.0),
+        rate_profile: None,
         duration_secs: Some(2), // Run for 2 seconds
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config,
@@ -283,9 +301,12 @@ async fn publisher_without_retry_stops_on_crash() {
         key_expr: "test/no_retry".to_string(),
         payload_size: 64,
         rate: Some(100.0),
+        rate_profile: None,
         duration_secs: Some(5), // Long duration - but should stop on crash
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config,
@@ -303,7 +324,10 @@ async fn publisher_without_retry_stops_on_crash() {
 
     let snapshot = stats.snapshot().await;
     assert_eq!(snapshot.crashes_injected, 1, "Should have 1 crash");
-    assert_eq!(snapshot.reconnects, 0, "Should have no reconnects (retry disabled)");
+    assert_eq!(
+        snapshot.reconnects, 0,
+        "Should have no reconnects (retry disabled)"
+    );
 }
 
 #[tokio::test]
@@ -316,9 +340,9 @@ async fn publisher_sequence_preserved_across_reconnect() {
 
     // Use shorter MTTF to ensure crashes happen within the test window
     let crash_config = CrashConfig {
-        mttf_secs: 0.08, // ~80ms mean time to failure
-        mttr_secs: 0.01, // Quick repair
-        crash_count: 2, // Two crashes
+        mttf_secs: 0.08,   // ~80ms mean time to failure
+        mttr_secs: 0.01,   // Quick repair
+        crash_count: 2,    // Two crashes
         seed: Some(12345), // Known-good seed
     };
 
@@ -331,9 +355,12 @@ async fn publisher_sequence_preserved_across_reconnect() {
         key_expr: "test/sequence_unique_key_12345".to_string(), // Unique key to avoid collision
         payload_size: 64,
         rate: Some(100.0),
+        rate_profile: None,
         duration_secs: Some(3), // Run for 3 seconds to ensure crashes happen
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(stats.clone()),
         disable_internal_snapshot: true,
         crash_config,
@@ -504,9 +531,12 @@ async fn pubsub_both_crashing_independently() {
         key_expr: "test/both_crash_unique_99999".to_string(),
         payload_size: 64,
         rate: Some(50.0),
+        rate_profile: None,
         duration_secs: Some(3),
         output_file: None,
         snapshot_interval_secs: 1,
+        sequence_start: 0,
+        sequence_step: 1,
         shared_stats: Some(pub_stats.clone()),
         disable_internal_snapshot: true,
         crash_config: pub_crash,
@@ -525,7 +555,8 @@ async fn pubsub_both_crashing_independently() {
     };
 
     // Run both concurrently
-    let (pub_result, sub_result) = tokio::join!(run_publisher(pub_config), run_subscriber(sub_config));
+    let (pub_result, sub_result) =
+        tokio::join!(run_publisher(pub_config), run_subscriber(sub_config));
 
     assert!(pub_result.is_ok());
     assert!(sub_result.is_ok());
@@ -605,7 +636,10 @@ fn different_seeds_produce_different_patterns() {
     let repair1 = injector1.sample_repair_time();
     let repair2 = injector2.sample_repair_time();
 
-    assert_ne!(repair1, repair2, "Different seeds should produce different values");
+    assert_ne!(
+        repair1, repair2,
+        "Different seeds should produce different values"
+    );
 }
 
 // ============================================================================
@@ -663,5 +697,9 @@ async fn zero_mttr_means_immediate_reconnect() {
     let mut injector = CrashInjector::new(config);
     let repair_time = injector.sample_repair_time();
 
-    assert_eq!(repair_time, Duration::ZERO, "Zero MTTR should give zero repair time");
+    assert_eq!(
+        repair_time,
+        Duration::ZERO,
+        "Zero MTTR should give zero repair time"
+    );
 }

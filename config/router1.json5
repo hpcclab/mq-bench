@@ -23,6 +23,7 @@
     link: {
       tx: {
         batch_size: 65535,      // Larger batches for throughput
+        threads: 4,             // Increase Zenoh transport TX parallelism
       },
       rx: {
         buffer_size: 131072,    // 128KB receive buffer

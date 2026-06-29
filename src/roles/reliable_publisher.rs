@@ -193,7 +193,7 @@ pub async fn run_reliable_publisher(config: ReliablePublisherConfig) -> Result<(
         options.set_keep_alive(Duration::from_secs(30));
         options.set_clean_session(clean_session);
         options.set_max_packet_size(16 * 1024 * 1024, 16 * 1024 * 1024);
-        
+
         let (client, mut eventloop) = AsyncClient::new(options, 1024);
 
         // Channel for ACK notifications

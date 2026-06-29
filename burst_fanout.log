@@ -1,0 +1,563 @@
+nohup: ignoring input
+[23:59:58] Fan-out bursty-load benchmark -> /home/cc/mq-bench/results/fanout_bursty_load_20260618_235958
+[23:59:58] Resolved: SUMMARY_CSV=/home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/raw_data/summary_by_phase.csv | PLOTS_DIR=/home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/plots | RAW_DIR=/home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/raw_data
+[23:59:58] Resolved payload=64B subs=1000 pubs=10 duration=240s profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20
+[23:59:58] Inter-run cooldown: 120s (use --cooldown-sec N or --interval-sec N to override)
+Controlled fan-out configuration:
+Total subscribers: 1000
+Subscribers per publisher/topic: 100
+Publishers/topics: 10
+Effective fan-out ratio: 1:100
+Expected delivery target per phase:
+  warmup:60s rate 20 msg/s/pub -> 20,000 delivered msg/s
+  baseline:60s rate 20 msg/s/pub -> 20,000 delivered msg/s
+  burst:60s rate 100 msg/s/pub -> 100,000 delivered msg/s
+  recovery:60s rate 20 msg/s/pub -> 20,000 delivered msg/s
+[23:59:58] Planned benchmark executions: 1
+[00:00:00] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
+[00:00:12] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose up -d rabbitmq
+ Network ubuntu_default Creating 
+ Network ubuntu_default Created 
+ Container rabbitmq Creating 
+ Container rabbitmq Created 
+ Container rabbitmq Starting 
+ Container rabbitmq Started 
+[00:00:18] Waiting for 192.168.0.245:1886...
+[00:00:19] Port 192.168.0.245:1886 is open.
+[00:00:22] Starting remote stats collector on ubuntu@192.168.0.245 for 315s...
+[00:00:22] Run: transport=mqtt_rabbitmq subs=1000 pubs=10 payload=64B profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20
+[run_fanout] Run ID: fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty | ENGINE=mqtt | PUBS=10 SUBS=1000 SUB_RAMP_UP_SECS=60 RATE_PROFILE=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20 DURATION=240s
+Starting 1000 subscribers across 10 controlled fan-out topics (100 per topic, 10 client process(es) per topic)
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_0.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_1.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_2.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_3.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_4.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_5.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_6.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_7.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_8.log 2>&1 &
+[sub] mqtt → topic_0 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_0 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_0_9.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_0.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_1.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_2.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_3.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_4.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_5.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_6.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_7.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_8.log 2>&1 &
+[sub] mqtt → topic_1 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_1 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_1_9.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_0.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_1.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_2.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_3.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_4.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_5.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_6.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_7.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_8.log 2>&1 &
+[sub] mqtt → topic_2 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_2 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_2_9.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_0.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_1.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_2.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_3.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_4.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_5.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_6.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_7.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_8.log 2>&1 &
+[sub] mqtt → topic_3 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_3 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_3_9.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_0.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_1.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_2.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_3.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_4.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_5.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_6.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_7.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_8.log 2>&1 &
+[sub] mqtt → topic_4 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_4 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_4_9.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_0.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_1.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_2.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_3.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_4.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_5.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_6.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_7.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_8.log 2>&1 &
+[sub] mqtt → topic_5 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_5 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_5_9.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_0.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_1.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_2.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_3.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_4.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_5.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_6.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_7.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_8.log 2>&1 &
+[sub] mqtt → topic_6 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_6 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_6_9.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_0.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_1.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_2.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_3.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_4.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_5.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_6.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_7.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_8.log 2>&1 &
+[sub] mqtt → topic_7 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_7 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_7_9.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_0.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_1.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_2.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_3.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_4.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_5.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_6.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_7.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_8.log 2>&1 &
+[sub] mqtt → topic_8 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_8 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_8_9.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_0.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_1.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_2.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_3.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_4.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_5.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_6.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_7.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_8.log 2>&1 &
+[sub] mqtt → topic_9 (subs=10, ramp_up=60s, fast_count=0, latency_sample_rate=1000)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 sub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --expr topic_9 --subscribers 10 --ramp-up-secs 60 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/sub_9_9.log 2>&1 &
+[sub] Waiting 60s for subscriber ramp-up before starting publishers
+Running 10 controlled publishers across 10 topics (profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20)
+[pub] mqtt → topic_0 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_0 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_0.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_0.log 2>&1 &
+[pub] mqtt → topic_1 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_1 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_1.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_1.log 2>&1 &
+[pub] mqtt → topic_2 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_2 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_2.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_2.log 2>&1 &
+[pub] mqtt → topic_3 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_3 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_3.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_3.log 2>&1 &
+[pub] mqtt → topic_4 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_4 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_4.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_4.log 2>&1 &
+[pub] mqtt → topic_5 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_5 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_5.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_5.log 2>&1 &
+[pub] mqtt → topic_6 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_6 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_6.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_6.log 2>&1 &
+[pub] mqtt → topic_7 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_7 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_7.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_7.log 2>&1 &
+[pub] mqtt → topic_8 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_8 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_8.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_8.log 2>&1 &
+[pub] mqtt → topic_9 (payload=64, profile=warmup:60:20,baseline:60:20,burst:60:100,recovery:60:20, dur=240s)
+[cmd] ./target/release/mq-bench --snapshot-interval 1 pub --engine mqtt --connect host=192.168.0.245 --connect port=1886 --topic-prefix topic_9 --publishers 1 --payload 64 --rate-profile warmup:60:20\,baseline:60:20\,burst:60:100\,recovery:60:20 --duration 240 --csv artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_9.csv 
+       1>artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite/pub_9.log 2>&1 &
+[watch] printing status every 1s...
+[status] PUB sent=19 tps=23527 (pubs=10) | SUB recv=0 itps=0 p99=0.00ms conn=0/0,0,0,1000,1000,1000,0,0,0,0,0,0,0,0,0,0,0
+[status] PUB sent=219 tps=219 (pubs=10) | SUB recv=16714 itps=16713.73 p99=2.85ms conn=48726015/5137520.48,10267788.50,16714,1000,1000,1000,0,0,0,0,0,0,2286517.73,41863953.90,46108158.82,5137520.48,16714
+[status] PUB sent=419 tps=209 (pubs=10) | SUB recv=36713 itps=19999.02 p99=2.72ms conn=48726015/3633822.82,7112008.07,36713,1000,1000,1000,0,0,0,0,0,0,2223674.57,4003461.02,5598971.51,2377119.84,19999
+[status] PUB sent=619 tps=206 (pubs=10) | SUB recv=56719 itps=20007.03 p99=2.69ms conn=48726015/3162546.12,5778223.32,56719,1000,1000,1000,0,0,0,0,0,0,2191168.59,3241967.44,4861082.50,2297706.50,20006
+[status] PUB sent=819 tps=205 (pubs=10) | SUB recv=85714 itps=8993.88 p99=2.71ms conn=48726015/2904460.59,4732890.27,85714,1000,1000,1000,0,0,0,0,0,0,2275155.31,3193093.32,3585949.09,2303816.30,8994
+[status] PUB sent=1219 tps=203 (pubs=10) | SUB recv=115504 itps=18790.48 p99=2.73ms conn=48726015/2770914.55,4101693.90,115504,1000,1000,1000,0,0,0,0,0,0,2291433.94,3280292.04,4032871.99,2345408.62,18790
+[status] PUB sent=1419 tps=203 (pubs=10) | SUB recv=136720 itps=20016.56 p99=2.74ms conn=48726015/2730620.00,3796597.48,136720,1000,1000,1000,0,0,0,0,0,0,2353782.51,3977730.79,6200173.91,2518617.58,20016
+[status] PUB sent=1619 tps=202 (pubs=10) | SUB recv=156713 itps=19991.43 p99=2.75ms conn=48726015/2699359.65,3567020.98,156713,1000,1000,1000,0,0,0,0,0,0,2320087.88,3933903.48,5993588.14,2485589.03,19993
+[status] PUB sent=1818 tps=202 (pubs=10) | SUB recv=176707 itps=19995.92 p99=2.76ms conn=48726015/2678827.91,3381462.53,176707,1000,1000,1000,0,0,0,0,0,0,2347910.85,3785964.23,6285680.16,2517900.15,19994
+[status] PUB sent=2019 tps=202 (pubs=10) | SUB recv=202316 itps=5599.74 p99=2.76ms conn=48726015/2650325.31,3180579.83,202316,1000,1000,1000,0,0,0,0,0,0,2253420.71,3118005.86,3331656.14,2284988.89,5600
+[status] PUB sent=2259 tps=202 (pubs=10) | SUB recv=233521 itps=16807.47 p99=2.76ms conn=48726015/2612933.75,2974293.12,233521,1000,1000,1000,0,0,0,0,0,0,2305525.41,3784231.12,5015762.15,2428651.58,16809
+[status] PUB sent=2619 tps=201 (pubs=10) | SUB recv=256717 itps=19998.90 p99=2.75ms conn=48726015/2590299.18,2851277.60,256717,1000,1000,1000,0,0,0,0,0,0,2238167.84,3346391.16,4942845.00,2341693.59,19997
+[status] PUB sent=2819 tps=201 (pubs=10) | SUB recv=276720 itps=20000.99 p99=2.73ms conn=48726015/2565631.03,2757203.75,276720,1000,1000,1000,0,0,0,0,0,0,2126431.93,3343398.37,4737875.35,2249041.83,20003
+[status] PUB sent=3019 tps=201 (pubs=10) | SUB recv=296718 itps=19999.85 p99=2.72ms conn=48726015/2536441.62,2675982.25,296718,1000,1000,1000,0,0,0,0,0,0,1988991.60,3320304.51,5124533.01,2132536.63,19998
+[status] PUB sent=3219 tps=201 (pubs=10) | SUB recv=320917 itps=4202.73 p99=2.72ms conn=48726015/2526197.70,2582913.73,320917,1000,1000,1000,0,0,0,0,0,0,2331621.91,3320395.14,3889133.95,2387205.30,4203
+[status] PUB sent=3459 tps=201 (pubs=10) | SUB recv=352918 itps=16197.13 p99=2.72ms conn=48726015/2512509.30,2474394.85,352918,1000,1000,1000,0,0,0,0,0,0,2307824.18,3391988.82,5372607.24,2411456.50,16198
+[status] PUB sent=3819 tps=201 (pubs=10) | SUB recv=376718 itps=19999.98 p99=2.73ms conn=48726015/2512803.08,2413216.62,376718,1000,1000,1000,0,0,0,0,0,0,2321868.00,3689928.52,6868087.63,2497844.66,20000
+[status] PUB sent=4018 tps=201 (pubs=10) | SUB recv=396715 itps=19997.83 p99=2.73ms conn=48726015/2504237.63,2356260.15,396715,1000,1000,1000,0,0,0,0,0,0,2271419.55,3399041.87,4127815.56,2342875.46,19997
+[status] PUB sent=4219 tps=201 (pubs=10) | SUB recv=416713 itps=19998.67 p99=2.72ms conn=48726015/2494551.51,2303214.00,416713,1000,1000,1000,0,0,0,0,0,0,2250084.21,3263757.77,3885446.82,2302400.84,19998
+[status] PUB sent=4419 tps=201 (pubs=10) | SUB recv=444502 itps=7790.76 p99=2.72ms conn=48726015/2483724.21,2235482.73,444502,1000,1000,1000,0,0,0,0,0,0,2222866.65,3145148.62,3710984.99,2269242.69,7790
+[status] PUB sent=4819 tps=201 (pubs=10) | SUB recv=476716 itps=20009.65 p99=2.72ms conn=48726015/2472990.05,2167397.24,476716,1000,1000,1000,0,0,0,0,0,0,2216237.03,3238223.93,3665596.19,2265259.36,20010
+[status] PUB sent=5019 tps=201 (pubs=10) | SUB recv=496717 itps=20000.97 p99=2.72ms conn=48726015/2465365.53,2126335.98,496717,1000,1000,1000,0,0,0,0,0,0,2251366.03,3132222.86,3475377.69,2283637.93,20001
+[status] PUB sent=5218 tps=201 (pubs=10) | SUB recv=516715 itps=19997.45 p99=2.71ms conn=48726015/2458226.30,2088007.84,516715,1000,1000,1000,0,0,0,0,0,0,2241324.29,3164757.59,3714708.47,2280899.81,19998
+[status] PUB sent=5419 tps=201 (pubs=10) | SUB recv=536720 itps=20005.33 p99=2.71ms conn=48726015/2451772.56,2051792.61,536720,1000,1000,1000,0,0,0,0,0,0,2238348.75,3187693.24,3683498.73,2285077.01,20005
+[status] PUB sent=5619 tps=201 (pubs=10) | SUB recv=570114 itps=13396.18 p99=2.71ms conn=48726015/2442606.38,1995483.03,570114,1000,1000,1000,0,0,0,0,0,0,2252721.64,3173336.17,3560201.78,2289919.35,13396
+[status] PUB sent=6019 tps=201 (pubs=10) | SUB recv=596721 itps=20007.12 p99=2.71ms conn=48726015/2435814.98,1956169.18,596721,1000,1000,1000,0,0,0,0,0,0,2224820.52,3150914.82,3971179.92,2284931.58,20007
+[status] PUB sent=6219 tps=201 (pubs=10) | SUB recv=616716 itps=19996.06 p99=2.71ms conn=48726015/2430288.61,1926788.28,616716,1000,1000,1000,0,0,0,0,0,0,2230588.47,3117596.83,3470659.74,2265362.32,19995
+[status] PUB sent=6419 tps=201 (pubs=10) | SUB recv=636712 itps=19995.58 p99=2.71ms conn=48726015/2426391.20,1899219.36,636712,1000,1000,1000,0,0,0,0,0,0,2254897.60,3198856.81,3833037.68,2306187.52,19996
+[status] PUB sent=6619 tps=201 (pubs=10) | SUB recv=665314 itps=8602.23 p99=2.71ms conn=48726015/2421741.32,1861253.81,665314,1000,1000,1000,0,0,0,0,0,0,2250455.78,3108375.64,3307546.14,2278622.07,8602
+[status] PUB sent=7019 tps=201 (pubs=10) | SUB recv=696713 itps=19994.19 p99=2.71ms conn=48726015/2418147.75,1824110.57,696713,1000,1000,1000,0,0,0,0,0,0,2275671.25,3343414.77,4065326.32,2337440.55,19995
+[status] PUB sent=7219 tps=201 (pubs=10) | SUB recv=716704 itps=19991.54 p99=2.71ms conn=48726015/2415296.40,1800853.70,716704,1000,1000,1000,0,0,0,0,0,0,2285627.75,3183677.65,3523128.81,2315923.29,19991
+[status] PUB sent=7419 tps=200 (pubs=10) | SUB recv=736712 itps=20007.38 p99=2.71ms conn=48726015/2413071.42,1778975.39,736712,1000,1000,1000,0,0,0,0,0,0,2279026.87,3323294.37,3823130.64,2333370.52,20008
+[status] PUB sent=7619 tps=200 (pubs=10) | SUB recv=760907 itps=4200.35 p99=2.71ms conn=48726015/2408943.82,1753379.15,760907,1000,1000,1000,0,0,0,0,0,0,2198917.10,3079995.95,3267534.24,2241164.07,4200
+[status] PUB sent=8019 tps=200 (pubs=10) | SUB recv=795712 itps=18993.50 p99=2.71ms conn=48726015/2403753.20,1719131.95,795712,1000,1000,1000,0,0,0,0,0,0,2262421.49,3162787.38,4061988.44,2315259.86,18994
+[status] PUB sent=8219 tps=200 (pubs=10) | SUB recv=816715 itps=20002.63 p99=2.71ms conn=48726015/2400674.00,1699239.61,816715,1000,1000,1000,0,0,0,0,0,0,2250188.40,3133042.67,3406337.48,2284105.67,20003
+[status] PUB sent=8419 tps=200 (pubs=10) | SUB recv=836718 itps=20003.34 p99=2.70ms conn=48726015/2397913.80,1681033.32,836718,1000,1000,1000,0,0,0,0,0,0,2247953.65,3162222.39,3550682.73,2285216.05,20003
+[status] PUB sent=8619 tps=200 (pubs=10) | SUB recv=859715 itps=2998.75 p99=2.70ms conn=48726015/2396605.71,1662972.46,859715,1000,1000,1000,0,0,0,0,0,0,2256314.54,3859901.95,7349200.90,2481843.60,2999
+[status] PUB sent=9019 tps=200 (pubs=10) | SUB recv=894318 itps=17602.25 p99=2.71ms conn=48726015/2394246.75,1635983.46,894318,1000,1000,1000,0,0,0,0,0,0,2261551.40,3364337.04,3748147.53,2311927.13,17604
+[status] PUB sent=9219 tps=200 (pubs=10) | SUB recv=916718 itps=20002.30 p99=2.71ms conn=48726015/2392113.42,1618297.85,916718,1000,1000,1000,0,0,0,0,0,0,2278361.06,3193632.24,3453047.93,2306708.52,20001
+[status] PUB sent=9419 tps=200 (pubs=10) | SUB recv=936719 itps=20000.79 p99=2.71ms conn=48726015/2392229.96,1604141.16,936719,1000,1000,1000,0,0,0,0,0,0,2324305.03,3464701.80,4443664.23,2397571.53,20001
+[status] PUB sent=9619 tps=200 (pubs=10) | SUB recv=960116 itps=3401.91 p99=2.71ms conn=48726015/2392090.60,1587819.28,960116,1000,1000,1000,0,0,0,0,0,0,2368145.59,3291980.21,3803913.99,2401744.74,3402
+[status] PUB sent=10019 tps=200 (pubs=10) | SUB recv=996517 itps=19798.89 p99=2.71ms conn=48726015/2386657.28,1562019.75,996517,1000,1000,1000,0,0,0,0,0,0,2207428.75,3054778.90,3331844.26,2238944.53,19799
+[status] PUB sent=10220 tps=200 (pubs=10) | SUB recv=1016708 itps=19991.82 p99=2.71ms conn=48726015/2384147.64,1548479.34,1016708,1000,1000,1000,0,0,0,0,0,0,2218006.56,3100657.78,3695362.42,2259310.73,19991
+[status] PUB sent=10419 tps=200 (pubs=10) | SUB recv=1036711 itps=20002.54 p99=2.70ms conn=48726015/2381952.22,1535438.25,1036711,1000,1000,1000,0,0,0,0,0,0,2231182.74,3143718.21,3609591.07,2270364.24,20003
+[status] PUB sent=10619 tps=200 (pubs=10) | SUB recv=1064319 itps=7603.01 p99=2.70ms conn=48726015/2379420.08,1518512.29,1064319,1000,1000,1000,0,0,0,0,0,0,2202839.98,3136096.85,3684794.11,2252054.05,7603
+[status] PUB sent=11019 tps=200 (pubs=10) | SUB recv=1096714 itps=19997.72 p99=2.70ms conn=48726015/2377114.11,1499488.79,1096714,1000,1000,1000,0,0,0,0,0,0,2259773.14,3192760.54,4089557.60,2317782.04,19998
+[status] PUB sent=11219 tps=200 (pubs=10) | SUB recv=1116708 itps=19994.88 p99=2.70ms conn=48726015/2376545.75,1488098.88,1116708,1000,1000,1000,0,0,0,0,0,0,2302085.49,3274569.39,3862575.96,2345370.04,19994
+[status] PUB sent=11419 tps=200 (pubs=10) | SUB recv=1136714 itps=20005.55 p99=2.70ms conn=48726015/2377260.32,1479135.18,1136714,1000,1000,1000,0,0,0,0,0,0,2320383.10,3672585.19,4796472.53,2417146.32,20006
+[status] PUB sent=11619 tps=200 (pubs=10) | SUB recv=1168112 itps=11396.75 p99=2.70ms conn=48726015/2376072.18,1463611.85,1168112,1000,1000,1000,0,0,0,0,0,0,2266928.71,3184038.99,3583689.74,2305966.06,11397
+[status] PUB sent=12019 tps=200 (pubs=10) | SUB recv=1196713 itps=19999.25 p99=2.71ms conn=48726015/2375356.80,1449019.57,1196713,1000,1000,1000,0,0,0,0,0,0,2299160.46,3351791.40,3843706.88,2354955.56,19999
+[status] PUB sent=12230 tps=200 (pubs=10) | SUB recv=1218702 itps=21989.21 p99=2.71ms conn=48726015/2389434.61,1484660.48,1218702,1000,1000,1000,0,0,0,0,0,0,2447886.16,8978212.50,12639513.07,3155595.04,21989
+[status] PUB sent=12431 tps=201 (pubs=10) | SUB recv=1238889 itps=199.89 p99=2.71ms conn=48726015/2394720.93,1483123.79,1238889,1000,1000,1000,0,0,0,0,0,0,2646015,3702783,6238207,2720343.04,200
+[status] PUB sent=12831 tps=201 (pubs=10) | SUB recv=1276699 itps=18001.06 p99=2.72ms conn=48726015/2398657.23,1468320.98,1276699,1000,1000,1000,0,0,0,0,0,0,2437375.67,4117176.31,5519165.36,2575032.41,18001
+[status] PUB sent=13033 tps=201 (pubs=10) | SUB recv=1298688 itps=19989.02 p99=2.72ms conn=48726015/2401499.67,1460763.15,1298688,1000,1000,1000,0,0,0,0,0,0,2450550.11,4058408.79,5466503.00,2577741.06,19989
+[status] PUB sent=13230 tps=200 (pubs=10) | SUB recv=1318680 itps=19991.98 p99=2.73ms conn=48726015/2402882.31,1452389.02,1318680,1000,1000,1000,0,0,0,0,0,0,2424396.96,3527657.59,4493860.60,2492699.15,19992
+[status] PUB sent=13431 tps=200 (pubs=10) | SUB recv=1347499 itps=8800.81 p99=2.73ms conn=48726015/2405165.69,1441744.76,1347499,1000,1000,1000,0,0,0,0,0,0,2324666.81,3267576.48,3792368.57,2367384.73,8800
+[status] PUB sent=13830 tps=200 (pubs=10) | SUB recv=1378698 itps=20003.82 p99=2.73ms conn=48726015/2405576.92,1428559.31,1378698,1000,1000,1000,0,0,0,0,0,0,2366609.04,3323337.05,4035687.32,2408895.86,20004
+[status] PUB sent=14031 tps=200 (pubs=10) | SUB recv=1398692 itps=19992.60 p99=2.73ms conn=48726015/2406991.46,1420766.32,1398692,1000,1000,1000,0,0,0,0,0,0,2437655.22,3591902.56,4397845.97,2504532.20,19994
+[status] PUB sent=14231 tps=200 (pubs=10) | SUB recv=1418694 itps=20003.44 p99=2.74ms conn=48726015/2409271.04,1415758.24,1418694,1000,1000,1000,0,0,0,0,0,0,2430346.84,4274407.12,5522796.33,2568676.74,20002
+[status] PUB sent=14631 tps=200 (pubs=10) | SUB recv=1457295 itps=18602.49 p99=2.74ms conn=48726015/2412133.20,1402859.38,1457295,1000,1000,1000,0,0,0,0,0,0,2394876.39,3477865.99,4332987.79,2461428.25,18602
+[status] PUB sent=14830 tps=200 (pubs=10) | SUB recv=1478687 itps=19990.75 p99=2.74ms conn=48726015/2412677.12,1395391.98,1478687,1000,1000,1000,0,0,0,0,0,0,2387562.46,3431398.41,4490712.28,2455597.56,19992
+[status] PUB sent=15030 tps=200 (pubs=10) | SUB recv=1498698 itps=20011.68 p99=2.74ms conn=48726015/2413866.46,1388674.45,1498698,1000,1000,1000,0,0,0,0,0,0,2415067.10,3756728.78,4622862.27,2501751.20,20011
+[status] PUB sent=15431 tps=200 (pubs=10) | SUB recv=1532294 itps=13599.39 p99=2.75ms conn=48726015/2414798.25,1377771.61,1532294,1000,1000,1000,0,0,0,0,0,0,2339228.74,3629501.49,4860278.27,2437185.47,13600
+[status] PUB sent=15631 tps=200 (pubs=10) | SUB recv=1558692 itps=19995.13 p99=2.75ms conn=48726015/2415513.56,1370532.04,1558692,1000,1000,1000,0,0,0,0,0,0,2312024.19,3237822.47,3575110.27,2344790.99,19994
+[status] PUB sent=15831 tps=200 (pubs=10) | SUB recv=1578690 itps=19997.53 p99=2.75ms conn=48726015/2415745.14,1365709.39,1578690,1000,1000,1000,0,0,0,0,0,0,2327043.51,3643352.08,5082640.46,2433794.68,19998
+[status] PUB sent=16132 tps=200 (pubs=10) | SUB recv=1609691 itps=11003.14 p99=2.75ms conn=48726015/2414814.77,1356589.42,1609691,1000,1000,1000,0,0,0,0,0,0,2258739.47,3659621.81,4809526.82,2367780.69,11003
+[status] PUB sent=16430 tps=200 (pubs=10) | SUB recv=1638692 itps=19991.26 p99=2.75ms conn=48726015/2415458.25,1348031.28,1638692,1000,1000,1000,0,0,0,0,0,0,2367773.13,3603848.75,4919289.67,2459172.45,19991
+[status] PUB sent=16631 tps=200 (pubs=10) | SUB recv=1658697 itps=20004.46 p99=2.75ms conn=48726015/2415234.54,1341535.28,1658697,1000,1000,1000,0,0,0,0,0,0,2350397.64,3325039.56,3944536.07,2396909.69,20005
+[status] PUB sent=16830 tps=200 (pubs=10) | SUB recv=1687297 itps=8592.15 p99=2.75ms conn=48726015/2414249.78,1332466.96,1687297,1000,1000,1000,0,0,0,0,0,0,2284614.99,3337500.56,4107697.06,2351281.34,8592
+[status] PUB sent=17230 tps=200 (pubs=10) | SUB recv=1718693 itps=19997.42 p99=2.75ms conn=48726015/2413570.71,1323528.47,1718693,1000,1000,1000,0,0,0,0,0,0,2295914.02,3314146.38,4529811.96,2373561.77,19998
+[status] PUB sent=17432 tps=200 (pubs=10) | SUB recv=1738699 itps=20006.51 p99=2.75ms conn=48726015/2412831.33,1317417.06,1738699,1000,1000,1000,0,0,0,0,0,0,2306695.71,3230465.64,3811026.14,2349312.38,20006
+[status] PUB sent=17632 tps=200 (pubs=10) | SUB recv=1764297 itps=5603.77 p99=2.75ms conn=48726015/2411959.98,1309739.57,1764297,1000,1000,1000,0,0,0,0,0,0,2238004.64,3323556.49,3879897.53,2304815.01,5603
+[status] PUB sent=18031 tps=200 (pubs=10) | SUB recv=1798701 itps=20000.15 p99=2.75ms conn=48726015/2410857.32,1299974.96,1798701,1000,1000,1000,0,0,0,0,0,0,2329111.34,3257573.44,3986795.78,2377437.07,20001
+[status] PUB sent=18230 tps=200 (pubs=10) | SUB recv=1818693 itps=19990.73 p99=2.75ms conn=48726015/2411076.59,1297203.89,1818693,1000,1000,1000,0,0,0,0,0,0,2276686.39,3624295.59,5933275.45,2430804.74,19992
+[status] PUB sent=18431 tps=200 (pubs=10) | SUB recv=1845289 itps=6608.14 p99=2.75ms conn=48726015/2409856.46,1289875.71,1845289,1000,1000,1000,0,0,0,0,0,0,2219269.97,3114831.27,3970106.20,2270524.82,6608
+[status] PUB sent=18830 tps=200 (pubs=10) | SUB recv=1878694 itps=19992.91 p99=2.75ms conn=48726015/2408361.58,1280637.25,1878694,1000,1000,1000,0,0,0,0,0,0,2264434.09,3132232.96,3326152.81,2293988.19,19992
+[status] PUB sent=19030 tps=200 (pubs=10) | SUB recv=1898692 itps=19998.45 p99=2.75ms conn=48726015/2407446.94,1275095.30,1898692,1000,1000,1000,0,0,0,0,0,0,2288315.08,3172830.79,3487755.70,2321521.78,19998
+[status] PUB sent=19231 tps=200 (pubs=10) | SUB recv=1927903 itps=9204.34 p99=2.75ms conn=48726015/2406247.51,1267428.63,1927903,1000,1000,1000,0,0,0,0,0,0,2242419.91,3213112.05,4259527.45,2316137.01,9203
+[status] PUB sent=19631 tps=200 (pubs=10) | SUB recv=1958699 itps=20001.04 p99=2.75ms conn=48726015/2405196.96,1259671.65,1958699,1000,1000,1000,0,0,0,0,0,0,2248909.07,3196766.65,3566484.15,2288812.00,20001
+[status] PUB sent=19831 tps=200 (pubs=10) | SUB recv=1978699 itps=19999.95 p99=2.75ms conn=48726015/2404209.33,1254494.83,1978699,1000,1000,1000,0,0,0,0,0,0,2275868.03,3159145.39,3455951.28,2307485.13,20000
+[status] PUB sent=20230 tps=200 (pubs=10) | SUB recv=2012297 itps=13598.83 p99=2.75ms conn=48726015/2402189.73,1246104.06,2012297,1000,1000,1000,0,0,0,0,0,0,2230086.00,3113765.70,3586392.60,2273006.95,13600
+[status] PUB sent=20430 tps=200 (pubs=10) | SUB recv=2038692 itps=19990.97 p99=2.75ms conn=48726015/2401721.34,1239863.82,2038692,1000,1000,1000,0,0,0,0,0,0,2316246.33,3325170.67,3774456.75,2360635.30,19991
+[status] PUB sent=20632 tps=200 (pubs=10) | SUB recv=2058701 itps=20010.58 p99=2.75ms conn=48726015/2400903.61,1235115.46,2058701,1000,1000,1000,0,0,0,0,0,0,2277001.66,3197173.26,3614486.14,2317586.26,20009
+[status] PUB sent=21031 tps=200 (pubs=10) | SUB recv=2096705 itps=18010.65 p99=2.75ms conn=48726015/2399254.22,1226154.69,2096705,1000,1000,1000,0,0,0,0,0,0,2273168.58,3207894.55,3681932.75,2318731.44,18010
+[status] PUB sent=21230 tps=200 (pubs=10) | SUB recv=2118694 itps=19989.22 p99=2.75ms conn=48726015/2398290.57,1221066.35,2118694,1000,1000,1000,0,0,0,0,0,0,2282881.72,3164094.25,3432621.69,2313811.91,19989
+[status] PUB sent=21431 tps=200 (pubs=10) | SUB recv=2138694 itps=20000.32 p99=2.75ms conn=48726015/2397897.29,1216779.94,2138694,1000,1000,1000,0,0,0,0,0,0,2297516.67,3341897.44,3885000.01,2356234.47,20000
+[status] PUB sent=21830 tps=200 (pubs=10) | SUB recv=2178705 itps=20005.84 p99=2.74ms conn=48726015/2396329.58,1207871.84,2178705,1000,1000,1000,0,0,0,0,0,0,2254576.96,3111948.46,3366555.39,2283230.57,20007
+[status] PUB sent=22031 tps=200 (pubs=10) | SUB recv=2198703 itps=19998.21 p99=2.74ms conn=48726015/2395788.93,1203544.99,2198703,1000,1000,1000,0,0,0,0,0,0,2303296.00,3239987.43,3559918.77,2336887.67,19998
+[status] PUB sent=22232 tps=200 (pubs=10) | SUB recv=2224900 itps=6196.13 p99=2.74ms conn=48726015/2395767.43,1199866.97,2224900,1000,1000,1000,0,0,0,0,0,0,2241326.76,3304776.87,4046767.67,2308681.05,6196
+[status] PUB sent=22630 tps=200 (pubs=10) | SUB recv=2258701 itps=20013.22 p99=2.75ms conn=48726015/2395428.48,1193099.37,2258701,1000,1000,1000,0,0,0,0,0,0,2318472.73,3320923.10,3697356.12,2364465.37,20014
+[status] PUB sent=22830 tps=200 (pubs=10) | SUB recv=2278698 itps=19996.87 p99=2.75ms conn=48726015/2394882.78,1189017.37,2278698,1000,1000,1000,0,0,0,0,0,0,2306635.48,3216796.50,3547728.50,2333244.32,19997
+[status] PUB sent=23230 tps=200 (pubs=10) | SUB recv=2312895 itps=14197.02 p99=2.75ms conn=48726015/2393899.48,1182018.49,2312895,1000,1000,1000,0,0,0,0,0,0,2278065.26,3180780.01,3438265.85,2314150.24,14197
+[status] PUB sent=23430 tps=200 (pubs=10) | SUB recv=2338702 itps=20004.61 p99=2.75ms conn=48726015/2393705.66,1176970.86,2338702,1000,1000,1000,0,0,0,0,0,0,2325180.47,3210521.91,3550908.93,2352092.27,20005
+[status] PUB sent=23631 tps=200 (pubs=10) | SUB recv=2358703 itps=20001.93 p99=2.75ms conn=48726015/2393265.81,1173075.37,2358703,1000,1000,1000,0,0,0,0,0,0,2304622.07,3211168.49,3600410.75,2341834.58,20001
+[status] PUB sent=24032 tps=200 (pubs=10) | SUB recv=2398689 itps=19994.89 p99=2.75ms conn=48726015/2392068.61,1165641.04,2398689,1000,1000,1000,0,0,0,0,0,0,2288877.24,3186567.88,3662892.63,2327352.45,19995
+[status] PUB sent=25050 tps=207 (pubs=10) | SUB recv=2481379 itps=82697.15 p99=2.74ms conn=48726015/2456599.45,1812285.44,2481379,1000,1000,1000,0,0,0,0,0,0,1500083.88,21956150.24,35830129.96,4328523.91,82690
+[status] PUB sent=26050 tps=214 (pubs=10) | SUB recv=2614380 itps=33011.66 p99=2.72ms conn=48726015/2407229.02,1780304.71,2614380,1000,1000,1000,0,0,0,0,0,0,1517610.92,2303214.90,2622322.67,1537821.76,33012
+[status] PUB sent=28050 tps=226 (pubs=10) | SUB recv=2781369 itps=99999.39 p99=2.68ms conn=48726015/2349621.29,1746927.04,2781369,1000,1000,1000,0,0,0,0,0,0,1447641.53,2206085.75,2696542.75,1482634.23,99998
+[status] PUB sent=29050 tps=232 (pubs=10) | SUB recv=2881367 itps=99997.54 p99=2.67ms conn=48726015/2318714.32,1726554.68,2881367,1000,1000,1000,0,0,0,0,0,0,1420574.90,2200916.54,2675697.75,1459060.27,99998
+[status] PUB sent=31050 tps=244 (pubs=10) | SUB recv=3076375 itps=95017.25 p99=2.63ms conn=48726015/2263282.66,1688753.97,3076375,1000,1000,1000,0,0,0,0,0,0,1407619.46,2259260.08,2795714.11,1457174.76,95018
+[status] PUB sent=32050 tps=250 (pubs=10) | SUB recv=3181364 itps=99987.52 p99=2.61ms conn=48726015/2234857.33,1670454.94,3181364,1000,1000,1000,0,0,0,0,0,0,1363406.89,2237781.98,2834255.22,1421187.36,99989
+[status] PUB sent=33050 tps=256 (pubs=10) | SUB recv=3304374 itps=22998.74 p99=2.59ms conn=48726015/2205699.12,1647357.18,3304374,1000,1000,1000,0,0,0,0,0,0,1479779.44,2340044.64,2738116.68,1522685.81,23001
+[status] PUB sent=35050 tps=268 (pubs=10) | SUB recv=3481362 itps=99987.61 p99=2.56ms conn=48726015/2165724.15,1618760.10,3481362,1000,1000,1000,0,0,0,0,0,0,1353386.16,2130534.61,2690402.12,1398255.39,99987
+[status] PUB sent=36050 tps=273 (pubs=10) | SUB recv=3581399 itps=100040.52 p99=2.55ms conn=48726015/2144872.23,1602583.68,3581399,1000,1000,1000,0,0,0,0,0,0,1375844.83,2174674.35,2577345.14,1419209.91,100037
+[status] PUB sent=38050 tps=284 (pubs=10) | SUB recv=3780378 itps=99015.69 p99=2.52ms conn=48726015/2109706.56,1570804.95,3780378,1000,1000,1000,0,0,0,0,0,0,1458359.78,2254401.81,2899517.78,1503146.60,99018
+[status] PUB sent=39050 tps=289 (pubs=10) | SUB recv=3881369 itps=99994.44 p99=2.50ms conn=48726015/2093252.16,1555695.04,3881369,1000,1000,1000,0,0,0,0,0,0,1428079.63,2243611.95,3162530.20,1481002.19,99991
+[status] PUB sent=41050 tps=300 (pubs=10) | SUB recv=4013356 itps=31993.84 p99=2.48ms conn=48726015/2071613.08,1536049.79,4013356,1000,1000,1000,0,0,0,0,0,0,1459049.91,2285996.01,2863471.08,1509996.37,31999
+[status] PUB sent=42050 tps=305 (pubs=10) | SUB recv=4181371 itps=100005.49 p99=2.46ms conn=48726015/2045571.62,1513543.33,4181371,1000,1000,1000,0,0,0,0,0,0,1394942.67,2168681.11,2549755.78,1435160.92,100002
+[status] PUB sent=43050 tps=310 (pubs=10) | SUB recv=4281372 itps=100002.80 p99=2.44ms conn=48726015/2030198.04,1500559.47,4281372,1000,1000,1000,0,0,0,0,0,0,1344510.12,2114887.24,2522219.70,1387377.77,100001
+[status] PUB sent=45050 tps=320 (pubs=10) | SUB recv=4481396 itps=100023.11 p99=2.42ms conn=48726015/2002753.52,1475868.16,4481396,1000,1000,1000,0,0,0,0,0,0,1368393.36,2138966.65,2697917.65,1415735.48,100019
+[status] PUB sent=46050 tps=324 (pubs=10) | SUB recv=4581360 itps=99964.14 p99=2.40ms conn=48726015/1991014.03,1463785.00,4581360,1000,1000,1000,0,0,0,0,0,0,1401981.43,2239290.69,3343258.55,1464731.56,99964
+[status] PUB sent=48050 tps=334 (pubs=10) | SUB recv=4746380 itps=65015.61 p99=2.38ms conn=48726015/1972037.48,1443997.49,4746380,1000,1000,1000,0,0,0,0,0,0,1474678.41,2253543.22,2608031.55,1510200.82,65021
+[status] PUB sent=49050 tps=338 (pubs=10) | SUB recv=4881389 itps=100004.09 p99=2.37ms conn=48726015/1955930.74,1429001.91,4881389,1000,1000,1000,0,0,0,0,0,0,1413470.34,2099892.44,2453011.67,1434942.01,100005
+[status] PUB sent=50050 tps=343 (pubs=10) | SUB recv=4989374 itps=8011.63 p99=2.35ms conn=48726015/1944979.50,1416920.36,4989374,1000,1000,1000,0,0,0,0,0,0,1288340.28,2204502.04,2690495.86,1334378.80,8012
+[status] PUB sent=52050 tps=352 (pubs=10) | SUB recv=5181360 itps=99978.71 p99=2.33ms conn=48726015/1927394.81,1396750.01,5181360,1000,1000,1000,0,0,0,0,0,0,1413223.59,2231978.18,2927105.23,1456636.58,99984
+[status] PUB sent=53050 tps=356 (pubs=10) | SUB recv=5281377 itps=100016.42 p99=2.32ms conn=48726015/1916852.05,1386916.41,5281377,1000,1000,1000,0,0,0,0,0,0,1331469.74,2070490.61,2563826.00,1370686.87,100017
+[status] PUB sent=55050 tps=365 (pubs=10) | SUB recv=5481370 itps=99998.81 p99=2.30ms conn=48726015/1912486.95,1479461.24,5481370,1000,1000,1000,0,0,0,0,0,0,1397187.65,3958187.90,25636734.10,2218709.38,100001
+[status] PUB sent=56050 tps=369 (pubs=10) | SUB recv=5581373 itps=99997.62 p99=2.29ms conn=48726015/1903908.85,1468754.56,5581373,1000,1000,1000,0,0,0,0,0,0,1387263.26,2168838.71,2720587.96,1433725.18,100003
+[status] PUB sent=58050 tps=377 (pubs=10) | SUB recv=5741364 itps=60017.76 p99=2.27ms conn=48726015/1892530.64,1452329.15,5741364,1000,1000,1000,0,0,0,0,0,0,1527484.99,2481315.19,3239183.60,1594752.56,60017
+[status] PUB sent=59050 tps=381 (pubs=10) | SUB recv=5881381 itps=100021.28 p99=2.26ms conn=48726015/1881570.73,1439062.31,5881381,1000,1000,1000,0,0,0,0,0,0,1421318.26,2359928.46,3296681.83,1496943.70,100018
+[status] PUB sent=60050 tps=385 (pubs=10) | SUB recv=5993361 itps=11984.94 p99=2.25ms conn=48726015/1873460.94,1428252.85,5993361,1000,1000,1000,0,0,0,0,0,0,1308240.81,2263885.54,2817310.16,1386774.36,11985
+[status] PUB sent=62050 tps=393 (pubs=10) | SUB recv=6181363 itps=99985.94 p99=2.23ms conn=48726015/1860046.63,1410811.58,6181363,1000,1000,1000,0,0,0,0,0,0,1380895.46,2130990.09,2609004.52,1418520.00,99983
+[status] PUB sent=63050 tps=396 (pubs=10) | SUB recv=6281371 itps=100005.18 p99=2.22ms conn=48726015/1853740.00,1402277.99,6281371,1000,1000,1000,0,0,0,0,0,0,1376451.39,2416628.57,3683348.81,1463935.29,100008
+[status] PUB sent=65050 tps=404 (pubs=10) | SUB recv=6481370 itps=99985.24 p99=2.20ms conn=48726015/1841073.93,1384534.65,6481370,1000,1000,1000,0,0,0,0,0,0,1429649.79,2149250.29,2530918.66,1456854.77,99991
+[status] PUB sent=66050 tps=408 (pubs=10) | SUB recv=6581358 itps=99994.62 p99=2.19ms conn=48726015/1835282.94,1376078.78,6581358,1000,1000,1000,0,0,0,0,0,0,1405305.05,2276205.10,2935475.86,1459902.18,99988
+[status] PUB sent=68050 tps=415 (pubs=10) | SUB recv=6779375 itps=98010.23 p99=2.18ms conn=48726015/1824070.60,1359950.32,6779375,1000,1000,1000,0,0,0,0,0,0,1426227.17,2337460.39,2930655.74,1482193.93,98013
+[status] PUB sent=69050 tps=418 (pubs=10) | SUB recv=6881369 itps=99990.41 p99=2.17ms conn=48726015/1818049.82,1351843.42,6881369,1000,1000,1000,0,0,0,0,0,0,1386678.42,2163498.98,2611187.84,1426428.57,99994
+[status] PUB sent=71050 tps=425 (pubs=10) | SUB recv=7046395 itps=64987.59 p99=2.16ms conn=48726015/1808575.98,1339061.58,7046395,1000,1000,1000,0,0,0,0,0,0,1434415.47,2259080.29,2784316.81,1481858.17,64993
+[status] PUB sent=72050 tps=429 (pubs=10) | SUB recv=7181383 itps=99987.25 p99=2.14ms conn=48726015/1799470.07,1329213.25,7181383,1000,1000,1000,0,0,0,0,0,0,1324808.46,2086725.53,2529625.20,1366662.90,99985
+[status] PUB sent=74050 tps=436 (pubs=10) | SUB recv=7320368 itps=38976.57 p99=2.13ms conn=48726015/1792778.90,1318671.37,7320368,1000,1000,1000,0,0,0,0,0,0,1475734.81,2304249.88,2623581.68,1506590.38,38980
+[status] PUB sent=75050 tps=439 (pubs=10) | SUB recv=7481362 itps=100005.94 p99=2.12ms conn=48726015/1784147.44,1307455.68,7481362,1000,1000,1000,0,0,0,0,0,0,1391245.66,2119997.50,2634025.23,1423105.67,100007
+[status] PUB sent=77050 tps=445 (pubs=10) | SUB recv=7596380 itps=14998.95 p99=2.11ms conn=48726015/1779010.11,1299447.67,7596380,1000,1000,1000,0,0,0,0,0,0,1426533.53,2522471.08,3176079.61,1512048.26,15001
+[status] PUB sent=78050 tps=449 (pubs=10) | SUB recv=7781370 itps=99985.70 p99=2.10ms conn=48726015/1770455.40,1287121.93,7781370,1000,1000,1000,0,0,0,0,0,0,1390698.84,2255598.62,2857149.30,1445805.40,99981
+[status] PUB sent=79050 tps=452 (pubs=10) | SUB recv=7881373 itps=100003.83 p99=2.09ms conn=48726015/1766208.30,1280684.93,7881373,1000,1000,1000,0,0,0,0,0,0,1384301.53,2213550.74,2953864.08,1435735.38,100003
+[status] PUB sent=81050 tps=458 (pubs=10) | SUB recv=8081366 itps=100005.37 p99=2.08ms conn=48726015/1756866.02,1268167.88,8081366,1000,1000,1000,0,0,0,0,0,0,1353458.64,2179942.68,2803647.51,1405755.19,100001
+[status] PUB sent=82050 tps=461 (pubs=10) | SUB recv=8181385 itps=100016.60 p99=2.07ms conn=48726015/1752514.01,1261962.52,8181385,1000,1000,1000,0,0,0,0,0,0,1359027.26,2145626.24,2682915.61,1400879.26,100019
+[status] PUB sent=84050 tps=467 (pubs=10) | SUB recv=8381372 itps=99987.10 p99=2.06ms conn=48726015/1744357.92,1249817.18,8381372,1000,1000,1000,0,0,0,0,0,0,1328728.30,2109402.07,2624996.60,1377331.37,99984
+[status] PUB sent=84270 tps=466 (pubs=10) | SUB recv=8422631 itps=41259.62 p99=2.06ms conn=48726015/1744554.05,1247706.16,8422631,1000,1000,1000,0,0,0,0,0,0,1711660.28,2991375.63,3391637.00,1784395.90,41259
+[status] PUB sent=84670 tps=463 (pubs=10) | SUB recv=8462640 itps=20007.32 p99=2.07ms conn=48726015/1747950.82,1246662.08,8462640,1000,1000,1000,0,0,0,0,0,0,2426751.24,3398982.38,3835042.07,2466823.37,20006
+[status] PUB sent=84870 tps=461 (pubs=10) | SUB recv=8482643 itps=20002.61 p99=2.07ms conn=48726015/1749652.90,1246270.51,8482643,1000,1000,1000,0,0,0,0,0,0,2377632.65,3653938.97,4714336.71,2469745.92,20003
+[status] PUB sent=85270 tps=458 (pubs=10) | SUB recv=8522643 itps=20006.04 p99=2.08ms conn=48726015/1752857.76,1245127.34,8522643,1000,1000,1000,0,0,0,0,0,0,2374984.92,3302651.99,3995127.60,2427086.34,20007
+[status] PUB sent=85470 tps=457 (pubs=10) | SUB recv=8542642 itps=20000.54 p99=2.08ms conn=48726015/1754345.28,1244455.94,8542642,1000,1000,1000,0,0,0,0,0,0,2347585.49,3266495.00,3685473.26,2388255.07,19999
+[status] PUB sent=85870 tps=454 (pubs=10) | SUB recv=8582643 itps=20002.41 p99=2.09ms conn=48726015/1757502.55,1243448.58,8582643,1000,1000,1000,0,0,0,0,0,0,2359524.46,3314452.32,3888419.22,2400181.23,20002
+[status] PUB sent=86070 tps=453 (pubs=10) | SUB recv=8602636 itps=19992.25 p99=2.09ms conn=48726015/1759064.22,1242884.75,8602636,1000,1000,1000,0,0,0,0,0,0,2379980.84,3414277.44,3913884.65,2429464.28,19993
+[status] PUB sent=86470 tps=450 (pubs=10) | SUB recv=8642634 itps=20000.60 p99=2.09ms conn=48726015/1762257.83,1241733.30,8642634,1000,1000,1000,0,0,0,0,0,0,2410351.39,3303623.69,3633632.36,2439150.23,20001
+[status] PUB sent=86670 tps=449 (pubs=10) | SUB recv=8662640 itps=20005.31 p99=2.10ms conn=48726015/1763831.02,1241155.18,8662640,1000,1000,1000,0,0,0,0,0,0,2394553.54,3376191.39,3957462.44,2443453.46,20006
+[status] PUB sent=87070 tps=446 (pubs=10) | SUB recv=8702632 itps=19998.16 p99=2.10ms conn=48726015/1767042.63,1240156.82,8702632,1000,1000,1000,0,0,0,0,0,0,2425526.98,3403879.66,3878147.53,2466919.43,19998
+[status] PUB sent=87270 tps=445 (pubs=10) | SUB recv=8722632 itps=19999.13 p99=2.11ms conn=48726015/1768628.90,1239586.61,8722632,1000,1000,1000,0,0,0,0,0,0,2423561.91,3356145.07,3724172.41,2458866.43,20000
+[status] PUB sent=87670 tps=443 (pubs=10) | SUB recv=8762640 itps=20005.07 p99=2.11ms conn=48726015/1771788.74,1238485.30,8762640,1000,1000,1000,0,0,0,0,0,0,2451269.91,3402901.23,3938103.98,2487481.94,20005
+[status] PUB sent=87870 tps=442 (pubs=10) | SUB recv=8782635 itps=19995.14 p99=2.12ms conn=48726015/1773391.74,1238175.61,8782635,1000,1000,1000,0,0,0,0,0,0,2399281.09,3522975.97,4492300.47,2475890.58,19995
+[status] PUB sent=88270 tps=439 (pubs=10) | SUB recv=8822637 itps=20001.73 p99=2.12ms conn=48726015/1776796.63,1237506.48,8822637,1000,1000,1000,0,0,0,0,0,0,2468908.00,3561007.56,4061210.75,2514632.67,20001
+[status] PUB sent=88670 tps=437 (pubs=10) | SUB recv=8842636 itps=19999.03 p99=2.13ms conn=48726015/1778397.00,1236986.50,8842636,1000,1000,1000,0,0,0,0,0,0,2444231.60,3452814.76,4024227.96,2484404.62,19999
+[status] PUB sent=88870 tps=436 (pubs=10) | SUB recv=8882647 itps=20002.20 p99=2.13ms conn=48726015/1781547.38,1236019.86,8882647,1000,1000,1000,0,0,0,0,0,0,2401598.81,3337849.30,3845973.75,2441258.11,20002
+[status] PUB sent=89270 tps=433 (pubs=10) | SUB recv=8906843 itps=4208.07 p99=2.14ms conn=48726015/1783399.99,1235297.51,8906843,1000,1000,1000,0,0,0,0,0,0,2287424.46,3195561.83,3653221.69,2339132.84,4208
+[status] PUB sent=89470 tps=432 (pubs=10) | SUB recv=8942624 itps=19985.10 p99=2.14ms conn=48726015/1786282.66,1234424.30,8942624,1000,1000,1000,0,0,0,0,0,0,2434769.84,3471989.51,4070519.71,2490863.91,19986
+[status] PUB sent=89870 tps=430 (pubs=10) | SUB recv=8971036 itps=8400.70 p99=2.14ms conn=48726015/1788360.31,1233672.84,8971036,1000,1000,1000,0,0,0,0,0,0,2257187.57,3173423.76,3575807,2296008.66,8400
+[status] PUB sent=90070 tps=429 (pubs=10) | SUB recv=9002634 itps=19994.86 p99=2.15ms conn=48726015/1790768.57,1232831.07,9002634,1000,1000,1000,0,0,0,0,0,0,2398955.94,3316677.39,3619843.25,2434164.24,19995
+[status] PUB sent=90470 tps=427 (pubs=10) | SUB recv=9037438 itps=14800.60 p99=2.15ms conn=48726015/1793376.46,1232041.82,9037438,1000,1000,1000,0,0,0,0,0,0,2349024.56,3592512.02,4279484.63,2417984.01,14801
+[status] PUB sent=90670 tps=426 (pubs=10) | SUB recv=9062641 itps=20000.27 p99=2.16ms conn=48726015/1795721.59,1231802.23,9062641,1000,1000,1000,0,0,0,0,0,0,2515793.70,3550942.55,4225714.88,2564826.18,20001
+[status] PUB sent=91070 tps=424 (pubs=10) | SUB recv=9102639 itps=20009.31 p99=2.16ms conn=48726015/1798993.57,1231391.79,9102639,1000,1000,1000,0,0,0,0,0,0,2505799.37,3623696.71,5272326.57,2603430.23,20008
+[status] PUB sent=91270 tps=422 (pubs=10) | SUB recv=9122639 itps=19997.37 p99=2.17ms conn=48726015/1800385.86,1230782.62,9122639,1000,1000,1000,0,0,0,0,0,0,2393542.88,3362671.74,3801689.21,2434061.77,20000
+[status] PUB sent=91670 tps=420 (pubs=10) | SUB recv=9162633 itps=19990.80 p99=2.17ms conn=48726015/1803282.01,1229793.67,9162633,1000,1000,1000,0,0,0,0,0,0,2405422.84,3512546.65,4476500.29,2474734.56,19990
+[status] PUB sent=92070 tps=418 (pubs=10) | SUB recv=9182644 itps=20010.28 p99=2.18ms conn=48726015/1804655.17,1229222.61,9182644,1000,1000,1000,0,0,0,0,0,0,2382623.02,3354201.14,4115487.90,2433397.63,20011
+[status] PUB sent=92270 tps=418 (pubs=10) | SUB recv=9222632 itps=19999.24 p99=2.18ms conn=48726015/1807377.68,1228062.53,9222632,1000,1000,1000,0,0,0,0,0,0,2394947.49,3366535.56,3971291.08,2438431.72,19998
+[status] PUB sent=92670 tps=416 (pubs=10) | SUB recv=9248843 itps=6202 p99=2.19ms conn=48726015/1809256.73,1227367.75,9248843,1000,1000,1000,0,0,0,0,0,0,2311298.76,3437247.68,3903549.08,2372728.69,6202
+[status] PUB sent=92870 tps=415 (pubs=10) | SUB recv=9282641 itps=19998.91 p99=2.19ms conn=48726015/1811789.82,1226588.30,9282641,1000,1000,1000,0,0,0,0,0,0,2404924.32,3468121.87,4281802.95,2462343.20,19999
+[status] PUB sent=93270 tps=413 (pubs=10) | SUB recv=9320636 itps=17991.93 p99=2.20ms conn=48726015/1814529.84,1225612.44,9320636,1000,1000,1000,0,0,0,0,0,0,2435312.43,3429279.84,4468625.38,2509369.43,17992
+[status] PUB sent=93470 tps=412 (pubs=10) | SUB recv=9342638 itps=19997.65 p99=2.20ms conn=48726015/1816075.61,1225028.26,9342638,1000,1000,1000,0,0,0,0,0,0,2440219.22,3384626.71,3845333.71,2482315.82,19997
+[status] PUB sent=93870 tps=410 (pubs=10) | SUB recv=9382634 itps=19993.85 p99=2.20ms conn=48726015/1818860.76,1223947.24,9382634,1000,1000,1000,0,0,0,0,0,0,2413645.26,3314465.75,3760671.21,2445142.09,19994
+[status] PUB sent=94270 tps=408 (pubs=10) | SUB recv=9402648 itps=20013.52 p99=2.21ms conn=48726015/1820202.64,1223363.64,9402648,1000,1000,1000,0,0,0,0,0,0,2418349.93,3338190.50,3756907.54,2449280.40,20014
+[status] PUB sent=94470 tps=407 (pubs=10) | SUB recv=9442639 itps=20000.32 p99=2.21ms conn=48726015/1822916.93,1222339.65,9442639,1000,1000,1000,0,0,0,0,0,0,2414732.21,3452722.81,3943261.21,2460851.12,20000
+[status] PUB sent=94870 tps=405 (pubs=10) | SUB recv=9471435 itps=8796.68 p99=2.22ms conn=48726015/1824776.18,1221472.10,9471435,1000,1000,1000,0,0,0,0,0,0,2275597.29,3419459.42,4124912.65,2339980.09,8797
+[status] PUB sent=95070 tps=405 (pubs=10) | SUB recv=9502639 itps=20001.24 p99=2.22ms conn=48726015/1827108.77,1220983.60,9502639,1000,1000,1000,0,0,0,0,0,0,2415779.70,3458469.43,4253882.28,2475621.09,20001
+[status] PUB sent=95470 tps=403 (pubs=10) | SUB recv=9542637 itps=19997.39 p99=2.23ms conn=48726015/1829843.74,1219944.91,9542637,1000,1000,1000,0,0,0,0,0,0,2433906.59,3400958.68,3930175.11,2476456.97,19997
+[status] PUB sent=95670 tps=402 (pubs=10) | SUB recv=9562636 itps=19999.27 p99=2.23ms conn=48726015/1831223.98,1219490.76,9562636,1000,1000,1000,0,0,0,0,0,0,2422849.36,3416502.63,4326095.62,2489815.06,19999
+[status] PUB sent=96070 tps=400 (pubs=10) | SUB recv=9602637 itps=20000.13 p99=2.23ms conn=48726015/1833854.19,1218899.50,9602637,1000,1000,1000,0,0,0,0,0,0,2388814.11,3462903.13,5188630.70,2497514.02,20001
+
+=== Summary (fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty) ===
+Publishers: 10 | Subscribers: 1000
+=== Summary ===
+Publisher: sent=96070 total_tps=400.3 connections=10 active=10
+Subscriber: recv=9607000 total_tps=39881.68 p50=1.27ms p95=1.64ms p99=2.23ms connections=48726015 active=1834175.91,1218848.13,9607000,1000,1000,1000,0,0,0,0,0,0,0,0,0,0,0
+Fanout run complete. Artifacts at artifacts/fanout_bursty_20260619_000022_mqtt_rabbitmq_p64_s1000_u10_bursty/fanout_singlesite
+Stopping subscribers (4126661 4126712 4126848 4126953 4127164 4127354 4127529 4127697 4127871 4128028 4128228 4128396 4128556 4128689 4128878 4129035 4129181 4129340 4129530 4129702 4129899 4130067 4130205 4130366 4130523 4130687 4130876 4131047 4131212 4131371 4131558 4131714 4131868 4132065 4132187 4132409 4132575 4132717 4132875 4133035 4133256 4133396 4133539 4133695 4133887 4134073 4134217 4134375 4134543 4134708 4134908 4135058 4135211 4135371 4135546 4135713 4135899 4136052 4136202 4136385 4136581 4136726 4136882 4137041 4137217 4137389 4137554 4137748 4137910 4138085 4138249 4138397 4138576 4138724 4138890 4139053 4139217 4139398 4139576 4139728 4139922 4140077 4140239 4140409 4140576 4140738 4140896 4141063 4141220 4141389 4141593 4141752 4141890 4142062 4142228 4142390 4142565 4142756 4142926 4143073) and publishers (4143391 4143466 4143675 4143801 4143971 4144130 4144309 4144476 4144641 4144820)
+[00:05:25] [remote] ubuntu@192.168.0.245: cd /home/ubuntu && docker compose down
+ Container rabbitmq Stopping 
+ Container rabbitmq Stopped 
+ Container rabbitmq Removing 
+ Container rabbitmq Removed 
+ Network ubuntu_default Removing 
+ Network ubuntu_default Removed 
+[00:05:28] Skipping cooldown after final run (mqtt/rabbitmq)
+[00:05:29] Wrote phase-rate summary: /home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/phase-rate-summary.md
+[00:05:29] Plotting bursty fan-out results to /home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/plots
+[plot] LaTeX mode enabled: PDF + PNG output, 300 DPI
+[plot] Wrote plot points: /home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/raw_data/plot_points.csv
+[plot] Auto/selected plot tuning: bucket_seconds=1, throughput window=5, marker_every=4; latency window=3, marker_every=4; resource window=5, marker_every=3
+[plot] Wrote plots to /home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/plots
+[plot] Wrote gallery: /home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/plots/README.md
+[00:05:34] Done. Phase summary CSV: /home/cc/mq-bench/results/fanout_bursty_load_20260618_235958/raw_data/summary_by_phase.csv

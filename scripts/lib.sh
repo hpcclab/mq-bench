@@ -163,6 +163,12 @@ start_broker_stats_monitor() {
 				  # Emit CSV-like line (no quotes)
 				  ($ts+","+$cid+","+$name+","+($cpu|round2|tostring)+"%"+","+(human($used))+" / "+(human($ml))+","+($mperc|round2|tostring)+"%"+","+(human($rx))+" / "+(human($tx))+","+(human($rbytes))+" / "+(human($wbytes))+","+($pids|tostring)+","+($used|tostring)+","+($ml|tostring)+","+($mperc|round4|tostring)+","+($rx|tostring)+","+($tx|tostring)+","+($rbytes|tostring)+","+($wbytes|tostring)+","+($cpu|round4|tostring))
 				' <<< "$json")
+				[[ -z "$line" ]] && continue
+				IFS=, read -r _ts _cid _name _cpu _mem_usage _mem_perc _net_io _blk_io _pids mem_used_b mem_limit_b _mem_perc_calc net_rx_b net_tx_b _blk_read_b _blk_write_b cpu_perc_num <<<"$line"
+				# Skip synthetic all-zero rows emitted while Docker tears down stats.
+				if [[ "${mem_limit_b}" == "0" && "${mem_used_b}" == "0" && "${net_rx_b}" == "0" && "${net_tx_b}" == "0" && "${cpu_perc_num}" == "0" ]]; then
+					continue
+				fi
 				# Append line
 				echo "$line"
 			done
@@ -358,7 +364,15 @@ make_connect_args() {
 			;;
 		redis)
 			local url="${REDIS_URL:-redis://127.0.0.1:6379}"
-			_out=(--engine redis --connect "url=${url}")
+			if [[ "${role}" == "pub" ]]; then
+				local pub_mode="${REDIS_PUB_MODE:-buffered}"
+				local publish_queue="${REDIS_PUBLISH_QUEUE:-8192}"
+				local publish_batch="${REDIS_PUBLISH_BATCH:-256}"
+				local publish_flush_micros="${REDIS_PUBLISH_FLUSH_MICROS:-250}"
+				_out=(--engine redis --connect "url=${url}" --connect "pub_mode=${pub_mode}" --connect "publish_queue=${publish_queue}" --connect "publish_batch=${publish_batch}" --connect "publish_flush_micros=${publish_flush_micros}")
+			else
+				_out=(--engine redis --connect "url=${url}")
+			fi
 			;;
 		*)
 			echo "[lib] Unsupported ENGINE='${engine}'" >&2
@@ -377,15 +391,28 @@ start_sub() {
 	local log="${1:?log}"; shift
 	local BIN="${BIN:-./target/release/mq-bench}"
 	local SNAPSHOT="${SNAPSHOT:-5}"
+	local SUB_RAMP_UP_SECS="${SUB_RAMP_UP_SECS:-0}"
 	local args=()
 	make_connect_args sub args
-	echo "[sub] ${ENGINE:-zenoh} → ${expr} (subs=${subs})"
+	local fast_count="${SUB_FAST_COUNT:-0}"
+	local latency_sample_rate="${SUB_LATENCY_SAMPLE_RATE:-1000}"
+	local disable_sequence_tracking="${SUB_DISABLE_SEQUENCE_TRACKING:-0}"
+	local -a sub_perf_args=()
+	if [[ "${fast_count}" == "1" || "${fast_count}" == "true" ]]; then
+		sub_perf_args+=(--fast-count --latency-sample-rate "${latency_sample_rate}")
+	fi
+	if [[ "${disable_sequence_tracking}" == "1" || "${disable_sequence_tracking}" == "true" ]]; then
+		sub_perf_args+=(--disable-sequence-tracking)
+	fi
+	echo "[sub] ${ENGINE:-zenoh} → ${expr} (subs=${subs}, ramp_up=${SUB_RAMP_UP_SECS}s, fast_count=${fast_count}, latency_sample_rate=${latency_sample_rate})"
 	local -a CMD=(
 		"${BIN}" --snapshot-interval "${SNAPSHOT}" sub
 		"${args[@]}"
 		--expr "${expr}"
 		--subscribers "${subs}"
+		--ramp-up-secs "${SUB_RAMP_UP_SECS}"
 		--csv "${csv}"
+		"${sub_perf_args[@]}"
 	)
 	print_cmd "${CMD[@]}" && echo "       1>$(printf %q "${log}") 2>&1 &"
 	"${CMD[@]}" >"${log}" 2>&1 &
@@ -393,7 +420,7 @@ start_sub() {
 }
 
 # Start publisher. Sets PID into out var name.
-# Args: OUT_PID_VAR  topic_prefix  payload  rate  duration  csv_path  log_path
+# Args: OUT_PID_VAR  topic_prefix  payload  rate  duration  csv_path  log_path [publishers]
 start_pub() {
 	local -n _outpid="${1:?out pid var}"; shift
 	local topic="${1:?topic}"; shift
@@ -402,17 +429,25 @@ start_pub() {
 	local duration="${1:?duration}"; shift
 	local csv="${1:?csv}"; shift
 	local log="${1:?log}"; shift
+	local publishers="${1:-1}"
 	local BIN="${BIN:-./target/release/mq-bench}"
 	local SNAPSHOT="${SNAPSHOT:-5}"
 	local args=()
 	make_connect_args pub args
 	local rate_flag=()
-	if [[ -n "${rate}" ]] && (( rate > 0 )); then rate_flag=(--rate "${rate}"); fi
-	echo "[pub] ${ENGINE:-zenoh} → ${topic} (payload=${payload}, rate=${rate:-max}, dur=${duration}s)"
+	local profile="${RATE_PROFILE:-}"
+	if [[ -n "${profile}" ]]; then
+		rate_flag=(--rate-profile "${profile}")
+		echo "[pub] ${ENGINE:-zenoh} → ${topic} (payload=${payload}, profile=${profile}, dur=${duration}s)"
+	else
+		if [[ -n "${rate}" ]] && (( rate > 0 )); then rate_flag=(--rate "${rate}"); fi
+		echo "[pub] ${ENGINE:-zenoh} → ${topic} (payload=${payload}, rate=${rate:-max}, dur=${duration}s)"
+	fi
 	local -a CMD=(
 		"${BIN}" --snapshot-interval "${SNAPSHOT}" pub
 		"${args[@]}"
 		--topic-prefix "${topic}"
+		--publishers "${publishers}"
 		--payload "${payload}"
 		"${rate_flag[@]}"
 		--duration "${duration}"
@@ -471,4 +506,3 @@ summarize_common() {
 			"${conns_sub:-0}" "${active_sub:-0}"
 	fi
 }
-

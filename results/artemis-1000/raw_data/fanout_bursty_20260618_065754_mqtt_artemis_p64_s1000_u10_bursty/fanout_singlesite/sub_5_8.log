@@ -1,0 +1,72 @@
+mq-bench starting with run_id: auto
+Writing CSV output to: artifacts/fanout_bursty_20260618_065754_mqtt_artemis_p64_s1000_u10_bursty/fanout_singlesite/sub_5_8.csv
+2026-06-18T06:57:54.906296Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:57:54.906349Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:57:54.906383Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:01.573860Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:01.573970Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:01.574028Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:08.241023Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:08.241133Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:08.241195Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:14.908801Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:14.908903Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:14.908964Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:21.576772Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:21.576832Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:21.576918Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:28.244198Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:28.244279Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:28.244351Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:34.912746Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:34.912800Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:34.912887Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:41.580762Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:41.580837Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:41.580917Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:48.248507Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:48.248559Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:48.248644Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T06:58:54.916686Z  INFO mq_bench::roles::subscriber: Starting subscriber engine=Mqtt key=topic_5 endpoint=None crash_enabled=false
+2026-06-18T06:58:54.916735Z  INFO mq_bench::roles::subscriber: Connected via transport engine=Mqtt
+2026-06-18T06:58:54.916822Z  INFO mq_bench::roles::subscriber: Subscribed to key expression key=topic_5
+2026-06-18T07:02:24.924909Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-de35f34393ef45489824562157aa89be error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:25.457983Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-1a805d14f23e47fa9661b9ea50c2d911 error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:28.256486Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-39d48385d5b7437a91f8974d11b5858e error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:30.926836Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-de35f34393ef45489824562157aa89be error=Network timeout
+2026-06-18T07:02:31.459854Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-1a805d14f23e47fa9661b9ea50c2d911 error=Network timeout
+2026-06-18T07:02:31.586431Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-9f8887f36fca4160abbf821f19cc1938 error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:34.258743Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-39d48385d5b7437a91f8974d11b5858e error=Network timeout
+2026-06-18T07:02:34.923095Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-594e7a3d25274bb28cef758eae2737f6 error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:36.929087Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-de35f34393ef45489824562157aa89be error=Network timeout
+2026-06-18T07:02:37.462103Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-1a805d14f23e47fa9661b9ea50c2d911 error=Network timeout
+2026-06-18T07:02:37.589654Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-9f8887f36fca4160abbf821f19cc1938 error=Network timeout
+2026-06-18T07:02:38.257301Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-5b1e8b67580f4508b5e6c9e81ca684c2 error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:40.261718Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-39d48385d5b7437a91f8974d11b5858e error=Network timeout
+2026-06-18T07:02:40.924899Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-594e7a3d25274bb28cef758eae2737f6 error=Network timeout
+2026-06-18T07:02:41.591614Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-8cb8be8b7edd403291366df700c5a104 error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:42.931550Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-de35f34393ef45489824562157aa89be error=Network timeout
+2026-06-18T07:02:43.464486Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-1a805d14f23e47fa9661b9ea50c2d911 error=Network timeout
+2026-06-18T07:02:43.591999Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-9f8887f36fca4160abbf821f19cc1938 error=Network timeout
+2026-06-18T07:02:44.260546Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-5b1e8b67580f4508b5e6c9e81ca684c2 error=Network timeout
+2026-06-18T07:02:44.923339Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-370a0b2110234f2bb0b5bff05398f30e error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:46.264338Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-39d48385d5b7437a91f8974d11b5858e error=Network timeout
+2026-06-18T07:02:46.927484Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-594e7a3d25274bb28cef758eae2737f6 error=Network timeout
+2026-06-18T07:02:47.594179Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-8cb8be8b7edd403291366df700c5a104 error=Network timeout
+2026-06-18T07:02:48.261764Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-8314574444744c05909dbc859c080546 error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:48.933283Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-de35f34393ef45489824562157aa89be error=Network timeout
+2026-06-18T07:02:49.466576Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-1a805d14f23e47fa9661b9ea50c2d911 error=Network timeout
+2026-06-18T07:02:49.594092Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-9f8887f36fca4160abbf821f19cc1938 error=Network timeout
+2026-06-18T07:02:50.262586Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-5b1e8b67580f4508b5e6c9e81ca684c2 error=Network timeout
+2026-06-18T07:02:50.925422Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-370a0b2110234f2bb0b5bff05398f30e error=Network timeout
+2026-06-18T07:02:51.588068Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-4967a67d9b0c47179b68089515efe183 error=Mqtt state: Last pingreq isn't acked
+2026-06-18T07:02:52.266621Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-39d48385d5b7437a91f8974d11b5858e error=Network timeout
+2026-06-18T07:02:52.929132Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-594e7a3d25274bb28cef758eae2737f6 error=Network timeout
+2026-06-18T07:02:53.596746Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-8cb8be8b7edd403291366df700c5a104 error=Network timeout
+2026-06-18T07:02:54.264274Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-8314574444744c05909dbc859c080546 error=Network timeout
+2026-06-18T07:02:54.935772Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-de35f34393ef45489824562157aa89be error=Network timeout
+2026-06-18T07:02:55.468038Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-1a805d14f23e47fa9661b9ea50c2d911 error=Network timeout
+2026-06-18T07:02:55.596549Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-9f8887f36fca4160abbf821f19cc1938 error=Network timeout
+2026-06-18T07:02:56.264042Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-5b1e8b67580f4508b5e6c9e81ca684c2 error=Network timeout
+2026-06-18T07:02:56.926880Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-370a0b2110234f2bb0b5bff05398f30e error=Network timeout
+2026-06-18T07:02:57.590561Z  WARN mq_bench::transport::mqtt: MQTT subscription eventloop error; continuing poll loop client_id=sub-mqb-5bfe12c8e69e3d1c-4967a67d9b0c47179b68089515efe183 error=Network timeout
